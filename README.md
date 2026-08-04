@@ -36,12 +36,7 @@ Versiunea inițială `0.1.0` livrează fundația tehnică și primul vertical sl
 
 ## Pornire locală
 
-Cerințe:
-
-- Node.js `24.17+`;
-- npm `11+`;
-- Python `3.13`;
-- `uv`.
+Cerințe: Node.js 24, npm 11, Python 3.13 și `uv`.
 
 ```bash
 cp .env.example .env
@@ -50,9 +45,9 @@ uv sync --project apps/api --all-groups
 npm run dev
 ```
 
-Aplicația web: `http://localhost:3100`  
-API: `http://localhost:8100`  
-OpenAPI: `http://localhost:8100/docs`
+- Web: `http://localhost:3100`
+- API: `http://localhost:8100`
+- OpenAPI: `http://localhost:8100/docs`
 
 Modul implicit este `demo`, deci aplicația pornește fără baza de date Retail.
 
@@ -87,6 +82,7 @@ npm run verify
 - [Sistem de design](docs/DESIGN_SYSTEM.md)
 - [Dezvoltare locală](docs/DEVELOPMENT.md)
 - [Deploy](docs/DEPLOYMENT.md)
+- [Autorizare și date sensibile](docs/AUTHORIZATION.md)
 - [ADR-uri](docs/adr/)
 
 ## Principii
