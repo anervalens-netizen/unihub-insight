@@ -62,13 +62,12 @@ async def module_analytics(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Capability {required.value} is required.",
         )
-    get_module = getattr(repository, "get_module", None)
-    if get_module is None:
+    if module in {ModuleId.FINANCE, ModuleId.PLANNING} and scope.agent:
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="The live module adapter is not initialized.",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Filtrul Agent nu este compatibil cu modulul {module.value}.",
         )
-    return await get_module(module, scope)
+    return await repository.get_module(module, scope)
 
 
 @router.get("/catalog/metrics", response_model=list[MetricDefinition])
