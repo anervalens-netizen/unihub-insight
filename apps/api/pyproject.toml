@@ -1,0 +1,52 @@
+[project]
+name = "unihub-insight-api"
+version = "0.1.0"
+description = "Read-only analytics API for UniHub Insight."
+readme = "../../README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+  "asyncpg==0.31.0",
+  "fastapi[standard]==0.139.2",
+  "orjson==3.11.9",
+  "pydantic-settings==2.14.2",
+]
+
+[dependency-groups]
+dev = [
+  "httpx==0.28.1",
+  "mypy==2.3.0",
+  "pytest==9.1.1",
+  "pytest-asyncio==1.4.0",
+  "ruff==0.15.22",
+]
+
+[build-system]
+requires = ["hatchling==1.28.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/unihub_insight_api"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC", "RUF"]
+ignore = ["B008"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+plugins = ["pydantic.mypy"]
+mypy_path = "src"
+exclude = ["tests/"]
