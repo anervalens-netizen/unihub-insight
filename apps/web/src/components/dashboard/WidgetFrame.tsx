@@ -1,4 +1,4 @@
-import { Expand, GripHorizontal, X } from 'lucide-react';
+import { Expand, GripHorizontal, TableProperties, X } from 'lucide-react';
 import { type ReactNode, useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -6,11 +6,13 @@ export function WidgetFrame({
   title,
   subtitle,
   editMode,
+  onInspect,
   children,
 }: {
   title: string;
   subtitle?: string;
   editMode: boolean;
+  onInspect?: () => void;
   children: ReactNode;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -38,14 +40,16 @@ export function WidgetFrame({
         </div>
         {subtitle ? <p>{subtitle}</p> : null}
       </div>
-      <button
-        type="button"
-        className="icon-button"
-        aria-label={`Extinde ${title}`}
-        onClick={() => setExpanded(true)}
-      >
-        <Expand size={15} />
-      </button>
+      <div className="widget-actions">
+        {onInspect ? (
+          <button type="button" className="icon-button" aria-label={`Inspectează datele ${title}`} onClick={onInspect}>
+            <TableProperties size={15} />
+          </button>
+        ) : null}
+        <button type="button" className="icon-button" aria-label={`Extinde ${title}`} onClick={() => setExpanded(true)}>
+          <Expand size={15} />
+        </button>
+      </div>
     </header>
   );
 
@@ -57,29 +61,14 @@ export function WidgetFrame({
       </article>
       {expanded
         ? createPortal(
-            <div
-              className="widget-modal-backdrop"
-              role="presentation"
-              onMouseDown={() => setExpanded(false)}
-            >
-              <section
-                className="widget-modal"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby={`${headingId}-expanded`}
-                onMouseDown={(event) => event.stopPropagation()}
-              >
+            <div className="widget-modal-backdrop" role="presentation" onMouseDown={() => setExpanded(false)}>
+              <section className="widget-modal" role="dialog" aria-modal="true" aria-labelledby={`${headingId}-expanded`} onMouseDown={(event) => event.stopPropagation()}>
                 <header className="widget-header widget-header--modal">
                   <div>
                     <h2 id={`${headingId}-expanded`}>{title}</h2>
                     {subtitle ? <p>{subtitle}</p> : null}
                   </div>
-                  <button
-                    type="button"
-                    className="icon-button"
-                    aria-label="Închide"
-                    onClick={() => setExpanded(false)}
-                  >
+                  <button type="button" className="icon-button" aria-label="Închide" onClick={() => setExpanded(false)}>
                     <X size={17} />
                   </button>
                 </header>

@@ -5,17 +5,14 @@ import { useEffect, useMemo, useRef } from 'react';
 import type { DashboardLayoutItem, DashboardWidgetDefinition } from './types';
 import { WidgetFrame } from './WidgetFrame';
 
-const STORAGE_VERSION = 1;
+const STORAGE_VERSION = 2;
 
 interface StoredLayout {
   version: number;
   items: DashboardLayoutItem[];
 }
 
-function readLayout(
-  storageKey: string,
-  defaults: DashboardWidgetDefinition[],
-): DashboardLayoutItem[] {
+function readLayout(storageKey: string, defaults: DashboardWidgetDefinition[]): DashboardLayoutItem[] {
   try {
     const raw = localStorage.getItem(storageKey);
     if (!raw) return defaults;
@@ -30,9 +27,7 @@ function readLayout(
 }
 
 function toStoredItem(node: GridStackNode): DashboardLayoutItem | null {
-  if (!node.id || node.x === undefined || node.y === undefined || !node.w || !node.h) {
-    return null;
-  }
+  if (!node.id || node.x === undefined || node.y === undefined || !node.w || !node.h) return null;
   return {
     id: String(node.id),
     x: node.x,
@@ -49,25 +44,23 @@ export function DashboardCanvas({
   editMode,
   resetToken,
   storageKey,
+  onInspect,
 }: {
   widgets: DashboardWidgetDefinition[];
   editMode: boolean;
   resetToken: number;
   storageKey: string;
+  onInspect?: (widgetId: string) => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<GridStack | null>(null);
   const previousResetToken = useRef(resetToken);
   const initialLayout = useMemo(() => readLayout(storageKey, widgets), [storageKey, widgets]);
-  const layoutById = useMemo(
-    () => new Map(initialLayout.map((item) => [item.id, item])),
-    [initialLayout],
-  );
+  const layoutById = useMemo(() => new Map(initialLayout.map((item) => [item.id, item])), [initialLayout]);
 
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-
     const grid = GridStack.init(
       {
         column: 24,
@@ -83,17 +76,12 @@ export function DashboardCanvas({
       host,
     );
     gridRef.current = grid;
-
     const persist = (): void => {
       const items = (grid.save(false) as GridStackWidget[])
         .map((item) => toStoredItem(item as GridStackNode))
         .filter((item): item is DashboardLayoutItem => item !== null);
-      localStorage.setItem(
-        storageKey,
-        JSON.stringify({ version: STORAGE_VERSION, items } satisfies StoredLayout),
-      );
+      localStorage.setItem(storageKey, JSON.stringify({ version: STORAGE_VERSION, items } satisfies StoredLayout));
     };
-
     grid.on('change', persist);
     return () => {
       grid.off('change', persist);
@@ -111,7 +99,6 @@ export function DashboardCanvas({
     previousResetToken.current = resetToken;
     const grid = gridRef.current;
     if (!grid) return;
-
     grid.batchUpdate();
     for (const widget of widgets) {
       const element = hostRef.current?.querySelector<HTMLElement>(`[gs-id="${widget.id}"]`);
@@ -136,19 +123,9 @@ export function DashboardCanvas({
         const position = layoutById.get(widget.id) ?? widget;
         const Widget = widget.component;
         return (
-          <div
-            key={widget.id}
-            className="grid-stack-item"
-            gs-id={widget.id}
-            gs-x={position.x}
-            gs-y={position.y}
-            gs-w={position.w}
-            gs-h={position.h}
-            gs-min-w={widget.minW}
-            gs-min-h={widget.minH}
-          >
+          <div key={widget.id} className="grid-stack-item" gs-id={widget.id} gs-x={position.x} gs-y={position.y} gs-w={position.w} gs-h={position.h} gs-min-w={widget.minW} gs-min-h={widget.minH}>
             <div className="grid-stack-item-content">
-              <WidgetFrame title={widget.title} subtitle={widget.subtitle} editMode={editMode}>
+              <WidgetFrame title={widget.title} subtitle={widget.subtitle} editMode={editMode} onInspect={onInspect ? () => onInspect(widget.id) : undefined}>
                 <Widget />
               </WidgetFrame>
             </div>
