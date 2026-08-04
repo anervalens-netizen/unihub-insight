@@ -34,7 +34,7 @@ jobs:
             exit 0
           fi
           cat .bootstrap/chunk-* > /tmp/unihub-insight-source.tar.gz.b64
-          base64 --decode /tmp/unihub-insight-source.tar.gz.b64 > /tmp/unihub-insight-source.tar.gz
+          base64 --decode --ignore-garbage /tmp/unihub-insight-source.tar.gz.b64 > /tmp/unihub-insight-source.tar.gz
           echo "5591ddab1fc5a97dab408662e04d6bb12f259e32175dfa25db31fc06b3a24534  /tmp/unihub-insight-source.tar.gz" | sha256sum --check -
           tar -xzf /tmp/unihub-insight-source.tar.gz -C .
           rm -rf .bootstrap
