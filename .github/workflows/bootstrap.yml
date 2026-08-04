@@ -33,8 +33,20 @@ jobs:
             echo "expanded=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          cat > /tmp/chunks.sha256 <<'EOF'
+          eaf8893b03a6cfacd74c47de911bce3d8659600c5e12fd1e570c60b3a0a8447b  .bootstrap/chunk-00
+          9f1853fbe9245a1882e252bd9d8ed61a49b9c41e268540abb0a1b5992e7f9af5  .bootstrap/chunk-01
+          ae19b9895ddc2308577e976fb5f9dec7668f61a7ba98944c948d31d609df495c  .bootstrap/chunk-02
+          b914555f0d98cbc23e3a57438cdc99fbf6fa0b76d5b236c1def7a65df3468ae5  .bootstrap/chunk-03
+          0bc19480037672abb28e3610698de15994c2a9fbc122b000a84e9ecd8edfb88e  .bootstrap/chunk-04
+          344bb4116eb0b5f770772914d39d1a21f32277052c681fc88c1f5fdb5e3d3b6b  .bootstrap/chunk-05
+          b906c72d70e71028d17384779e81a223f664ce8395c5427aff1d614fcacf7a50  .bootstrap/chunk-06
+          6e4bdc2244aac084dd468cbc22b0914085b422a46a6737ee90ce40c90f2ec249  .bootstrap/chunk-07
+          db26d2358054faf07177099579217ade77d1e792e4023fb8b33b34fd5117085f  .bootstrap/chunk-08
+          EOF
+          sha256sum --check /tmp/chunks.sha256
           cat .bootstrap/chunk-* > /tmp/unihub-insight-source.tar.gz.b64
-          base64 --decode --ignore-garbage /tmp/unihub-insight-source.tar.gz.b64 > /tmp/unihub-insight-source.tar.gz
+          base64 --decode /tmp/unihub-insight-source.tar.gz.b64 > /tmp/unihub-insight-source.tar.gz
           echo "5591ddab1fc5a97dab408662e04d6bb12f259e32175dfa25db31fc06b3a24534  /tmp/unihub-insight-source.tar.gz" | sha256sum --check -
           tar -xzf /tmp/unihub-insight-source.tar.gz -C .
           rm -rf .bootstrap
