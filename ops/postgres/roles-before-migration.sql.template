@@ -1,0 +1,39 @@
+-- Run as the owner of database unihub after replacing the three passwords.
+-- Keep passwords outside Git and shell history where possible.
+
+CREATE ROLE unihub_insight_reader LOGIN PASSWORD 'REPLACE_READER_PASSWORD';
+ALTER ROLE unihub_insight_reader SET default_transaction_read_only = on;
+ALTER ROLE unihub_insight_reader SET statement_timeout = '2500ms';
+ALTER ROLE unihub_insight_reader SET lock_timeout = '1000ms';
+GRANT CONNECT ON DATABASE unihub TO unihub_insight_reader;
+GRANT USAGE ON SCHEMA public TO unihub_insight_reader;
+GRANT SELECT ON TABLE
+    reporting_agent_day,
+    reporting_agent_month,
+    reporting_category_month,
+    reporting_focus_item_month,
+    reporting_agent_profile,
+    reporting_agent_lifecycle_month,
+    store_targets,
+    agent_targets,
+    import_snapshots,
+    stores,
+    grile_store_current_status,
+    salary_records,
+    agent_salary_links,
+    store_pnl_monthly,
+    store_pnl_site_links,
+    ai_forecast_runs,
+    ai_forecast_store_month
+TO unihub_insight_reader;
+
+CREATE ROLE unihub_insight_migrator LOGIN PASSWORD 'REPLACE_MIGRATOR_PASSWORD';
+ALTER ROLE unihub_insight_migrator SET statement_timeout = '30s';
+ALTER ROLE unihub_insight_migrator SET lock_timeout = '5s';
+GRANT CONNECT, CREATE ON DATABASE unihub TO unihub_insight_migrator;
+GRANT USAGE ON SCHEMA public TO unihub_insight_migrator;
+
+CREATE ROLE unihub_insight_metadata LOGIN PASSWORD 'REPLACE_METADATA_PASSWORD';
+ALTER ROLE unihub_insight_metadata SET statement_timeout = '2500ms';
+ALTER ROLE unihub_insight_metadata SET lock_timeout = '1000ms';
+GRANT CONNECT ON DATABASE unihub TO unihub_insight_metadata;
