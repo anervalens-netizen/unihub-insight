@@ -1,0 +1,62 @@
+name: Verify
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/verify-now
+
+permissions:
+  contents: write
+
+concurrency:
+  group: unihub-insight-verify
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install web dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Install API dependencies
+        run: uv sync --project apps/api --all-groups
+
+      - name: Normalize formatting
+        run: npm run format
+
+      - name: Verify source
+        run: npm run verify
+
+      - name: Persist verified locks and formatting
+        run: |
+          rm -rf .bootstrap
+          rm -f .github/verify-now
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "build: persist verified dependency locks"
+            git push
+          fi
