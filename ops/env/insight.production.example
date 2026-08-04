@@ -1,0 +1,19 @@
+UNIHUB_INSIGHT_ENVIRONMENT=production
+UNIHUB_INSIGHT_DATA_MODE=postgres
+UNIHUB_INSIGHT_AUTH_MODE=proxy
+UNIHUB_INSIGHT_DATABASE_URL=postgresql://unihub_insight_reader:REPLACE@127.0.0.1:5432/unihub
+UNIHUB_INSIGHT_METADATA_DATABASE_URL=postgresql://unihub_insight_metadata:REPLACE@127.0.0.1:5432/unihub
+UNIHUB_INSIGHT_TRUSTED_PROXY_SECRET=REPLACE_WITH_64_HEX_CHARACTERS
+UNIHUB_INSIGHT_ALLOWED_ORIGINS=https://insight.unihub.ro
+UNIHUB_INSIGHT_DB_POOL_MIN_SIZE=1
+UNIHUB_INSIGHT_DB_POOL_MAX_SIZE=6
+UNIHUB_INSIGHT_METADATA_POOL_MAX_SIZE=3
+UNIHUB_INSIGHT_STATEMENT_TIMEOUT_MS=2500
+UNIHUB_INSIGHT_ANALYTICS_GROUPS=unihub-manager,unihub-analytics,unihub-admin,authentik Admins
+UNIHUB_INSIGHT_MANAGEMENT_GROUPS=unihub-manager,unihub-admin,authentik Admins
+UNIHUB_INSIGHT_HR_GROUPS=unihub-hr,unihub-admin,authentik Admins
+UNIHUB_INSIGHT_PNL_GROUPS=unihub-pnl,unihub-admin,authentik Admins
+UNIHUB_INSIGHT_ADMIN_GROUPS=unihub-admin,authentik Admins
+
+# Used only by the one-shot migration service, never by the API runtime.
+UNIHUB_INSIGHT_MIGRATION_DATABASE_URL=postgresql://unihub_insight_migrator:REPLACE@127.0.0.1:5432/unihub
