@@ -1,0 +1,19 @@
+[Unit]
+Description=Backup UniHub Insight metadata
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/unihub-insight/current
+ExecStart=/bin/bash /opt/unihub-insight/current/ops/scripts/backup-metadata.sh
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/backups/unihub-insight
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+UMask=0077
+TimeoutStartSec=300
