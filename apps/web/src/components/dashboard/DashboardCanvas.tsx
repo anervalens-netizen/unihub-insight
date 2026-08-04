@@ -6,11 +6,7 @@ import type { DashboardLayoutItem, DashboardWidgetDefinition } from './types';
 import { WidgetFrame } from './WidgetFrame';
 
 const STORAGE_VERSION = 2;
-
-interface StoredLayout {
-  version: number;
-  items: DashboardLayoutItem[];
-}
+interface StoredLayout { version: number; items: DashboardLayoutItem[]; }
 
 function readLayout(storageKey: string, defaults: DashboardWidgetDefinition[]): DashboardLayoutItem[] {
   try {
@@ -28,30 +24,10 @@ function readLayout(storageKey: string, defaults: DashboardWidgetDefinition[]): 
 
 function toStoredItem(node: GridStackNode): DashboardLayoutItem | null {
   if (!node.id || node.x === undefined || node.y === undefined || !node.w || !node.h) return null;
-  return {
-    id: String(node.id),
-    x: node.x,
-    y: node.y,
-    w: node.w,
-    h: node.h,
-    ...(node.minW ? { minW: node.minW } : {}),
-    ...(node.minH ? { minH: node.minH } : {}),
-  };
+  return { id: String(node.id), x: node.x, y: node.y, w: node.w, h: node.h, ...(node.minW ? { minW: node.minW } : {}), ...(node.minH ? { minH: node.minH } : {}) };
 }
 
-export function DashboardCanvas({
-  widgets,
-  editMode,
-  resetToken,
-  storageKey,
-  onInspect,
-}: {
-  widgets: DashboardWidgetDefinition[];
-  editMode: boolean;
-  resetToken: number;
-  storageKey: string;
-  onInspect?: (widgetId: string) => void;
-}) {
+export function DashboardCanvas({ widgets, editMode, resetToken, storageKey, onInspect, onLayoutChange }: { widgets: DashboardWidgetDefinition[]; editMode: boolean; resetToken: number; storageKey: string; onInspect?: (widgetId: string) => void; onLayoutChange?: (items: DashboardLayoutItem[]) => void; }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<GridStack | null>(null);
   const previousResetToken = useRef(resetToken);
@@ -61,77 +37,39 @@ export function DashboardCanvas({
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-    const grid = GridStack.init(
-      {
-        column: 24,
-        cellHeight: 28,
-        margin: 10,
-        float: false,
-        animate: true,
-        staticGrid: true,
-        handle: '.widget-drag-handle',
-        resizable: { handles: 'e,se,s,sw,w' },
-        minRow: 1,
-      },
-      host,
-    );
+    const grid = GridStack.init({ column: 24, cellHeight: 28, margin: 10, float: false, animate: true, staticGrid: true, handle: '.widget-drag-handle', resizable: { handles: 'e,se,s,sw,w' }, minRow: 1 }, host);
     gridRef.current = grid;
     const persist = (): void => {
-      const items = (grid.save(false) as GridStackWidget[])
-        .map((item) => toStoredItem(item as GridStackNode))
-        .filter((item): item is DashboardLayoutItem => item !== null);
+      const items = (grid.save(false) as GridStackWidget[]).map((item) => toStoredItem(item as GridStackNode)).filter((item): item is DashboardLayoutItem => item !== null);
       localStorage.setItem(storageKey, JSON.stringify({ version: STORAGE_VERSION, items } satisfies StoredLayout));
+      onLayoutChange?.(items);
     };
     grid.on('change', persist);
-    return () => {
-      grid.off('change', persist);
-      grid.destroy(false);
-      gridRef.current = null;
-    };
-  }, [storageKey]);
+    return () => { grid.off('change', persist); grid.destroy(false); gridRef.current = null; };
+  }, [onLayoutChange, storageKey]);
 
-  useEffect(() => {
-    gridRef.current?.setStatic(!editMode);
-  }, [editMode]);
+  useEffect(() => { gridRef.current?.setStatic(!editMode); }, [editMode]);
 
   useEffect(() => {
     if (previousResetToken.current === resetToken) return;
     previousResetToken.current = resetToken;
     const grid = gridRef.current;
     if (!grid) return;
+    const defaults: DashboardLayoutItem[] = widgets.map((widget) => ({ id: widget.id, x: widget.x, y: widget.y, w: widget.w, h: widget.h, ...(widget.minW === undefined ? {} : { minW: widget.minW }), ...(widget.minH === undefined ? {} : { minH: widget.minH }) }));
     grid.batchUpdate();
     for (const widget of widgets) {
       const element = hostRef.current?.querySelector<HTMLElement>(`[gs-id="${widget.id}"]`);
-      if (element) {
-        grid.update(element, {
-          x: widget.x,
-          y: widget.y,
-          w: widget.w,
-          h: widget.h,
-          ...(widget.minW === undefined ? {} : { minW: widget.minW }),
-          ...(widget.minH === undefined ? {} : { minH: widget.minH }),
-        });
-      }
+      if (element) grid.update(element, { x: widget.x, y: widget.y, w: widget.w, h: widget.h, ...(widget.minW === undefined ? {} : { minW: widget.minW }), ...(widget.minH === undefined ? {} : { minH: widget.minH }) });
     }
     grid.batchUpdate(false);
     localStorage.removeItem(storageKey);
-  }, [resetToken, storageKey, widgets]);
+    onLayoutChange?.(defaults);
+  }, [onLayoutChange, resetToken, storageKey, widgets]);
 
-  return (
-    <div ref={hostRef} className={`grid-stack insight-grid ${editMode ? 'is-editing' : ''}`}>
-      {widgets.map((widget) => {
-        const position = layoutById.get(widget.id) ?? widget;
-        const Widget = widget.component;
-        return (
-          <div key={widget.id} className="grid-stack-item" gs-id={widget.id} gs-x={position.x} gs-y={position.y} gs-w={position.w} gs-h={position.h} gs-min-w={widget.minW} gs-min-h={widget.minH}>
-            <div className="grid-stack-item-content">
-              <WidgetFrame title={widget.title} subtitle={widget.subtitle} editMode={editMode} onInspect={onInspect ? () => onInspect(widget.id) : undefined}>
-                <Widget />
-              </WidgetFrame>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
+  return <div ref={hostRef} className={`grid-stack insight-grid ${editMode ? 'is-editing' : ''}`}>{widgets.map((widget) => {
+    const position = layoutById.get(widget.id) ?? widget;
+    const Widget = widget.component;
+    const inspectProps = onInspect ? { onInspect: () => onInspect(widget.id) } : {};
+    return <div key={widget.id} className="grid-stack-item" gs-id={widget.id} gs-x={position.x} gs-y={position.y} gs-w={position.w} gs-h={position.h} gs-min-w={widget.minW} gs-min-h={widget.minH}><div className="grid-stack-item-content"><WidgetFrame title={widget.title} subtitle={widget.subtitle} editMode={editMode} {...inspectProps}><Widget /></WidgetFrame></div></div>;
+  })}</div>;
 }
