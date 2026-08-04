@@ -23,4 +23,13 @@ export const moduleMetrics: Record<DashboardWidget['module'], Array<{ id: string
   finance: [{ id: 'finance.revenue', label: 'Venit net' }, { id: 'finance.ebit', label: 'EBIT' }, { id: 'finance.ebit_margin', label: 'Marjă EBIT' }, { id: 'finance.operating_costs', label: 'Cost operațional' }],
   planning: [{ id: 'planning.forecast', label: 'Forecast' }, { id: 'planning.target_gap', label: 'Gap target' }, { id: 'planning.accuracy', label: 'Acuratețe' }, { id: 'planning.actual', label: 'Actual' }],
 };
-export const compatibleVisualizations: DashboardWidget['visualization'][] = ['kpi', 'line', 'area', 'bar', 'donut', 'heatmap', 'scatter', 'waterfall', 'table'];
+
+export const moduleVisualizations: Record<DashboardWidget['module'], DashboardWidget['visualization'][]> = {
+  sales: ['kpi', 'line', 'area', 'bar', 'donut', 'heatmap', 'scatter', 'table'],
+  performance: ['kpi', 'line', 'bar', 'heatmap', 'scatter', 'table'],
+  campaigns: ['kpi', 'line', 'area', 'bar', 'donut', 'heatmap', 'table'],
+  workforce: ['kpi', 'line', 'bar', 'donut', 'heatmap', 'table'],
+  compensation: ['kpi', 'line', 'bar', 'donut', 'heatmap', 'scatter', 'table'],
+  finance: ['kpi', 'line', 'area', 'bar', 'donut', 'heatmap', 'waterfall', 'table'],
+  planning: ['kpi', 'line', 'area', 'bar', 'heatmap', 'scatter', 'table'],
+};
