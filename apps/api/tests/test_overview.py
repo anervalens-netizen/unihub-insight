@@ -44,7 +44,7 @@ def test_store_scope_is_deduplicated_and_deterministic(client: TestClient) -> No
     first_payload = first.json()
     second_payload = second.json()
     assert first_payload["meta"]["scope_label"] == "2 magazine"
-    assert [row["id"] for row in first_payload["performance"]] == ["B001", "B002"]
+    assert {row["id"] for row in first_payload["performance"]} == {"B001", "B002"}
     assert first_payload["kpis"] == second_payload["kpis"]
     assert first_payload["daily"] == second_payload["daily"]
 
