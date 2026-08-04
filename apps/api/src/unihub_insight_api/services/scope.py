@@ -19,16 +19,19 @@ def previous_period(period: str, comparison: ComparisonMode) -> str | None:
 
 def scope_label(scope: AnalyticsScope) -> str:
     segments: list[str] = []
-    if scope.firm:
-        segments.append(scope.firm)
-    if scope.regional:
-        segments.append(scope.regional)
-    if scope.asm:
-        segments.append(scope.asm)
     if scope.stores:
         segments.append(
-            scope.stores[0] if len(scope.stores) == 1 else f"{len(scope.stores)} magazine"
+            f"Magazin {scope.stores[0]}"
+            if len(scope.stores) == 1
+            else f"{len(scope.stores)} magazine"
         )
+    else:
+        if scope.firm:
+            segments.append(scope.firm)
+        if scope.regional:
+            segments.append(scope.regional)
+        if scope.asm:
+            segments.append(scope.asm)
     if scope.agent:
         segments.append(scope.agent)
     return " · ".join(segments) if segments else "Toată rețeaua"

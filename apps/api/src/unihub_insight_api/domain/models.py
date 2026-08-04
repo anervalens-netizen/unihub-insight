@@ -37,6 +37,49 @@ class AlertSeverity(StrEnum):
     CRITICAL = "critical"
 
 
+class Capability(StrEnum):
+    ANALYTICS = "insight:analytics"
+    MANAGEMENT = "insight:management"
+    HR = "insight:hr"
+    PNL = "insight:pnl"
+    ADMIN = "insight:admin"
+
+
+class ModuleId(StrEnum):
+    SALES = "sales"
+    PERFORMANCE = "performance"
+    CAMPAIGNS = "campaigns"
+    WORKFORCE = "workforce"
+    COMPENSATION = "compensation"
+    FINANCE = "finance"
+    PLANNING = "planning"
+
+
+class ChartKind(StrEnum):
+    LINE = "line"
+    AREA = "area"
+    BAR = "bar"
+    STACKED_BAR = "stacked-bar"
+    DONUT = "donut"
+    HEATMAP = "heatmap"
+    SCATTER = "scatter"
+    WATERFALL = "waterfall"
+    TABLE = "table"
+    KPI = "kpi"
+
+
+class FilterMode(StrEnum):
+    INHERIT = "inherit"
+    AUGMENT = "augment"
+    OVERRIDE = "override"
+    IGNORE = "ignore"
+
+
+class DashboardVisibility(StrEnum):
+    PRIVATE = "private"
+    SHARED = "shared"
+
+
 class AnalyticsScope(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -47,6 +90,17 @@ class AnalyticsScope(BaseModel):
     asm: str | None = None
     stores: tuple[str, ...] = ()
     agent: str | None = None
+
+
+class UserContext(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    subject: str
+    email: str | None = None
+    name: str | None = None
+    groups: tuple[str, ...] = ()
+    capabilities: frozenset[Capability]
+    is_demo: bool = False
 
 
 class FilterStore(BaseModel):
@@ -153,4 +207,106 @@ class MetricDefinition(BaseModel):
     allowed_grains: tuple[str, ...]
     comparison_policy: str
     missing_policy: str
-    required_capability: str = "insight:analytics"
+    required_capability: Capability = Capability.ANALYTICS
+
+
+class ValueAxis(BaseModel):
+    key: str
+    label: str
+    unit: MetricUnit
+
+
+class TrendPoint(BaseModel):
+    key: str
+    label: str
+    primary: Decimal | None
+    comparison: Decimal | None = None
+    target: Decimal | None = None
+    secondary: Decimal | None = None
+    is_estimate: bool = False
+
+
+class BreakdownRow(BaseModel):
+    id: str
+    label: str
+    context: str
+    primary: Decimal
+    secondary: Decimal | None = None
+    tertiary: Decimal | None = None
+    progress_pct: Decimal | None = None
+    delta_pct: Decimal | None = None
+    risk: RiskLevel = RiskLevel.HEALTHY
+
+
+class MatrixCell(BaseModel):
+    x: str
+    y: str
+    value: Decimal
+    label: str | None = None
+    risk: RiskLevel = RiskLevel.HEALTHY
+
+
+class ModuleAnalyticsResponse(BaseModel):
+    meta: OverviewMeta
+    module: ModuleId
+    title: str
+    description: str
+    required_capability: Capability
+    axes: tuple[ValueAxis, ...]
+    supported_charts: tuple[ChartKind, ...]
+    kpis: list[KpiMetric]
+    trend: list[TrendPoint]
+    distribution: list[DimensionShare]
+    breakdown: list[BreakdownRow]
+    matrix: list[MatrixCell]
+    alerts: list[InsightAlert]
+
+
+class DashboardLayout(BaseModel):
+    x: int = Field(ge=0, le=23)
+    y: int = Field(ge=0)
+    w: int = Field(ge=2, le=24)
+    h: int = Field(ge=2, le=40)
+    min_w: int = Field(default=2, ge=2, le=24)
+    min_h: int = Field(default=2, ge=2, le=40)
+
+
+class DashboardWidget(BaseModel):
+    id: str = Field(min_length=1, max_length=100)
+    module: ModuleId
+    title: str = Field(min_length=1, max_length=160)
+    metric_id: str = Field(min_length=1, max_length=160)
+    visualization: ChartKind
+    dimension: str | None = Field(default=None, max_length=100)
+    time_grain: str = Field(default="month", max_length=40)
+    filter_mode: FilterMode = FilterMode.INHERIT
+    filters: dict[str, str] = Field(default_factory=dict)
+    options: dict[str, str | int | float | bool] = Field(default_factory=dict)
+    layout: DashboardLayout
+
+
+class DashboardCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    description: str = Field(default="", max_length=600)
+    visibility: DashboardVisibility = DashboardVisibility.PRIVATE
+    widgets: list[DashboardWidget] = Field(default_factory=list, max_length=80)
+
+
+class DashboardUpdateRequest(DashboardCreateRequest):
+    version: int = Field(ge=1)
+
+
+class DashboardDocument(BaseModel):
+    id: str
+    name: str
+    description: str
+    owner_subject: str
+    visibility: DashboardVisibility
+    version: int
+    widgets: list[DashboardWidget]
+    created_at: datetime
+    updated_at: datetime
+
+
+class DashboardListResponse(BaseModel):
+    items: list[DashboardDocument]

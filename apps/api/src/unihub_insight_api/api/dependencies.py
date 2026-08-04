@@ -4,9 +4,11 @@ from typing import Annotated, cast
 
 from fastapi import Depends, HTTPException, Query, Request, status
 
+from unihub_insight_api.auth import get_current_user, require_capability
 from unihub_insight_api.config import Settings
-from unihub_insight_api.domain import AnalyticsScope, ComparisonMode
+from unihub_insight_api.domain import AnalyticsScope, Capability, ComparisonMode, UserContext
 from unihub_insight_api.repositories import AnalyticsRepository, DemoAnalyticsRepository
+from unihub_insight_api.repositories.dashboards import DashboardStore
 
 
 def parse_stores(value: str | None) -> tuple[str, ...]:
@@ -43,21 +45,37 @@ async def analytics_scope(
 
 
 async def get_repository(request: Request) -> AnalyticsRepository:
+    repository = getattr(request.app.state, "analytics_repository", None)
+    if repository is not None:
+        return cast(AnalyticsRepository, repository)
+
     settings = cast(Settings, request.app.state.settings)
     if settings.data_mode == "demo":
-        return DemoAnalyticsRepository()
+        repository = DemoAnalyticsRepository()
+        request.app.state.analytics_repository = repository
+        return cast(AnalyticsRepository, repository)
 
-    pool = getattr(request.app.state, "pool", None)
-    if pool is None:
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Analytics repository is unavailable.",
+    )
+
+
+async def get_dashboard_store(request: Request) -> DashboardStore:
+    store = getattr(request.app.state, "dashboard_store", None)
+    if store is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="PostgreSQL analytics pool is unavailable.",
+            detail="Dashboard metadata store is unavailable.",
         )
-
-    from unihub_insight_api.repositories.postgres import PostgresAnalyticsRepository
-
-    return cast(AnalyticsRepository, PostgresAnalyticsRepository(pool))
+    return cast(DashboardStore, store)
 
 
 RepositoryDependency = Annotated[AnalyticsRepository, Depends(get_repository)]
+DashboardStoreDependency = Annotated[DashboardStore, Depends(get_dashboard_store)]
 ScopeDependency = Annotated[AnalyticsScope, Depends(analytics_scope)]
+UserDependency = Annotated[UserContext, Depends(get_current_user)]
+AnalyticsUserDependency = Annotated[
+    UserContext,
+    Depends(require_capability(Capability.ANALYTICS)),
+]

@@ -10,9 +10,18 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 
-from unihub_insight_api.api.routes import analytics_router, health_router
+from unihub_insight_api.api.routes import (
+    analytics_router,
+    auth_router,
+    dashboards_router,
+    health_router,
+)
 from unihub_insight_api.config import Settings, get_settings
-from unihub_insight_api.db import close_pool, create_pool
+from unihub_insight_api.db import close_pool, create_metadata_pool, create_pool
+from unihub_insight_api.repositories.dashboards import (
+    MemoryDashboardStore,
+    PostgresDashboardStore,
+)
 
 
 REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
@@ -30,11 +39,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.pool = None
+        app.state.metadata_pool = None
+        app.state.analytics_repository = None
         if resolved_settings.data_mode == "postgres":
             app.state.pool = await create_pool(resolved_settings)
+        if resolved_settings.metadata_database_url:
+            app.state.metadata_pool = await create_metadata_pool(resolved_settings)
+            app.state.dashboard_store = PostgresDashboardStore(app.state.metadata_pool)
+        else:
+            app.state.dashboard_store = MemoryDashboardStore()
         try:
             yield
         finally:
+            await close_pool(app.state.metadata_pool)
             await close_pool(app.state.pool)
 
     app = FastAPI(
@@ -54,7 +71,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         CORSMiddleware,
         allow_origins=resolved_settings.cors_origins,
         allow_credentials=True,
-        allow_methods=["GET", "OPTIONS"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["Accept", "Content-Type", "X-Request-ID"],
         expose_headers=["X-Request-ID", "Server-Timing"],
     )
@@ -70,7 +87,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response = await call_next(request)
         duration_ms = (time.perf_counter() - started) * 1000
         response.headers["X-Request-ID"] = request_id
-        response.headers["Server-Timing"] = f'app;dur={duration_ms:.2f}'
+        response.headers["Server-Timing"] = f"app;dur={duration_ms:.2f}"
+        response.headers["Cache-Control"] = "private, no-store"
         return response
 
     @app.get("/", include_in_schema=False)
@@ -79,10 +97,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "name": resolved_settings.app_name,
             "version": resolved_settings.version,
             "data_mode": resolved_settings.data_mode,
+            "auth_mode": resolved_settings.auth_mode,
         }
 
     app.include_router(health_router)
+    app.include_router(auth_router)
     app.include_router(analytics_router)
+    app.include_router(dashboards_router)
     return app
 
 

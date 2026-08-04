@@ -18,10 +18,16 @@ def test_period_last_day_handles_leap_year() -> None:
     assert period_last_day("2026-02").isoformat() == "2026-02-28"
 
 
-def test_scope_label_prefers_store_selection() -> None:
+def test_store_scope_dominates_parent_labels() -> None:
     scope = AnalyticsScope(
         period="2026-08",
         firm="MOBIUP",
+        regional="Sud",
         stores=("S001", "S002"),
     )
-    assert scope_label(scope) == "MOBIUP · 2 magazine"
+    assert scope_label(scope) == "2 magazine"
+
+
+def test_agent_remains_visible_inside_store_scope() -> None:
+    scope = AnalyticsScope(period="2026-08", stores=("S001",), agent="Agent 01")
+    assert scope_label(scope) == "Magazin S001 · Agent 01"
