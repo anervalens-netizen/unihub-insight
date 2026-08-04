@@ -10,18 +10,11 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 
-from unihub_insight_api.api.routes import (
-    analytics_router,
-    auth_router,
-    dashboards_router,
-    health_router,
-)
+from unihub_insight_api.api.routes import analytics_router, auth_router, dashboards_router, health_router
 from unihub_insight_api.config import Settings, get_settings
 from unihub_insight_api.db import close_pool, create_metadata_pool, create_pool
-from unihub_insight_api.repositories.dashboards import (
-    MemoryDashboardStore,
-    PostgresDashboardStore,
-)
+from unihub_insight_api.repositories.dashboards import MemoryDashboardStore, PostgresDashboardStore
+from unihub_insight_api.repositories.demo_modules import DemoInsightRepository
 
 
 REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
@@ -43,6 +36,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.analytics_repository = None
         if resolved_settings.data_mode == "postgres":
             app.state.pool = await create_pool(resolved_settings)
+            from unihub_insight_api.repositories.postgres import PostgresAnalyticsRepository
+
+            app.state.analytics_repository = PostgresAnalyticsRepository(app.state.pool)
+        else:
+            app.state.analytics_repository = DemoInsightRepository()
         if resolved_settings.metadata_database_url:
             app.state.metadata_pool = await create_metadata_pool(resolved_settings)
             app.state.dashboard_store = PostgresDashboardStore(app.state.metadata_pool)
@@ -61,9 +59,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
         docs_url="/docs" if resolved_settings.environment != "production" else None,
         redoc_url=None,
-        openapi_url=(
-            "/openapi.json" if resolved_settings.environment != "production" else None
-        ),
+        openapi_url="/openapi.json" if resolved_settings.environment != "production" else None,
     )
     app.state.settings = resolved_settings
 
