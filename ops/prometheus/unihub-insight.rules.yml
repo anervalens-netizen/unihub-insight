@@ -1,0 +1,52 @@
+groups:
+  - name: unihub-insight
+    rules:
+      - alert: UniHubInsightHighErrorRate
+        expr: |
+          sum(rate(unihub_insight_http_requests_total{status_class="5xx"}[5m]))
+          /
+          clamp_min(sum(rate(unihub_insight_http_requests_total[5m])), 0.001)
+          > 0.02
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: UniHub Insight has a sustained 5xx rate above 2%
+
+      - alert: UniHubInsightSlowAnalytics
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, route) (
+              rate(unihub_insight_http_request_duration_seconds_bucket[10m])
+            )
+          ) > 2
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: UniHub Insight analytical p95 exceeds two seconds
+
+      - alert: UniHubInsightPoorLCP
+        expr: |
+          sum(rate(unihub_insight_web_vital_milliseconds_count{metric="LCP",rating="poor"}[30m]))
+          /
+          clamp_min(sum(rate(unihub_insight_web_vital_milliseconds_count{metric="LCP"}[30m])), 0.001)
+          > 0.25
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: More than 25% of recent LCP samples are poor
+
+      - alert: UniHubInsightPoorINP
+        expr: |
+          sum(rate(unihub_insight_web_vital_milliseconds_count{metric="INP",rating="poor"}[30m]))
+          /
+          clamp_min(sum(rate(unihub_insight_web_vital_milliseconds_count{metric="INP"}[30m])), 0.001)
+          > 0.25
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: More than 25% of recent INP samples are poor
