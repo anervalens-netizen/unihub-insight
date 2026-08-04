@@ -1,0 +1,70 @@
+name: Bootstrap UniHub Insight
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".bootstrap/**"
+      - ".github/workflows/bootstrap.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bootstrap-unihub-insight
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Expand and verify staged source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .bootstrap/chunk-* > /tmp/unihub-insight-source.tar.gz.b64
+          base64 --decode /tmp/unihub-insight-source.tar.gz.b64 > /tmp/unihub-insight-source.tar.gz
+          echo "5591ddab1fc5a97dab408662e04d6bb12f259e32175dfa25db31fc06b3a24534  /tmp/unihub-insight-source.tar.gz" | sha256sum --check -
+          tar -xzf /tmp/unihub-insight-source.tar.gz -C .
+          rm -rf .bootstrap
+
+      - name: Configure Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
+      - name: Configure Python and uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version-file: .python-version
+          enable-cache: true
+
+      - name: Install web dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Install API dependencies
+        run: uv sync --project apps/api --all-groups
+
+      - name: Verify complete repository
+        run: npm run verify
+
+      - name: Publish verified foundation
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/bootstrap.yml
+          git add -A
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Build UniHub Insight foundation [skip ci]"
+          git push
