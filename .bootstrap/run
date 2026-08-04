@@ -1,2 +1,2 @@
 Bootstrap requested from the verified pull-request workflow.
-Retry: tolerate transport-only Base64 characters; SHA-256 remains authoritative.
+Retry: verify every staged segment before decoding.
