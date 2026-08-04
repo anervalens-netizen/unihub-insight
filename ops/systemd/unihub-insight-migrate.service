@@ -1,0 +1,28 @@
+[Unit]
+Description=UniHub Insight metadata migrations
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=unihub-insight
+Group=unihub-insight
+WorkingDirectory=/opt/unihub-insight/current
+EnvironmentFile=/etc/unihub-insight/insight.env
+ExecStart=/opt/unihub-insight/current/apps/api/.venv/bin/python ops/scripts/migrate.py
+RemainAfterExit=no
+TimeoutStartSec=90
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+UMask=0027
+TasksMax=64
+MemoryMax=384M
