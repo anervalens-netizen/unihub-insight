@@ -19,10 +19,7 @@ export function CustomDashboardPreview({ dashboard, search, editMode, resetToken
   if (firstError?.error) return <ErrorState message={firstError.error instanceof Error ? firstError.error.message : 'Un modul nu a putut fi încărcat.'} />;
   const dataByModule = new Map<ModuleId, ModuleAnalytics>();
   modules.forEach((module, index) => { const data = queries[index]?.data; if (data) dataByModule.set(module, data); });
-  const definitions: DashboardWidgetDefinition[] = dashboard.widgets.map((widget: DashboardWidget) => {
-    const data = dataByModule.get(widget.module);
-    const Component = () => <ConfiguredWidget widget={widget} data={data} />;
-    return { id: widget.id, title: widget.title, subtitle: `${widget.module} · ${widget.metric_id}`, component: Component, x: widget.layout.x, y: widget.layout.y, w: widget.layout.w, h: widget.layout.h, minW: widget.layout.min_w, minH: widget.layout.min_h };
-  });
-  return <DashboardCanvas widgets={definitions} editMode={editMode} resetToken={resetToken} storageKey={`unihub-insight:custom:${dashboard.id}:v${dashboard.version}`} onLayoutChange={onLayoutChange} />;
+  const definitions: DashboardWidgetDefinition[] = dashboard.widgets.map((widget: DashboardWidget) => { const data = dataByModule.get(widget.module); const Component = () => <ConfiguredWidget widget={widget} data={data} />; return { id: widget.id, title: widget.title, subtitle: `${widget.module} · ${widget.metric_id}`, component: Component, x: widget.layout.x, y: widget.layout.y, w: widget.layout.w, h: widget.layout.h, minW: widget.layout.min_w, minH: widget.layout.min_h }; });
+  const widgetKey = dashboard.widgets.map((widget) => widget.id).join('|');
+  return <DashboardCanvas key={widgetKey} widgets={definitions} editMode={editMode} resetToken={resetToken} storageKey={`unihub-insight:custom:${dashboard.id}:v${dashboard.version}`} onLayoutChange={onLayoutChange} />;
 }

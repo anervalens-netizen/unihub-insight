@@ -31,6 +31,8 @@ export function DashboardCanvas({ widgets, editMode, resetToken, storageKey, onI
   const hostRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<GridStack | null>(null);
   const previousResetToken = useRef(resetToken);
+  const layoutCallbackRef = useRef(onLayoutChange);
+  layoutCallbackRef.current = onLayoutChange;
   const initialLayout = useMemo(() => readLayout(storageKey, widgets), [storageKey, widgets]);
   const layoutById = useMemo(() => new Map(initialLayout.map((item) => [item.id, item])), [initialLayout]);
 
@@ -42,11 +44,11 @@ export function DashboardCanvas({ widgets, editMode, resetToken, storageKey, onI
     const persist = (): void => {
       const items = (grid.save(false) as GridStackWidget[]).map((item) => toStoredItem(item as GridStackNode)).filter((item): item is DashboardLayoutItem => item !== null);
       localStorage.setItem(storageKey, JSON.stringify({ version: STORAGE_VERSION, items } satisfies StoredLayout));
-      onLayoutChange?.(items);
+      layoutCallbackRef.current?.(items);
     };
     grid.on('change', persist);
     return () => { grid.off('change', persist); grid.destroy(false); gridRef.current = null; };
-  }, [onLayoutChange, storageKey]);
+  }, [storageKey]);
 
   useEffect(() => { gridRef.current?.setStatic(!editMode); }, [editMode]);
 
@@ -63,8 +65,8 @@ export function DashboardCanvas({ widgets, editMode, resetToken, storageKey, onI
     }
     grid.batchUpdate(false);
     localStorage.removeItem(storageKey);
-    onLayoutChange?.(defaults);
-  }, [onLayoutChange, resetToken, storageKey, widgets]);
+    layoutCallbackRef.current?.(defaults);
+  }, [resetToken, storageKey, widgets]);
 
   return <div ref={hostRef} className={`grid-stack insight-grid ${editMode ? 'is-editing' : ''}`}>{widgets.map((widget) => {
     const position = layoutById.get(widget.id) ?? widget;
