@@ -15,6 +15,9 @@ export const globalSearchSchema = z.object({
 });
 
 export type GlobalSearch = z.infer<typeof globalSearchSchema>;
+export type GlobalSearchPatch = {
+  [Key in keyof GlobalSearch]?: GlobalSearch[Key] | undefined;
+};
 export type ComparisonMode = (typeof comparisonModes)[number];
 
 export function currentBusinessMonth(now = new Date()): string {
