@@ -5,6 +5,7 @@ import { EChart } from '../../components/charts/EChart';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { formatCurrency, formatInteger, formatPercent } from '../../lib/format';
 import type { ModuleAnalytics } from '../modules/schemas';
+import { widgetFilterLabel } from './filter-resolution';
 import type { DashboardWidget } from './schemas';
 
 function format(value: number, unit: string): string {
@@ -28,7 +29,7 @@ function ConfiguredChart({ widget, data }: { widget: DashboardWidget; data: Modu
     const chartType = widget.visualization === 'bar' ? 'bar' : 'line';
     return { grid: { top: 18, right: 16, bottom: 36, left: 58 }, tooltip: { trigger: 'axis' }, xAxis: { type: 'category', data: data.trend.map((row) => row.label) }, yAxis: { type: 'value' }, series: [{ type: chartType, data: data.trend.map((row) => row.primary), showSymbol: false, smooth: 0.15, itemStyle: { color: '#4f46e5' }, lineStyle: { color: '#4f46e5', width: 2 }, ...(widget.visualization === 'area' ? { areaStyle: { color: 'rgba(79,70,229,.12)' } } : {}) }, { type: 'line', data: data.trend.map((row) => row.target), showSymbol: false, lineStyle: { color: '#0f766e', type: 'dashed' } }] };
   }, [data, widget.visualization]);
-  return <div className="configured-chart"><span className="widget-filter-mode">{widget.filter_mode}</span><EChart option={option} className="chart--fill" ariaLabel={widget.title} /></div>;
+  return <div className="configured-chart"><span className="widget-filter-mode">{widgetFilterLabel(widget)}</span><EChart option={option} className="chart--fill" ariaLabel={widget.title} /></div>;
 }
 
 export function ConfiguredWidget({ widget, data }: { widget: DashboardWidget; data: ModuleAnalytics | undefined }) {
@@ -36,8 +37,8 @@ export function ConfiguredWidget({ widget, data }: { widget: DashboardWidget; da
   const metric = data.kpis.find((item) => item.id === widget.metric_id) ?? data.kpis[0];
   if (widget.visualization === 'kpi') {
     if (!metric) return <EmptyState message="Metrica configurată nu este disponibilă." />;
-    return <div className="configured-kpi"><strong>{format(metric.value, metric.unit)}</strong><span>{metric.label}</span><small className={`risk-badge risk-badge--${metric.risk}`}>{metric.supporting_label ?? data.meta.scope_label}</small><em>Filtru local: {widget.filter_mode}</em></div>;
+    return <div className="configured-kpi"><strong>{format(metric.value, metric.unit)}</strong><span>{metric.label}</span><small className={`risk-badge risk-badge--${metric.risk}`}>{metric.supporting_label ?? data.meta.scope_label}</small><em>{widgetFilterLabel(widget)}</em></div>;
   }
-  if (widget.visualization === 'table') return <div className="table-scroll"><table className="data-table"><thead><tr><th>Entitate</th><th>{data.axes[0]?.label ?? 'Principal'}</th><th>Progres</th><th>Status</th></tr></thead><tbody>{data.breakdown.map((row) => <tr key={row.id}><td>{row.label}<small className="table-context">{row.context}</small></td><td>{format(row.primary, data.axes[0]?.unit ?? 'decimal')}</td><td>{formatPercent(row.progress_pct)}</td><td><span className={`risk-badge risk-badge--${row.risk}`}>{row.risk}</span></td></tr>)}</tbody></table></div>;
+  if (widget.visualization === 'table') return <div className="table-scroll"><span className="widget-filter-mode">{widgetFilterLabel(widget)}</span><table className="data-table"><thead><tr><th>Entitate</th><th>{data.axes[0]?.label ?? 'Principal'}</th><th>Progres</th><th>Status</th></tr></thead><tbody>{data.breakdown.map((row) => <tr key={row.id}><td>{row.label}<small className="table-context">{row.context}</small></td><td>{format(row.primary, data.axes[0]?.unit ?? 'decimal')}</td><td>{formatPercent(row.progress_pct)}</td><td><span className={`risk-badge risk-badge--${row.risk}`}>{row.risk}</span></td></tr>)}</tbody></table></div>;
   return <ConfiguredChart widget={widget} data={data} />;
 }
