@@ -1,0 +1,36 @@
+[Unit]
+Description=UniHub Insight API
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=unihub-insight-migrate.service
+
+[Service]
+Type=simple
+User=unihub-insight
+Group=unihub-insight
+WorkingDirectory=/opt/unihub-insight/current
+EnvironmentFile=/etc/unihub-insight/insight.env
+ExecStart=/opt/unihub-insight/current/apps/api/.venv/bin/uvicorn unihub_insight_api.main:app --host 127.0.0.1 --port 8100 --workers 2 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=on-failure
+RestartSec=3
+TimeoutStartSec=45
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+UMask=0027
+TasksMax=160
+MemoryHigh=768M
+MemoryMax=1G
+
+[Install]
+WantedBy=multi-user.target
