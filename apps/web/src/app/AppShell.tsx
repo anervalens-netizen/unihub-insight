@@ -1,0 +1,74 @@
+import { Outlet, useLocation } from '@tanstack/react-router';
+import { Laptop, Moon, Sun } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
+import { GlobalFilters } from './GlobalFilters';
+import { moduleMetadata } from './navigation';
+import { Sidebar } from './Sidebar';
+
+function usePersistentBoolean(key: string, initial: boolean): [boolean, (value: boolean) => void] {
+  const [value, setValue] = useState(() => {
+    const stored = localStorage.getItem(key);
+    return stored === null ? initial : stored === 'true';
+  });
+  const update = (next: boolean): void => {
+    setValue(next);
+    localStorage.setItem(key, String(next));
+  };
+  return [value, update];
+}
+
+function useTheme() {
+  const [dark, setDark] = usePersistentBoolean('unihub-insight:dark', false);
+  useEffect(() => {
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  }, [dark]);
+  return { dark, setDark };
+}
+
+export function AppShell() {
+  const [collapsed, setCollapsed] = usePersistentBoolean(
+    'unihub-insight:sidebar-collapsed',
+    false,
+  );
+  const { dark, setDark } = useTheme();
+  const pathname = useLocation({ select: (location) => location.pathname });
+  const metadata =
+    moduleMetadata[pathname as keyof typeof moduleMetadata] ?? moduleMetadata['/'];
+
+  return (
+    <div className="app-root">
+      <div className="desktop-warning">
+        <Laptop size={24} />
+        <strong>UniHub Insight este optimizat pentru desktop</strong>
+        <span>Folosește o fereastră de minimum 1180 px pentru analiza completă.</span>
+      </div>
+
+      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
+      <div className="workspace">
+        <header className="topbar">
+          <div className="page-identity">
+            <span>Retail Intelligence</span>
+            <h1>{metadata.title}</h1>
+            <p>{metadata.description}</p>
+          </div>
+          <div className="topbar-actions">
+            <span className="environment-badge">v0.1</span>
+            <button
+              type="button"
+              className="icon-button icon-button--topbar"
+              onClick={() => setDark(!dark)}
+              aria-label={dark ? 'Folosește tema luminoasă' : 'Folosește tema întunecată'}
+            >
+              {dark ? <Sun size={17} /> : <Moon size={17} />}
+            </button>
+          </div>
+        </header>
+        <GlobalFilters />
+        <main className="content-canvas">
+          <Outlet />
+        </main>
+      </div>
+    </div>
+  );
+}
