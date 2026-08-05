@@ -37,7 +37,14 @@ export function currentBusinessMonth(now = new Date()): string {
 
 export function parseStoreSelection(value: string | undefined): string[] {
   if (!value) return [];
-  return [...new Set(value.split(',').map((item) => item.trim()).filter(Boolean))];
+  return [
+    ...new Set(
+      value
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  ];
 }
 
 export function serializeStoreSelection(values: readonly string[]): string | undefined {

@@ -1,0 +1,420 @@
+
+> unihub-insight@0.1.0 verify
+> bash scripts/verify.sh
+
+
+> unihub-insight@0.1.0 format:check
+> npm --workspace @unihub-insight/web run format:check && uv run --project apps/api ruff format --check apps/api/src apps/api/tests
+
+
+> @unihub-insight/web@0.1.0 format:check
+> biome format src tests vite.config.ts
+
+Checked 56 files in 22ms. No fixes applied.
+47 files already formatted
+
+> unihub-insight@0.1.0 lint
+> npm --workspace @unihub-insight/web run lint && uv run --project apps/api ruff check apps/api/src apps/api/tests
+
+
+> @unihub-insight/web@0.1.0 lint
+> biome check src tests vite.config.ts
+
+src/lib/search.ts:32:22 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+  
+    30 │     formatter.formatToParts(now).map((part) => [part.type, part.value]),
+    31 │   );
+  > 32 │   const year = parts['year'];
+       │                      ^^^^^^
+    33 │   const month = parts['month'];
+    34 │   if (!year || !month) throw new Error('Business month could not be resolved.');
+  
+  i Unsafe fix: Use a literal key instead.
+  
+    30 30 │       formatter.formatToParts(now).map((part) => [part.type, part.value]),
+    31 31 │     );
+    32    │ - ··const·year·=·parts['year'];
+       32 │ + ··const·year·=·parts.year;
+    33 33 │     const month = parts['month'];
+    34 34 │     if (!year || !month) throw new Error('Business month could not be resolved.');
+  
+
+src/lib/search.ts:33:23 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+  
+    31 │   );
+    32 │   const year = parts['year'];
+  > 33 │   const month = parts['month'];
+       │                       ^^^^^^^
+    34 │   if (!year || !month) throw new Error('Business month could not be resolved.');
+    35 │   return `${year}-${month}`;
+  
+  i Unsafe fix: Use a literal key instead.
+  
+    31 31 │     );
+    32 32 │     const year = parts['year'];
+    33    │ - ··const·month·=·parts['month'];
+       33 │ + ··const·month·=·parts.month;
+    34 34 │     if (!year || !month) throw new Error('Business month could not be resolved.');
+    35 35 │     return `${year}-${month}`;
+  
+
+src/app/GlobalFilters.tsx:215:5 lint/a11y/useAriaPropsSupportedByRole ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × The ARIA attribute 'aria-label' is not supported by this element.
+  
+    214 │   return (
+  > 215 │     <div className="global-filters" aria-label="Filtre globale">
+        │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    216 │       <div className="filter-heading" title={`${count} filtre business active`}>
+    217 │         <Filter size={16} />
+  
+  i Ensure that ARIA attributes are valid for the role of the element.
+  
+
+src/components/charts/EChart.tsx:1:1 assist/source/organizeImports  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Sort these imports.
+  
+   > 1 │ import { BarChart, HeatmapChart, LineChart, PieChart, ScatterChart } from 'echarts/charts';
+       │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   > 2 │ import {
+   > 3 │   AriaComponent,
+   > 4 │   DataZoomComponent,
+        ...
+  > 12 │ import * as echarts from 'echarts/core';
+  > 13 │ import type { EChartsCoreOption, EChartsType } from 'echarts/core';
+       │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    14 │ import { CanvasRenderer } from 'echarts/renderers';
+    15 │ import { useEffect, useRef } from 'react';
+  
+  i Safe fix: Organize imports and exports (Biome)
+  
+    10 10 │     VisualMapComponent,
+    11 11 │   } from 'echarts/components';
+    12    │ - import·*·as·echarts·from·'echarts/core';
+    13    │ - import·type·{·EChartsCoreOption,·EChartsType·}·from·'echarts/core';
+       12 │ + import·type·{·EChartsCoreOption,·EChartsType·}·from·'echarts/core';
+       13 │ + import·*·as·echarts·from·'echarts/core';
+    14 14 │   import { CanvasRenderer } from 'echarts/renderers';
+    15 15 │   import { useEffect, useRef } from 'react';
+  
+
+src/components/dashboard/WidgetFrame.tsx:74:13 lint/a11y/noStaticElementInteractions ━━━━━━━━━━━━━━━
+
+  × Unexpected event handler on static element.
+  
+    72 │       {expanded
+    73 │         ? createPortal(
+  > 74 │             <div
+       │             ^^^^
+  > 75 │               className="widget-modal-backdrop"
+  > 76 │               role="presentation"
+  > 77 │               onMouseDown={() => setExpanded(false)}
+  > 78 │             >
+       │             ^
+    79 │               <section
+    80 │                 className="widget-modal"
+  
+  i Static elements should not be interactive. To add interactivity such as a mouse or key event listener to a static element, give the element an appropriate role value.
+  
+
+src/features/dashboards/CustomDashboardsPage.tsx:18:1 assist/source/organizeImports  FIXABLE  ━━━━━━━━━━
+
+  × Sort the imported names.
+  
+    16 │ import { DashboardLibrary } from './DashboardLibrary';
+    17 │ import type { DashboardDocument, DashboardWidget } from './schemas';
+  > 18 │ import { dashboardTemplates, moduleMetrics, type DashboardTemplate } from './templates';
+       │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    19 │ 
+    20 │ const moduleCapability: Record<ModuleId, Capability> = {
+  
+  i Safe fix: Organize imports and exports (Biome)
+  
+     16  16 │   import { DashboardLibrary } from './DashboardLibrary';
+     17  17 │   import type { DashboardDocument, DashboardWidget } from './schemas';
+     18     │ - import·{·dashboardTemplates,·moduleMetrics,·type·DashboardTemplate·}·from·'./templates';
+         18 │ + import·{·type·DashboardTemplate,·dashboardTemplates,·moduleMetrics·}·from·'./templates';
+     19  19 │   
+     20  20 │   const moduleCapability: Record<ModuleId, Capability> = {
+  
+
+src/features/dashboards/api.ts:4:1 assist/source/organizeImports  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Sort the imported names.
+  
+     3 │ import { getJson, requestEmpty, requestJson } from '../../lib/api';
+   > 4 │ import {
+       │ ^^^^^^^^
+   > 5 │   dashboardDocumentSchema,
+   > 6 │   dashboardListSchema,
+   > 7 │   type DashboardCreateInput,
+   > 8 │   type DashboardUpdateInput,
+   > 9 │ } from './schemas';
+       │ ^^^^^^^^^^^^^^^^^^^
+    10 │ 
+    11 │ export const dashboardsQuery = queryOptions({
+  
+  i Safe fix: Organize imports and exports (Biome)
+  
+     3  3 │   import { getJson, requestEmpty, requestJson } from '../../lib/api';
+     4  4 │   import {
+     5    │ - ··dashboardDocumentSchema,
+     6    │ - ··dashboardListSchema,
+     7    │ - ··type·DashboardCreateInput,
+     8    │ - ··type·DashboardUpdateInput,
+        5 │ + ··type·DashboardCreateInput,
+        6 │ + ··type·DashboardUpdateInput,
+        7 │ + ··dashboardDocumentSchema,
+        8 │ + ··dashboardListSchema,
+     9  9 │   } from './schemas';
+    10 10 │   
+  
+
+src/features/modules/AnalyticsModulePage.tsx:1:1 assist/source/organizeImports  FIXABLE  ━━━━━━━━━━━
+
+  × Sort these imports.
+  
+   > 1 │ import { useQuery } from '@tanstack/react-query';
+       │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   > 2 │ import { Lock, RefreshCw, RotateCcw, Unlock } from 'lucide-react';
+   > 3 │ import { useMemo, useState } from 'react';
+   > 4 │ 
+   > 5 │ import { useGlobalSearch, useUpdateGlobalSearch } from '../../app/search-hooks';
+   > 6 │ import { DashboardCanvas } from '../../components/dashboard/DashboardCanvas';
+   > 7 │ import { ExcelExportButton } from '../../components/ui/ExcelExportButton';
+   > 8 │ import { ErrorState } from '../../components/ui/ErrorState';
+       │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     9 │ import { LoadingState } from '../../components/ui/LoadingState';
+    10 │ import { analyticsSearchParams } from '../../lib/download';
+  
+  i Safe fix: Organize imports and exports (Biome)
+  
+      5   5 │   import { useGlobalSearch, useUpdateGlobalSearch } from '../../app/search-hooks';
+      6   6 │   import { DashboardCanvas } from '../../components/dashboard/DashboardCanvas';
+      7     │ - import·{·ExcelExportButton·}·from·'../../components/ui/ExcelExportButton';
+      8     │ - import·{·ErrorState·}·from·'../../components/ui/ErrorState';
+          7 │ + import·{·ErrorState·}·from·'../../components/ui/ErrorState';
+          8 │ + import·{·ExcelExportButton·}·from·'../../components/ui/ExcelExportButton';
+      9   9 │   import { LoadingState } from '../../components/ui/LoadingState';
+     10  10 │   import { analyticsSearchParams } from '../../lib/download';
+  
+
+src/features/modules/DataInspector.tsx:110:5 lint/a11y/noStaticElementInteractions ━━━━━━━━━━━━━━━━━
+
+  × Unexpected event handler on static element.
+  
+    108 │   }, [onClose]);
+    109 │   return createPortal(
+  > 110 │     <div className="widget-modal-backdrop" role="presentation" onMouseDown={onClose}>
+        │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    111 │       <section
+    112 │         className="data-inspector"
+  
+  i Static elements should not be interactive. To add interactivity such as a mouse or key event listener to a static element, give the element an appropriate role value.
+  
+
+src/features/modules/DataInspector.tsx:159:43 lint/suspicious/noArrayIndexKey ━━━━━━━━━━━━━━━━━━━━━━
+
+  × Avoid using the index of an array as key property in an element.
+  
+    157 │               <tbody>
+    158 │                 {rows.map((row, index) => (
+  > 159 │                   <tr key={`${widgetId}-${index}`}>
+        │                                           ^^^^^
+    160 │                     {columns.map((column) => (
+    161 │                       <td key={column}>{String(row[column] ?? '')}</td>
+  
+  i This is the source of the key value.
+  
+    156 │               </thead>
+    157 │               <tbody>
+  > 158 │                 {rows.map((row, index) => (
+        │                                 ^^^^^
+    159 │                   <tr key={`${widgetId}-${index}`}>
+    160 │                     {columns.map((column) => (
+  
+  i The order of the items may change, and this also affects performances and component state.
+  
+  i Check the React documentation. 
+  
+
+src/features/modules/api.ts:5:1 assist/source/organizeImports  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Sort the imported names.
+  
+    3 │ import { getJson } from '../../lib/api';
+    4 │ import type { GlobalSearch } from '../../lib/search';
+  > 5 │ import { moduleAnalyticsSchema, type ModuleId } from './schemas';
+      │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    6 │ 
+    7 │ export function moduleAnalyticsQuery(module: ModuleId, search: GlobalSearch & { period: string }) {
+  
+  i Safe fix: Organize imports and exports (Biome)
+  
+     3  3 │   import { getJson } from '../../lib/api';
+     4  4 │   import type { GlobalSearch } from '../../lib/search';
+     5    │ - import·{·moduleAnalyticsSchema,·type·ModuleId·}·from·'./schemas';
+        5 │ + import·{·type·ModuleId,·moduleAnalyticsSchema·}·from·'./schemas';
+     6  6 │   
+     7  7 │   export function moduleAnalyticsQuery(module: ModuleId, search: GlobalSearch & { period: string }) {
+  
+
+src/features/modules/widget-catalog.ts:1:1 assist/source/organizeImports  FIXABLE  ━━━━━━━━━━━━━━━━━
+
+  × Sort these imports.
+  
+   > 1 │ import type { DashboardWidgetDefinition } from '../../components/dashboard/types';
+       │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   > 2 │ import {
+   > 3 │   ModuleAlertsWidget,
+   > 4 │   ModuleBreakdownWidget,
+        ...
+  > 12 │ } from './widgets';
+  > 13 │ import type { ModuleAnalytics } from './schemas';
+       │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    14 │ 
+    15 │ export function moduleWidgets(data: ModuleAnalytics): DashboardWidgetDefinition[] {
+  
+  i Safe fix: Organize imports and exports (Biome)
+  
+      1   1 │   import type { DashboardWidgetDefinition } from '../../components/dashboard/types';
+      2     │ - import·{
+      3     │ - ··ModuleAlertsWidget,
+      4     │ - ··ModuleBreakdownWidget,
+      5     │ - ··ModuleDistributionWidget,
+      6     │ - ··ModuleKpiFour,
+      7     │ - ··ModuleKpiOne,
+      8     │ - ··ModuleKpiThree,
+      9     │ - ··ModuleKpiTwo,
+     10     │ - ··ModuleMatrixWidget,
+     11     │ - ··ModuleTrendWidget,
+     12     │ - }·from·'./widgets';
+     13     │ - import·type·{·ModuleAnalytics·}·from·'./schemas';
+          2 │ + import·type·{·ModuleAnalytics·}·from·'./schemas';
+          3 │ + import·{
+          4 │ + ··ModuleAlertsWidget,
+          5 │ + ··ModuleBreakdownWidget,
+          6 │ + ··ModuleDistributionWidget,
+          7 │ + ··ModuleKpiFour,
+          8 │ + ··ModuleKpiOne,
+          9 │ + ··ModuleKpiThree,
+         10 │ + ··ModuleKpiTwo,
+         11 │ + ··ModuleMatrixWidget,
+         12 │ + ··ModuleTrendWidget,
+         13 │ + }·from·'./widgets';
+     14  14 │   
+     15  15 │   export function moduleWidgets(data: ModuleAnalytics): DashboardWidgetDefinition[] {
+  
+
+src/features/modules/widgets.tsx:119:5 lint/a11y/useAriaPropsSupportedByRole ━━━━━━━━━━━━━━━━━━━━━━━
+
+  × The ARIA attribute 'aria-label' is not supported by this element.
+  
+    117 │   };
+    118 │   return (
+  > 119 │     <div className="chart-toggle" aria-label="Tip de grafic">
+        │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    120 │       {options.map((option) => (
+    121 │         <button
+  
+  i Ensure that ARIA attributes are valid for the role of the element.
+  
+
+src/features/monthly-review/MonthlyReviewPage.tsx:1:1 assist/source/organizeImports  FIXABLE  ━━━━━━━━━━
+
+  × Sort these imports.
+  
+   > 1 │ import { useQuery } from '@tanstack/react-query';
+       │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   > 2 │ import type { EChartsCoreOption } from 'echarts/core';
+   > 3 │ import { AlertCircle, CheckCircle2, FileSpreadsheet, RefreshCw, TriangleAlert } from 'lucide-react';
+   > 4 │ import { useMemo, useState } from 'react';
+        ...
+   > 8 │ import { ExcelExportButton } from '../../components/ui/ExcelExportButton';
+   > 9 │ import { ErrorState } from '../../components/ui/ErrorState';
+       │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    10 │ import { LoadingState } from '../../components/ui/LoadingState';
+    11 │ import { analyticsSearchParams } from '../../lib/download';
+  
+  i Safe fix: Organize imports and exports (Biome)
+  
+      6   6 │   import { useGlobalSearch } from '../../app/search-hooks';
+      7   7 │   import { EChart } from '../../components/charts/EChart';
+      8     │ - import·{·ExcelExportButton·}·from·'../../components/ui/ExcelExportButton';
+      9     │ - import·{·ErrorState·}·from·'../../components/ui/ErrorState';
+          8 │ + import·{·ErrorState·}·from·'../../components/ui/ErrorState';
+          9 │ + import·{·ExcelExportButton·}·from·'../../components/ui/ExcelExportButton';
+     10  10 │   import { LoadingState } from '../../components/ui/LoadingState';
+     11  11 │   import { analyticsSearchParams } from '../../lib/download';
+  
+
+src/features/overview/OverviewPage.tsx:1:1 assist/source/organizeImports  FIXABLE  ━━━━━━━━━━━━━━━━━
+
+  × Sort these imports.
+  
+   > 1 │ import { useQuery } from '@tanstack/react-query';
+       │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   > 2 │ import { LayoutGrid, Lock, RefreshCw, RotateCcw, Unlock } from 'lucide-react';
+   > 3 │ import { useMemo, useState } from 'react';
+   > 4 │ 
+   > 5 │ import { useGlobalSearch } from '../../app/search-hooks';
+   > 6 │ import { DashboardCanvas } from '../../components/dashboard/DashboardCanvas';
+   > 7 │ import { ExcelExportButton } from '../../components/ui/ExcelExportButton';
+   > 8 │ import { ErrorState } from '../../components/ui/ErrorState';
+       │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     9 │ import { LoadingState } from '../../components/ui/LoadingState';
+    10 │ import { analyticsSearchParams } from '../../lib/download';
+  
+  i Safe fix: Organize imports and exports (Biome)
+  
+      5   5 │   import { useGlobalSearch } from '../../app/search-hooks';
+      6   6 │   import { DashboardCanvas } from '../../components/dashboard/DashboardCanvas';
+      7     │ - import·{·ExcelExportButton·}·from·'../../components/ui/ExcelExportButton';
+      8     │ - import·{·ErrorState·}·from·'../../components/ui/ErrorState';
+          7 │ + import·{·ErrorState·}·from·'../../components/ui/ErrorState';
+          8 │ + import·{·ExcelExportButton·}·from·'../../components/ui/ExcelExportButton';
+      9   9 │   import { LoadingState } from '../../components/ui/LoadingState';
+     10  10 │   import { analyticsSearchParams } from '../../lib/download';
+  
+
+src/router.tsx:7:1 assist/source/organizeImports  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Sort the imported names.
+  
+    5 │   type ErrorComponentProps,
+    6 │ } from '@tanstack/react-router';
+  > 7 │ import { lazy, Suspense, type ReactNode } from 'react';
+      │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    8 │ 
+    9 │ import { AppShell } from './app/AppShell';
+  
+  i Safe fix: Organize imports and exports (Biome)
+  
+      5   5 │     type ErrorComponentProps,
+      6   6 │   } from '@tanstack/react-router';
+      7     │ - import·{·lazy,·Suspense,·type·ReactNode·}·from·'react';
+          7 │ + import·{·lazy,·type·ReactNode,·Suspense·}·from·'react';
+      8   8 │   
+      9   9 │   import { AppShell } from './app/AppShell';
+  
+
+Checked 56 files in 71ms. No fixes applied.
+Found 14 errors.
+Found 2 infos.
+check ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Some errors were emitted while running checks.
+  
+
+npm error Lifecycle script `lint` failed with error:
+npm error code 1
+npm error path /home/runner/work/unihub-insight/unihub-insight/apps/web
+npm error workspace @unihub-insight/web@0.1.0
+npm error location /home/runner/work/unihub-insight/unihub-insight/apps/web
+npm error command failed
+npm error command sh -c biome check src tests vite.config.ts

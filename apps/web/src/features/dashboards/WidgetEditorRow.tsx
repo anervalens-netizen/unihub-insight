@@ -23,8 +23,7 @@ export function WidgetEditorRow({
   onChange: (patch: Partial<DashboardWidget>) => void;
   onRemove: () => void;
 }) {
-  const localFiltersEnabled =
-    widget.filter_mode === 'augment' || widget.filter_mode === 'override';
+  const localFiltersEnabled = widget.filter_mode === 'augment' || widget.filter_mode === 'override';
 
   return (
     <article className="widget-editor-card">
@@ -71,9 +70,8 @@ export function WidgetEditorRow({
             onChange({
               metric_id: event.target.value,
               title:
-                moduleMetrics[widget.module].find(
-                  (metric) => metric.id === event.target.value,
-                )?.label ?? widget.title,
+                moduleMetrics[widget.module].find((metric) => metric.id === event.target.value)
+                  ?.label ?? widget.title,
             })
           }
         >
@@ -105,9 +103,7 @@ export function WidgetEditorRow({
             const filterMode = event.target.value as DashboardWidget['filter_mode'];
             onChange({
               filter_mode: filterMode,
-              ...(filterMode === 'inherit' || filterMode === 'ignore'
-                ? { filters: {} }
-                : {}),
+              ...(filterMode === 'inherit' || filterMode === 'ignore' ? { filters: {} } : {}),
             });
           }}
         >
@@ -116,12 +112,7 @@ export function WidgetEditorRow({
           <option value="override">Suprascrie</option>
           <option value="ignore">Ignoră global</option>
         </select>
-        <button
-          type="button"
-          className="icon-button"
-          aria-label="Șterge cardul"
-          onClick={onRemove}
-        >
+        <button type="button" className="icon-button" aria-label="Șterge cardul" onClick={onRemove}>
           <Trash2 size={14} />
         </button>
       </div>

@@ -42,11 +42,21 @@ export function WidgetFrame({
       </div>
       <div className="widget-actions">
         {onInspect ? (
-          <button type="button" className="icon-button" aria-label={`Inspectează datele ${title}`} onClick={onInspect}>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label={`Inspectează datele ${title}`}
+            onClick={onInspect}
+          >
             <TableProperties size={15} />
           </button>
         ) : null}
-        <button type="button" className="icon-button" aria-label={`Extinde ${title}`} onClick={() => setExpanded(true)}>
+        <button
+          type="button"
+          className="icon-button"
+          aria-label={`Extinde ${title}`}
+          onClick={() => setExpanded(true)}
+        >
           <Expand size={15} />
         </button>
       </div>
@@ -61,14 +71,29 @@ export function WidgetFrame({
       </article>
       {expanded
         ? createPortal(
-            <div className="widget-modal-backdrop" role="presentation" onMouseDown={() => setExpanded(false)}>
-              <section className="widget-modal" role="dialog" aria-modal="true" aria-labelledby={`${headingId}-expanded`} onMouseDown={(event) => event.stopPropagation()}>
+            <div
+              className="widget-modal-backdrop"
+              role="presentation"
+              onMouseDown={() => setExpanded(false)}
+            >
+              <section
+                className="widget-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={`${headingId}-expanded`}
+                onMouseDown={(event) => event.stopPropagation()}
+              >
                 <header className="widget-header widget-header--modal">
                   <div>
                     <h2 id={`${headingId}-expanded`}>{title}</h2>
                     {subtitle ? <p>{subtitle}</p> : null}
                   </div>
-                  <button type="button" className="icon-button" aria-label="Închide" onClick={() => setExpanded(false)}>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label="Închide"
+                    onClick={() => setExpanded(false)}
+                  >
                     <X size={17} />
                   </button>
                 </header>

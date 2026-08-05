@@ -40,11 +40,7 @@ def salary_statistics(values: Sequence[Decimal]) -> SalaryStatistics:
     salaries = sorted(_money(value) for value in values)
     total = sum(salaries, Decimal(0))
     eligible = [value for value in salaries if value >= MIN_SALARY_FOR_AVERAGE]
-    average = (
-        _money(sum(eligible, Decimal(0)) / Decimal(len(eligible)))
-        if eligible
-        else Decimal(0)
-    )
+    average = _money(sum(eligible, Decimal(0)) / Decimal(len(eligible))) if eligible else Decimal(0)
     if not salaries:
         median = Decimal(0)
     else:
@@ -96,7 +92,7 @@ class PostgresHardenedInsightRepository(PostgresInsightRepository):
                 f"""
                 SELECT COUNT(DISTINCT store.site_code)::INT
                 FROM stores store
-                WHERE {' AND '.join(eligible_clauses)}
+                WHERE {" AND ".join(eligible_clauses)}
                 """,
                 *eligible_params,
             )
@@ -104,7 +100,7 @@ class PostgresHardenedInsightRepository(PostgresInsightRepository):
                 f"""
                 SELECT COUNT(DISTINCT agg.site_code)::INT
                 FROM reporting_agent_month agg
-                WHERE {' AND '.join(staffed_clauses)}
+                WHERE {" AND ".join(staffed_clauses)}
                   AND agg.working_days > 0
                 """,
                 *staffed_params,
@@ -157,11 +153,7 @@ class PostgresHardenedInsightRepository(PostgresInsightRepository):
         response = await super()._compensation(scope)
         rows = await self._salary_rows(scope)
         year, month = (int(part) for part in scope.period.split("-"))
-        current = [
-            row
-            for row in rows
-            if int(row["year"]) == year and int(row["month"]) == month
-        ]
+        current = [row for row in rows if int(row["year"]) == year and int(row["month"]) == month]
         values = [_money(row["total_salary"]) for row in current]
         stats = salary_statistics(values)
 
@@ -240,11 +232,7 @@ class PostgresHardenedInsightRepository(PostgresInsightRepository):
                     secondary=metrics["ebit"],
                     tertiary=metrics["operating_costs"],
                     progress_pct=margin,
-                    risk=(
-                        RiskLevel.RISK
-                        if metrics["ebit"] < 0
-                        else RiskLevel.HEALTHY
-                    ),
+                    risk=(RiskLevel.RISK if metrics["ebit"] < 0 else RiskLevel.HEALTHY),
                 )
             )
         breakdown.sort(key=lambda item: item.secondary or Decimal(0))

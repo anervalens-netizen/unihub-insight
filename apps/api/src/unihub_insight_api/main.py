@@ -10,12 +10,24 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 
-from unihub_insight_api.api.routes import analytics_router, auth_router, dashboards_router, health_router
+from unihub_insight_api.api.routes import (
+    analytics_router,
+    auth_router,
+    dashboards_router,
+    exports_router,
+    health_router,
+    monthly_review_router,
+)
 from unihub_insight_api.config import Settings, get_settings
 from unihub_insight_api.db import close_pool, create_metadata_pool, create_pool
-from unihub_insight_api.repositories.dashboards import MemoryDashboardStore, PostgresDashboardStore
-from unihub_insight_api.repositories.demo_modules import DemoInsightRepository
-from unihub_insight_api.repositories.postgres_hardened import PostgresHardenedInsightRepository
+from unihub_insight_api.repositories.dashboards import (
+    MemoryDashboardStore,
+    PostgresDashboardStore,
+)
+from unihub_insight_api.repositories.monthly_review import (
+    DemoMonthlyReviewRepository,
+    PostgresMonthlyReviewRepository,
+)
 
 
 REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
@@ -36,9 +48,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.metadata_pool = None
         if resolved_settings.data_mode == "postgres":
             app.state.pool = await create_pool(resolved_settings)
-            app.state.analytics_repository = PostgresHardenedInsightRepository(app.state.pool)
+            app.state.analytics_repository = PostgresMonthlyReviewRepository(app.state.pool)
         else:
-            app.state.analytics_repository = DemoInsightRepository()
+            app.state.analytics_repository = DemoMonthlyReviewRepository()
         if resolved_settings.metadata_database_url:
             app.state.metadata_pool = await create_metadata_pool(resolved_settings)
             app.state.dashboard_store = PostgresDashboardStore(app.state.metadata_pool)
@@ -97,6 +109,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health_router)
     app.include_router(auth_router)
     app.include_router(analytics_router)
+    app.include_router(monthly_review_router)
+    app.include_router(exports_router)
     app.include_router(dashboards_router)
     return app
 

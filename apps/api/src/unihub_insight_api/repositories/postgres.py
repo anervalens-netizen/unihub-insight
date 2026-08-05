@@ -168,7 +168,9 @@ class PostgresAnalyticsRepository:
         )
 
         previous_sales = (
-            _money(comparison_summary["total_sales"]) if comparison_summary is not None else Decimal(0)
+            _money(comparison_summary["total_sales"])
+            if comparison_summary is not None
+            else Decimal(0)
         )
         sales_delta = _delta(total_sales, previous_sales) if comparison_period else None
         comparison_by_day = self._cumulative_by_day(comparison_daily)
@@ -197,8 +199,7 @@ class PostgresAnalyticsRepository:
             )
 
         comparison_sales_by_store = {
-            str(row["site_code"]): _money(row["total_sales"])
-            for row in comparison_performance
+            str(row["site_code"]): _money(row["total_sales"]) for row in comparison_performance
         }
         performance = self._performance_view(performance_rows, comparison_sales_by_store)
         contribution = self._contribution_view(contribution_rows, total_sales)
@@ -256,9 +257,7 @@ class PostgresAnalyticsRepository:
                     value=receipt_2plus_pct,
                     unit=MetricUnit.PERCENT,
                     risk=(
-                        RiskLevel.HEALTHY
-                        if receipt_2plus_pct >= Decimal("32")
-                        else RiskLevel.WATCH
+                        RiskLevel.HEALTHY if receipt_2plus_pct >= Decimal("32") else RiskLevel.WATCH
                     ),
                     supporting_value=Decimal(total_receipts),
                     supporting_label="Bonuri totale",
@@ -314,7 +313,7 @@ class PostgresAnalyticsRepository:
                         agg.receipt_2plus_count,
                         agg.focus_quantity
                     FROM reporting_agent_day agg
-                    WHERE {' AND '.join(clauses)}
+                    WHERE {" AND ".join(clauses)}
                 ),
                 target_summary AS (
                     SELECT COALESCE(SUM(target.target_value), 0) AS total_target
@@ -349,9 +348,7 @@ class PostgresAnalyticsRepository:
             raise RuntimeError("Overview summary query returned no aggregate row.")
         return row
 
-    async def _fetch_daily(
-        self, scope: AnalyticsScope, period: str
-    ) -> Sequence[asyncpg.Record]:
+    async def _fetch_daily(self, scope: AnalyticsScope, period: str) -> Sequence[asyncpg.Record]:
         clauses, params = self._scope_sql(scope, period)
         async with self.pool.acquire() as connection:
             return await connection.fetch(
@@ -361,7 +358,7 @@ class PostgresAnalyticsRepository:
                         agg.sale_date,
                         COALESCE(SUM(agg.total_sales), 0) AS daily_sales
                     FROM reporting_agent_day agg
-                    WHERE {' AND '.join(clauses)}
+                    WHERE {" AND ".join(clauses)}
                     GROUP BY agg.sale_date
                 )
                 SELECT
@@ -384,7 +381,7 @@ class PostgresAnalyticsRepository:
                     agg.firma,
                     COALESCE(SUM(agg.total_sales), 0) AS total_sales
                 FROM reporting_agent_day agg
-                WHERE {' AND '.join(clauses)}
+                WHERE {" AND ".join(clauses)}
                 GROUP BY agg.firma
                 ORDER BY total_sales DESC
                 """,
@@ -406,7 +403,7 @@ class PostgresAnalyticsRepository:
                         MAX(agg.regional) AS regional,
                         COALESCE(SUM(agg.total_sales), 0) AS total_sales
                     FROM reporting_agent_day agg
-                    WHERE {' AND '.join(clauses)}
+                    WHERE {" AND ".join(clauses)}
                     GROUP BY agg.site_code
                 ),
                 targets AS (

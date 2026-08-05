@@ -39,9 +39,7 @@ export function DashboardEditor({
           <span>Descriere</span>
           <textarea
             value={draft.description}
-            onChange={(event) =>
-              onDraftChange({ ...draft, description: event.target.value })
-            }
+            onChange={(event) => onDraftChange({ ...draft, description: event.target.value })}
           />
         </label>
         <label>

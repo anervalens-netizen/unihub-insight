@@ -85,9 +85,7 @@ function StoreMultiSelect({
   const selectedSet = useMemo(() => new Set(selected), [selected]);
   const normalizedSearch = search.trim().toLocaleLowerCase('ro-RO');
   const filtered = stores.filter((store) =>
-    `${store.label} ${store.site_code}`
-      .toLocaleLowerCase('ro-RO')
-      .includes(normalizedSearch),
+    `${store.label} ${store.site_code}`.toLocaleLowerCase('ro-RO').includes(normalizedSearch),
   );
 
   return (

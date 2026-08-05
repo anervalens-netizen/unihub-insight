@@ -81,18 +81,90 @@ def _seed(*parts: str) -> int:
 
 
 DEMO_STORES: tuple[FilterStore, ...] = (
-    FilterStore(site_code="B001", label="București Plaza", firm="MOBIUP", regional="Andrei Sud", asm="ASM București"),
-    FilterStore(site_code="B002", label="București ParkLake", firm="MOBIUP", regional="Andrei Sud", asm="ASM București"),
-    FilterStore(site_code="B003", label="București Sun Plaza", firm="MOBICELL", regional="Andrei Sud", asm="ASM București"),
-    FilterStore(site_code="C001", label="Constanța City", firm="MOBIUP", regional="Dobrogea", asm="ASM Constanța"),
-    FilterStore(site_code="C002", label="Constanța VIVO", firm="MOBICELL", regional="Dobrogea", asm="ASM Constanța"),
-    FilterStore(site_code="G001", label="Galați Shopping", firm="MOBIUP", regional="Dobrogea", asm="ASM Galați"),
-    FilterStore(site_code="BZR1", label="Buzău Aurora", firm="MOBICELL", regional="Moldova Sud", asm="ASM Buzău"),
-    FilterStore(site_code="BR01", label="Brăila Mall", firm="MOBIUP", regional="Moldova Sud", asm="ASM Brăila"),
-    FilterStore(site_code="P001", label="Ploiești Shopping", firm="MOBIUP", regional="Muntenia", asm="ASM Prahova"),
-    FilterStore(site_code="P002", label="Ploiești AFI", firm="MOBICELL", regional="Muntenia", asm="ASM Prahova"),
-    FilterStore(site_code="T001", label="Târgoviște Dâmbovița", firm="MOBIUP", regional="Muntenia", asm="ASM Dâmbovița"),
-    FilterStore(site_code="F001", label="Focșani Mall", firm="MOBICELL", regional="Moldova Sud", asm="ASM Vrancea"),
+    FilterStore(
+        site_code="B001",
+        label="București Plaza",
+        firm="MOBIUP",
+        regional="Andrei Sud",
+        asm="ASM București",
+    ),
+    FilterStore(
+        site_code="B002",
+        label="București ParkLake",
+        firm="MOBIUP",
+        regional="Andrei Sud",
+        asm="ASM București",
+    ),
+    FilterStore(
+        site_code="B003",
+        label="București Sun Plaza",
+        firm="MOBICELL",
+        regional="Andrei Sud",
+        asm="ASM București",
+    ),
+    FilterStore(
+        site_code="C001",
+        label="Constanța City",
+        firm="MOBIUP",
+        regional="Dobrogea",
+        asm="ASM Constanța",
+    ),
+    FilterStore(
+        site_code="C002",
+        label="Constanța VIVO",
+        firm="MOBICELL",
+        regional="Dobrogea",
+        asm="ASM Constanța",
+    ),
+    FilterStore(
+        site_code="G001",
+        label="Galați Shopping",
+        firm="MOBIUP",
+        regional="Dobrogea",
+        asm="ASM Galați",
+    ),
+    FilterStore(
+        site_code="BZR1",
+        label="Buzău Aurora",
+        firm="MOBICELL",
+        regional="Moldova Sud",
+        asm="ASM Buzău",
+    ),
+    FilterStore(
+        site_code="BR01",
+        label="Brăila Mall",
+        firm="MOBIUP",
+        regional="Moldova Sud",
+        asm="ASM Brăila",
+    ),
+    FilterStore(
+        site_code="P001",
+        label="Ploiești Shopping",
+        firm="MOBIUP",
+        regional="Muntenia",
+        asm="ASM Prahova",
+    ),
+    FilterStore(
+        site_code="P002",
+        label="Ploiești AFI",
+        firm="MOBICELL",
+        regional="Muntenia",
+        asm="ASM Prahova",
+    ),
+    FilterStore(
+        site_code="T001",
+        label="Târgoviște Dâmbovița",
+        firm="MOBIUP",
+        regional="Muntenia",
+        asm="ASM Dâmbovița",
+    ),
+    FilterStore(
+        site_code="F001",
+        label="Focșani Mall",
+        firm="MOBICELL",
+        regional="Moldova Sud",
+        asm="ASM Vrancea",
+    ),
 )
 
 DEMO_AGENTS: tuple[FilterAgent, ...] = tuple(
@@ -142,8 +214,12 @@ class DemoAnalyticsRepository:
         target_total = _money(store_count * rng.uniform(72_000, 96_000))
         final_progress = Decimal(str(rng.uniform(0.87, 1.09)))
         expected_final_sales = _money(target_total * final_progress)
-        covered_ratio = Decimal(cutoff_day) / Decimal(days_in_month) if days_in_month else Decimal(0)
-        total_sales = expected_final_sales if is_final else _money(expected_final_sales * covered_ratio)
+        covered_ratio = (
+            Decimal(cutoff_day) / Decimal(days_in_month) if days_in_month else Decimal(0)
+        )
+        total_sales = (
+            expected_final_sales if is_final else _money(expected_final_sales * covered_ratio)
+        )
         forecast = (
             _money(total_sales / Decimal(cutoff_day) * Decimal(days_in_month))
             if cutoff_day > 0 and not is_final
@@ -157,7 +233,9 @@ class DemoAnalyticsRepository:
         )
 
         comparison_factor = Decimal(str(rng.uniform(0.89, 1.08)))
-        previous_sales = _money(total_sales / comparison_factor) if comparison_factor else Decimal(0)
+        previous_sales = (
+            _money(total_sales / comparison_factor) if comparison_factor else Decimal(0)
+        )
         sales_delta = _delta(total_sales, previous_sales)
         receipt_count = max(int(total_sales / Decimal(str(rng.uniform(85, 120)))), 0)
         receipt_2plus_pct = _percent(rng.uniform(23, 41)) if receipt_count else Decimal(0)
@@ -221,7 +299,9 @@ class DemoAnalyticsRepository:
                     label="Vânzări",
                     value=total_sales,
                     unit=MetricUnit.CURRENCY,
-                    delta_pct=sales_delta if previous_period(scope.period, scope.comparison) else None,
+                    delta_pct=sales_delta
+                    if previous_period(scope.period, scope.comparison)
+                    else None,
                     delta_label="față de reper",
                     risk=(
                         RiskLevel.HEALTHY
@@ -255,9 +335,7 @@ class DemoAnalyticsRepository:
                     value=receipt_2plus_pct,
                     unit=MetricUnit.PERCENT,
                     risk=(
-                        RiskLevel.HEALTHY
-                        if receipt_2plus_pct >= Decimal("32")
-                        else RiskLevel.WATCH
+                        RiskLevel.HEALTHY if receipt_2plus_pct >= Decimal("32") else RiskLevel.WATCH
                     ),
                     supporting_value=Decimal(receipt_count),
                     supporting_label="Bonuri totale",
@@ -282,9 +360,7 @@ class DemoAnalyticsRepository:
         if scope.asm:
             stores = [store for store in stores if store.asm == scope.asm]
         if scope.agent:
-            site_codes = {
-                agent.site_code for agent in DEMO_AGENTS if agent.name == scope.agent
-            }
+            site_codes = {agent.site_code for agent in DEMO_AGENTS if agent.name == scope.agent}
             stores = [store for store in stores if store.site_code in site_codes]
         return stores
 

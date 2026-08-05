@@ -130,7 +130,13 @@ PROFILES: dict[ModuleId, ModuleProfile] = {
             _axis("secondary", "EBIT", MetricUnit.CURRENCY),
             _axis("tertiary", "Marjă EBIT", MetricUnit.PERCENT),
         ),
-        charts=(ChartKind.LINE, ChartKind.BAR, ChartKind.WATERFALL, ChartKind.DONUT, ChartKind.TABLE),
+        charts=(
+            ChartKind.LINE,
+            ChartKind.BAR,
+            ChartKind.WATERFALL,
+            ChartKind.DONUT,
+            ChartKind.TABLE,
+        ),
         categories=("Marfă", "Salarii", "Chirii", "Servicii", "Amortizare"),
         base=Decimal("780000"),
     ),
@@ -228,7 +234,10 @@ def _meta(module: ModuleId, scope: AnalyticsScope) -> OverviewMeta:
 def _entities(module: ModuleId, scope: AnalyticsScope) -> list[tuple[str, str, str]]:
     stores = DemoAnalyticsRepository._selected_stores(scope)
     if module is ModuleId.CAMPAIGNS:
-        return [(f"product-{index}", product, "Portofoliu Focus") for index, product in enumerate(PRODUCTS, 1)]
+        return [
+            (f"product-{index}", product, "Portofoliu Focus")
+            for index, product in enumerate(PRODUCTS, 1)
+        ]
     if module in {ModuleId.WORKFORCE, ModuleId.COMPENSATION}:
         store_codes = {store.site_code for store in stores}
         agents = [agent for agent in DEMO_AGENTS if agent.site_code in store_codes]
@@ -237,8 +246,7 @@ def _entities(module: ModuleId, scope: AnalyticsScope) -> list[tuple[str, str, s
             for agent in agents[:16]
         ]
     return [
-        (store.site_code, store.label, f"{store.firm} · {store.regional}")
-        for store in stores[:16]
+        (store.site_code, store.label, f"{store.firm} · {store.regional}") for store in stores[:16]
     ]
 
 
@@ -249,61 +257,230 @@ def _kpis(module: ModuleId, scope: AnalyticsScope, entity_count: int) -> list[Kp
         target = _number(sales / Decimal(str(rng.uniform(0.87, 1.08))))
         receipts = _number(sales / Decimal(str(rng.uniform(88, 118))))
         return [
-            KpiMetric(id="sales.total", label="Vânzări", value=sales, unit=MetricUnit.CURRENCY, delta_pct=_number(rng.uniform(-8, 14)), supporting_value=target, supporting_label="Target", risk=_risk(_number(sales * 100 / target))),
-            KpiMetric(id="target.progress_pct", label="Realizare target", value=_number(sales * 100 / target), unit=MetricUnit.PERCENT, supporting_value=target, supporting_label="Target", risk=_risk(_number(sales * 100 / target))),
-            KpiMetric(id="receipts.average_value", label="Valoare medie bon", value=_number(sales / receipts), unit=MetricUnit.CURRENCY, delta_pct=_number(rng.uniform(-4, 9))),
-            KpiMetric(id="receipts.total", label="Bonuri", value=receipts, unit=MetricUnit.INTEGER, delta_pct=_number(rng.uniform(-6, 12))),
+            KpiMetric(
+                id="sales.total",
+                label="Vânzări",
+                value=sales,
+                unit=MetricUnit.CURRENCY,
+                delta_pct=_number(rng.uniform(-8, 14)),
+                supporting_value=target,
+                supporting_label="Target",
+                risk=_risk(_number(sales * 100 / target)),
+            ),
+            KpiMetric(
+                id="target.progress_pct",
+                label="Realizare target",
+                value=_number(sales * 100 / target),
+                unit=MetricUnit.PERCENT,
+                supporting_value=target,
+                supporting_label="Target",
+                risk=_risk(_number(sales * 100 / target)),
+            ),
+            KpiMetric(
+                id="receipts.average_value",
+                label="Valoare medie bon",
+                value=_number(sales / receipts),
+                unit=MetricUnit.CURRENCY,
+                delta_pct=_number(rng.uniform(-4, 9)),
+            ),
+            KpiMetric(
+                id="receipts.total",
+                label="Bonuri",
+                value=receipts,
+                unit=MetricUnit.INTEGER,
+                delta_pct=_number(rng.uniform(-6, 12)),
+            ),
         ]
     if module is ModuleId.PERFORMANCE:
         average = _number(rng.uniform(88, 104))
         at_target = _number(max(0, round(entity_count * float(average) / 110)))
         return [
-            KpiMetric(id="performance.average", label="Realizare medie", value=average, unit=MetricUnit.PERCENT, risk=_risk(average)),
-            KpiMetric(id="performance.at_target", label="Entități la target", value=at_target, unit=MetricUnit.INTEGER, supporting_value=_number(entity_count), supporting_label="Entități analizate"),
-            KpiMetric(id="performance.volatility", label="Volatilitate", value=_number(rng.uniform(6, 18)), unit=MetricUnit.PERCENT, risk=RiskLevel.WATCH),
-            KpiMetric(id="performance.daily_productivity", label="Productivitate / zi", value=_number(rng.uniform(3700, 6900)), unit=MetricUnit.CURRENCY, delta_pct=_number(rng.uniform(-7, 10))),
+            KpiMetric(
+                id="performance.average",
+                label="Realizare medie",
+                value=average,
+                unit=MetricUnit.PERCENT,
+                risk=_risk(average),
+            ),
+            KpiMetric(
+                id="performance.at_target",
+                label="Entități la target",
+                value=at_target,
+                unit=MetricUnit.INTEGER,
+                supporting_value=_number(entity_count),
+                supporting_label="Entități analizate",
+            ),
+            KpiMetric(
+                id="performance.volatility",
+                label="Volatilitate",
+                value=_number(rng.uniform(6, 18)),
+                unit=MetricUnit.PERCENT,
+                risk=RiskLevel.WATCH,
+            ),
+            KpiMetric(
+                id="performance.daily_productivity",
+                label="Productivitate / zi",
+                value=_number(rng.uniform(3700, 6900)),
+                unit=MetricUnit.CURRENCY,
+                delta_pct=_number(rng.uniform(-7, 10)),
+            ),
         ]
     if module is ModuleId.CAMPAIGNS:
         focus_sales = _number(PROFILES[module].base * Decimal(str(rng.uniform(0.8, 1.2))))
         return [
-            KpiMetric(id="campaigns.focus_sales", label="Vânzări Focus", value=focus_sales, unit=MetricUnit.CURRENCY, delta_pct=_number(rng.uniform(-5, 16))),
-            KpiMetric(id="campaigns.focus_share", label="Pondere Focus", value=_number(rng.uniform(18, 34)), unit=MetricUnit.PERCENT, risk=RiskLevel.HEALTHY),
-            KpiMetric(id="campaigns.active_stores", label="Magazine active", value=_number(max(entity_count, 1)), unit=MetricUnit.INTEGER),
-            KpiMetric(id="campaigns.reward_value", label="Discount & recompense", value=_number(focus_sales * Decimal(str(rng.uniform(0.04, 0.09)))), unit=MetricUnit.CURRENCY),
+            KpiMetric(
+                id="campaigns.focus_sales",
+                label="Vânzări Focus",
+                value=focus_sales,
+                unit=MetricUnit.CURRENCY,
+                delta_pct=_number(rng.uniform(-5, 16)),
+            ),
+            KpiMetric(
+                id="campaigns.focus_share",
+                label="Pondere Focus",
+                value=_number(rng.uniform(18, 34)),
+                unit=MetricUnit.PERCENT,
+                risk=RiskLevel.HEALTHY,
+            ),
+            KpiMetric(
+                id="campaigns.active_stores",
+                label="Magazine active",
+                value=_number(max(entity_count, 1)),
+                unit=MetricUnit.INTEGER,
+            ),
+            KpiMetric(
+                id="campaigns.reward_value",
+                label="Discount & recompense",
+                value=_number(focus_sales * Decimal(str(rng.uniform(0.04, 0.09)))),
+                unit=MetricUnit.CURRENCY,
+            ),
         ]
     if module is ModuleId.WORKFORCE:
         headcount = _number(max(entity_count, 1))
         return [
-            KpiMetric(id="workforce.headcount", label="Headcount activ", value=headcount, unit=MetricUnit.INTEGER),
-            KpiMetric(id="workforce.productivity", label="Productivitate / agent", value=_number(rng.uniform(18500, 31500)), unit=MetricUnit.CURRENCY, delta_pct=_number(rng.uniform(-5, 11))),
-            KpiMetric(id="workforce.coverage", label="Acoperire magazine", value=_number(rng.uniform(86, 100)), unit=MetricUnit.PERCENT, risk=RiskLevel.HEALTHY),
-            KpiMetric(id="workforce.stability", label="Stabilitate 12 luni", value=_number(rng.uniform(72, 94)), unit=MetricUnit.PERCENT, risk=RiskLevel.WATCH),
+            KpiMetric(
+                id="workforce.headcount",
+                label="Headcount activ",
+                value=headcount,
+                unit=MetricUnit.INTEGER,
+            ),
+            KpiMetric(
+                id="workforce.productivity",
+                label="Productivitate / agent",
+                value=_number(rng.uniform(18500, 31500)),
+                unit=MetricUnit.CURRENCY,
+                delta_pct=_number(rng.uniform(-5, 11)),
+            ),
+            KpiMetric(
+                id="workforce.coverage",
+                label="Acoperire magazine",
+                value=_number(rng.uniform(86, 100)),
+                unit=MetricUnit.PERCENT,
+                risk=RiskLevel.HEALTHY,
+            ),
+            KpiMetric(
+                id="workforce.stability",
+                label="Stabilitate 12 luni",
+                value=_number(rng.uniform(72, 94)),
+                unit=MetricUnit.PERCENT,
+                risk=RiskLevel.WATCH,
+            ),
         ]
     if module is ModuleId.COMPENSATION:
         payroll = _number(PROFILES[module].base * Decimal(str(rng.uniform(0.82, 1.14))))
         average = _number(payroll / Decimal(max(entity_count, 1)))
         return [
-            KpiMetric(id="compensation.payroll", label="Cost salarial", value=payroll, unit=MetricUnit.CURRENCY, delta_pct=_number(rng.uniform(-3, 9))),
-            KpiMetric(id="compensation.average", label="Salariu mediu", value=average, unit=MetricUnit.CURRENCY),
-            KpiMetric(id="compensation.median", label="Salariu median", value=_number(average * Decimal(str(rng.uniform(0.91, 0.98)))), unit=MetricUnit.CURRENCY),
-            KpiMetric(id="compensation.sales_ratio", label="Cost / vânzări", value=_number(rng.uniform(17, 28)), unit=MetricUnit.PERCENT, risk=RiskLevel.WATCH),
+            KpiMetric(
+                id="compensation.payroll",
+                label="Cost salarial",
+                value=payroll,
+                unit=MetricUnit.CURRENCY,
+                delta_pct=_number(rng.uniform(-3, 9)),
+            ),
+            KpiMetric(
+                id="compensation.average",
+                label="Salariu mediu",
+                value=average,
+                unit=MetricUnit.CURRENCY,
+            ),
+            KpiMetric(
+                id="compensation.median",
+                label="Salariu median",
+                value=_number(average * Decimal(str(rng.uniform(0.91, 0.98)))),
+                unit=MetricUnit.CURRENCY,
+            ),
+            KpiMetric(
+                id="compensation.sales_ratio",
+                label="Cost / vânzări",
+                value=_number(rng.uniform(17, 28)),
+                unit=MetricUnit.PERCENT,
+                risk=RiskLevel.WATCH,
+            ),
         ]
     if module is ModuleId.FINANCE:
         revenue = _number(PROFILES[module].base * Decimal(str(rng.uniform(0.82, 1.15))))
         ebit = _number(revenue * Decimal(str(rng.uniform(0.08, 0.21))))
         return [
-            KpiMetric(id="finance.revenue", label="Venit net", value=revenue, unit=MetricUnit.CURRENCY, delta_pct=_number(rng.uniform(-7, 13))),
-            KpiMetric(id="finance.ebit", label="EBIT", value=ebit, unit=MetricUnit.CURRENCY, risk=RiskLevel.HEALTHY),
-            KpiMetric(id="finance.ebit_margin", label="Marjă EBIT", value=_number(ebit * 100 / revenue), unit=MetricUnit.PERCENT, risk=RiskLevel.HEALTHY),
-            KpiMetric(id="finance.operating_costs", label="Cost operațional", value=_number(revenue * Decimal(str(rng.uniform(0.36, 0.54)))), unit=MetricUnit.CURRENCY),
+            KpiMetric(
+                id="finance.revenue",
+                label="Venit net",
+                value=revenue,
+                unit=MetricUnit.CURRENCY,
+                delta_pct=_number(rng.uniform(-7, 13)),
+            ),
+            KpiMetric(
+                id="finance.ebit",
+                label="EBIT",
+                value=ebit,
+                unit=MetricUnit.CURRENCY,
+                risk=RiskLevel.HEALTHY,
+            ),
+            KpiMetric(
+                id="finance.ebit_margin",
+                label="Marjă EBIT",
+                value=_number(ebit * 100 / revenue),
+                unit=MetricUnit.PERCENT,
+                risk=RiskLevel.HEALTHY,
+            ),
+            KpiMetric(
+                id="finance.operating_costs",
+                label="Cost operațional",
+                value=_number(revenue * Decimal(str(rng.uniform(0.36, 0.54)))),
+                unit=MetricUnit.CURRENCY,
+            ),
         ]
     forecast = _number(PROFILES[module].base * Decimal(str(rng.uniform(0.89, 1.11))))
     target = _number(forecast / Decimal(str(rng.uniform(0.91, 1.05))))
     return [
-        KpiMetric(id="planning.forecast", label="Forecast", value=forecast, unit=MetricUnit.CURRENCY, supporting_value=target, supporting_label="Target", risk=_risk(_number(forecast * 100 / target))),
-        KpiMetric(id="planning.target_gap", label="Gap față de target", value=_number(forecast - target), unit=MetricUnit.CURRENCY, risk=_risk(_number(forecast * 100 / target))),
-        KpiMetric(id="planning.accuracy", label="Acuratețe forecast", value=_number(rng.uniform(86, 97)), unit=MetricUnit.PERCENT, risk=RiskLevel.HEALTHY),
-        KpiMetric(id="planning.upside", label="Scenariu upside", value=_number(forecast * Decimal(str(rng.uniform(1.06, 1.13)))), unit=MetricUnit.CURRENCY),
+        KpiMetric(
+            id="planning.forecast",
+            label="Forecast",
+            value=forecast,
+            unit=MetricUnit.CURRENCY,
+            supporting_value=target,
+            supporting_label="Target",
+            risk=_risk(_number(forecast * 100 / target)),
+        ),
+        KpiMetric(
+            id="planning.target_gap",
+            label="Gap față de target",
+            value=_number(forecast - target),
+            unit=MetricUnit.CURRENCY,
+            risk=_risk(_number(forecast * 100 / target)),
+        ),
+        KpiMetric(
+            id="planning.accuracy",
+            label="Acuratețe forecast",
+            value=_number(rng.uniform(86, 97)),
+            unit=MetricUnit.PERCENT,
+            risk=RiskLevel.HEALTHY,
+        ),
+        KpiMetric(
+            id="planning.upside",
+            label="Scenariu upside",
+            value=_number(forecast * Decimal(str(rng.uniform(1.06, 1.13)))),
+            unit=MetricUnit.CURRENCY,
+        ),
     ]
 
 
@@ -377,7 +554,11 @@ def _distribution(module: ModuleId, scope: AnalyticsScope) -> list[DimensionShar
     allocated = Decimal(0)
     result: list[DimensionShare] = []
     for index, (label, weight) in enumerate(zip(profile.categories, weights, strict=True)):
-        value = total_value - allocated if index == len(weights) - 1 else _number(total_value * weight / total_weight)
+        value = (
+            total_value - allocated
+            if index == len(weights) - 1
+            else _number(total_value * weight / total_weight)
+        )
         allocated += value
         result.append(
             DimensionShare(

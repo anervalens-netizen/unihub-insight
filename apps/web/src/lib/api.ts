@@ -42,13 +42,7 @@ async function parseError(response: Response): Promise<ApiError> {
 export async function requestJson<T>(
   path: string,
   search: URLSearchParams | undefined,
-  {
-    schema,
-    signal,
-    timeoutMs = 5_000,
-    method = 'GET',
-    body,
-  }: RequestOptions<T>,
+  { schema, signal, timeoutMs = 5_000, method = 'GET', body }: RequestOptions<T>,
 ): Promise<T> {
   const timeoutController = new AbortController();
   const timeout = window.setTimeout(() => timeoutController.abort(), timeoutMs);

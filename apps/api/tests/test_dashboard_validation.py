@@ -22,7 +22,11 @@ def payload(widget: dict[str, object]) -> dict[str, object]:
 
 
 def test_rejects_unknown_metric_and_canvas_overflow(client: TestClient) -> None:
-    widget = {**BASE_WIDGET, "metric_id": "finance.revenue", "layout": {**BASE_WIDGET["layout"], "x": 22, "w": 6}}
+    widget = {
+        **BASE_WIDGET,
+        "metric_id": "finance.revenue",
+        "layout": {**BASE_WIDGET["layout"], "x": 22, "w": 6},
+    }
     response = client.post("/api/v1/dashboards", json=payload(widget))
     assert response.status_code == 422
     errors = response.json()["detail"]["errors"]
@@ -38,8 +42,14 @@ def test_rejects_duplicate_widget_ids(client: TestClient) -> None:
 
 
 def test_manager_cannot_save_finance_widget() -> None:
-    settings = Settings(environment="test", data_mode="demo", auth_mode="proxy", trusted_proxy_secret="secret")
-    headers = {"X-UniHub-Proxy-Secret": "secret", "X-Authentik-Uid": "manager", "X-Authentik-Groups": "unihub-manager"}
+    settings = Settings(
+        environment="test", data_mode="demo", auth_mode="proxy", trusted_proxy_secret="secret"
+    )
+    headers = {
+        "X-UniHub-Proxy-Secret": "secret",
+        "X-Authentik-Uid": "manager",
+        "X-Authentik-Groups": "unihub-manager",
+    }
     widget = {**BASE_WIDGET, "module": "finance", "metric_id": "finance.revenue"}
     with TestClient(create_app(settings)) as client:
         response = client.post("/api/v1/dashboards", json=payload(widget), headers=headers)

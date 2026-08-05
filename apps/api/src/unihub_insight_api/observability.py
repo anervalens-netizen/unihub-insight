@@ -67,9 +67,7 @@ class MetricsRegistry:
         duration_key = (route, method)
         with self._lock:
             self._http_counts[key] += 1
-            histogram = self._http_durations.setdefault(
-                duration_key, HistogramState(HTTP_BUCKETS)
-            )
+            histogram = self._http_durations.setdefault(duration_key, HistogramState(HTTP_BUCKETS))
             histogram.observe(duration_seconds)
 
     def record_web_vital(
@@ -82,9 +80,7 @@ class MetricsRegistry:
     ) -> None:
         key = (metric, rating, navigation_type)
         with self._lock:
-            histogram = self._web_vitals.setdefault(
-                key, HistogramState(WEB_VITAL_BUCKETS_MS)
-            )
+            histogram = self._web_vitals.setdefault(key, HistogramState(WEB_VITAL_BUCKETS_MS))
             histogram.observe(value_ms)
 
     def render(self) -> str:
@@ -94,9 +90,7 @@ class MetricsRegistry:
         ]
         with self._lock:
             for (route, method, status_class), count in sorted(self._http_counts.items()):
-                labels = _labels(
-                    {"route": route, "method": method, "status_class": status_class}
-                )
+                labels = _labels({"route": route, "method": method, "status_class": status_class})
                 lines.append(f"unihub_insight_http_requests_total{labels} {count}")
 
             lines.extend(
@@ -131,9 +125,7 @@ class MetricsRegistry:
                     "# TYPE unihub_insight_web_vital_milliseconds histogram",
                 ]
             )
-            for (metric, rating, navigation_type), state in sorted(
-                self._web_vitals.items()
-            ):
+            for (metric, rating, navigation_type), state in sorted(self._web_vitals.items()):
                 base = {
                     "metric": metric,
                     "rating": rating,
