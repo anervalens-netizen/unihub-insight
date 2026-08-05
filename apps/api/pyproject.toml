@@ -56,3 +56,7 @@ strict = true
 plugins = ["pydantic.mypy"]
 mypy_path = "src"
 exclude = ["tests/"]
+
+[[tool.mypy.overrides]]
+module = ["asyncpg", "asyncpg.*", "xlsxwriter", "xlsxwriter.*"]
+ignore_missing_imports = true
