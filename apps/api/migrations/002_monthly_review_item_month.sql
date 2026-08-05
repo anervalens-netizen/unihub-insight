@@ -28,6 +28,7 @@ GROUP BY
 COMMENT ON VIEW insight.monthly_review_item_month IS
     'Governed monthly return-value and product-attribute supplement. Core KPIs remain sourced from reporting_* tables.';
 
+GRANT USAGE ON SCHEMA insight TO unihub_insight_reader;
 GRANT SELECT ON insight.monthly_review_item_month TO unihub_insight_reader;
 
 COMMIT;
