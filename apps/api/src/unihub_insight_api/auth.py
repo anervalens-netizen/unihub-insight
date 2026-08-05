@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import secrets
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Annotated, cast
 
 from fastapi import Depends, HTTPException, Request, status
@@ -73,7 +73,7 @@ async def get_current_user(request: Request) -> UserContext:
     )
 
 
-def require_capability(capability: Capability) -> Callable[..., UserContext]:
+def require_capability(capability: Capability) -> Callable[..., Awaitable[UserContext]]:
     async def dependency(
         user: Annotated[UserContext, Depends(get_current_user)],
     ) -> UserContext:
