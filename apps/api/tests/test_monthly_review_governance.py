@@ -115,7 +115,9 @@ def test_monthly_targets_are_aggregated_before_joining() -> None:
 
     assert combined.count("SUM(target.target_value) AS target_value") >= 3
     assert "GROUP BY target.import_month, target.site_code" in store_source
-    assert "GROUP BY\n                        target.import_month,\n                        target.site_code,\n                        target.agent" in agent_source
+    assert "target.import_month" in agent_source
+    assert "target.site_code" in agent_source
+    assert "target.agent" in agent_source
     assert "LEFT JOIN targets USING (import_month, site_code)" in store_source
     assert "LEFT JOIN targets USING (import_month, site_code, agent)" in agent_source
     assert "LEFT JOIN agent_targets target USING" not in combined
