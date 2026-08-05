@@ -126,12 +126,14 @@ function ConfiguredChart({
   metric,
   result,
   onUrlStateChange,
+  onUrlStateReset,
 }: {
   widget: DashboardWidget;
   dataset: QueryDataset;
   metric: MetricDefinition;
   result: WidgetQueryResult;
   onUrlStateChange?: (event: ChartUrlStateEvent) => void;
+  onUrlStateReset?: () => void;
 }) {
   const resolved = useMemo(
     () => resolveChartSpec(metric, widget.visualization, dataset),
@@ -157,6 +159,11 @@ function ConfiguredChart({
           const interaction = chartEventToUrlState(dataset, event);
           if (interaction) onUrlStateChange?.(interaction);
         }}
+        onDoubleEvent={(event) => {
+          const interaction = chartEventToUrlState(dataset, event);
+          if (interaction) onUrlStateChange?.(interaction);
+        }}
+        {...(onUrlStateReset ? { onBlankReset: onUrlStateReset } : {})}
       />
       <details className="chart-backing-table">
         <summary>Date sursă accesibile</summary>
@@ -175,6 +182,7 @@ export function ConfiguredWidget({
   requestError,
   onRetry,
   onUrlStateChange,
+  onUrlStateReset,
 }: {
   widget: DashboardWidget;
   result: WidgetQueryResult | undefined;
@@ -183,6 +191,7 @@ export function ConfiguredWidget({
   requestError?: unknown;
   onRetry?: () => void;
   onUrlStateChange?: (event: ChartUrlStateEvent) => void;
+  onUrlStateReset?: () => void;
 }) {
   if (loading) return <LoadingState label={`Se încarcă ${widget.title}…`} />;
   if (requestError) {
@@ -274,6 +283,7 @@ export function ConfiguredWidget({
       metric={metric}
       result={result}
       {...(onUrlStateChange ? { onUrlStateChange } : {})}
+      {...(onUrlStateReset ? { onUrlStateReset } : {})}
     />
   );
 }

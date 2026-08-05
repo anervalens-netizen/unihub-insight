@@ -453,6 +453,7 @@ export function CustomDashboardsPage() {
                         : {}),
                     });
                   }}
+                  onUrlStateReset={() => updateSearch({ drill: undefined, stores: undefined })}
                 />
               </>
             ) : canEdit ? (

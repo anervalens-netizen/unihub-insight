@@ -64,6 +64,16 @@ function SourceMetadataStrip({ data }: { data: ModuleAnalytics }) {
       <h3 id="module-source-metadata-title" className="sr-only">
         Metadata surse
       </h3>
+      {data.meta.range_start && data.meta.range_end ? (
+        <span className="meta-chip">
+          Interval: {data.meta.range_start} → {data.meta.range_end}
+        </span>
+      ) : null}
+      {data.meta.warnings?.map((warning) => (
+        <span className="meta-chip meta-chip--warning" key={warning}>
+          {warning}
+        </span>
+      ))}
       {sources.length === 0 ? (
         <span className="meta-chip meta-chip--warning">Metadata sursă indisponibilă</span>
       ) : (
@@ -157,7 +167,11 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
     });
   };
   return (
-    <ModuleProvider data={data} onUrlStateChange={handleUrlState}>
+    <ModuleProvider
+      data={data}
+      onUrlStateChange={handleUrlState}
+      onUrlStateReset={() => updateSearch({ drill: undefined, stores: undefined })}
+    >
       <SubviewNavigation
         views={views}
         selected={selectedSubview}

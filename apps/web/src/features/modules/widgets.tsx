@@ -21,10 +21,10 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { EChart } from '../../components/charts/EChart';
+import { EChart, type EChartEvent } from '../../components/charts/EChart';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { formatCurrency, formatInteger, formatPercent } from '../../lib/format';
-import { useModuleData, useModuleUrlStateChange } from './context';
+import { useModuleData, useModuleUrlStateChange, useModuleUrlStateReset } from './context';
 import type { BreakdownRow, ChartKind, ModuleKpi } from './schemas';
 
 function formatValue(value: number | null | undefined, unit: string, compact = false): string {
@@ -150,6 +150,7 @@ function ChartToggle<Kind extends ChartKind>({
 export function ModuleTrendWidget() {
   const data = useModuleData();
   const onUrlStateChange = useModuleUrlStateChange();
+  const onUrlStateReset = useModuleUrlStateReset();
   const supported = data.supported_charts.filter(
     (kind): kind is 'line' | 'area' | 'bar' => kind === 'line' || kind === 'area' || kind === 'bar',
   );
@@ -172,7 +173,7 @@ export function ModuleTrendWidget() {
             name: primaryAxis?.label ?? 'Valoare',
             data: data.trend.map((point) => point.primary),
             showSymbol: false,
-            smooth: 0.18,
+            smooth: false,
             lineStyle: { width: 3, color: '#4f46e5' },
             itemStyle: { color: '#4f46e5' },
             ...(kind === 'area' ? { areaStyle: { color: 'rgba(79,70,229,0.12)' } } : {}),
@@ -219,6 +220,12 @@ export function ModuleTrendWidget() {
   }, [data, kind, primaryAxis]);
   if (data.trend.length === 0)
     return <EmptyState message="Nu există serie temporală pentru scope-ul curent." />;
+  const handlePointEvent = (event: EChartEvent) => {
+    const point = event.dataIndex === undefined ? undefined : data.trend[event.dataIndex];
+    if (point) {
+      onUrlStateChange?.({ dimensionId: 'period', value: point.key, label: point.label });
+    }
+  };
   return (
     <div className="chart-widget">
       <ChartToggle options={choices} value={kind} onChange={setKind} />
@@ -226,12 +233,9 @@ export function ModuleTrendWidget() {
         option={option}
         className="chart--fill"
         ariaLabel={`Evoluție ${data.title}`}
-        onEvent={(event) => {
-          const point = event.dataIndex === undefined ? undefined : data.trend[event.dataIndex];
-          if (point) {
-            onUrlStateChange?.({ dimensionId: 'period', value: point.key, label: point.label });
-          }
-        }}
+        onEvent={handlePointEvent}
+        onDoubleEvent={handlePointEvent}
+        {...(onUrlStateReset ? { onBlankReset: onUrlStateReset } : {})}
       />
     </div>
   );
@@ -240,6 +244,7 @@ export function ModuleTrendWidget() {
 export function ModuleDistributionWidget() {
   const data = useModuleData();
   const onUrlStateChange = useModuleUrlStateChange();
+  const onUrlStateReset = useModuleUrlStateReset();
   const choices: Array<'donut' | 'bar'> = data.supported_charts.includes('donut')
     ? ['donut', 'bar']
     : ['bar'];
@@ -283,6 +288,16 @@ export function ModuleDistributionWidget() {
   );
   if (data.distribution.length === 0)
     return <EmptyState message="Nu există distribuție pentru scope-ul curent." />;
+  const handleDistributionEvent = (event: EChartEvent) => {
+    const item = event.dataIndex === undefined ? undefined : data.distribution[event.dataIndex];
+    if (item) {
+      onUrlStateChange?.({
+        dimensionId: `${data.module}.distribution`,
+        value: item.id,
+        label: item.label,
+      });
+    }
+  };
   return (
     <div className="chart-widget">
       <ChartToggle options={choices} value={kind} onChange={setKind} />
@@ -290,17 +305,9 @@ export function ModuleDistributionWidget() {
         option={option}
         className="chart--fill"
         ariaLabel={`Distribuție ${data.title}`}
-        onEvent={(event) => {
-          const item =
-            event.dataIndex === undefined ? undefined : data.distribution[event.dataIndex];
-          if (item) {
-            onUrlStateChange?.({
-              dimensionId: `${data.module}.distribution`,
-              value: item.id,
-              label: item.label,
-            });
-          }
-        }}
+        onEvent={handleDistributionEvent}
+        onDoubleEvent={handleDistributionEvent}
+        {...(onUrlStateReset ? { onBlankReset: onUrlStateReset } : {})}
       />
     </div>
   );
@@ -309,6 +316,7 @@ export function ModuleDistributionWidget() {
 export function ModuleMatrixWidget() {
   const data = useModuleData();
   const onUrlStateChange = useModuleUrlStateChange();
+  const onUrlStateReset = useModuleUrlStateReset();
   const xValues = useMemo(() => [...new Set(data.matrix.map((cell) => cell.x))], [data.matrix]);
   const yValues = useMemo(() => [...new Set(data.matrix.map((cell) => cell.y))], [data.matrix]);
   const values = data.matrix.map((cell) => cell.value);
@@ -358,21 +366,24 @@ export function ModuleMatrixWidget() {
   );
   if (data.matrix.length === 0)
     return <EmptyState message="Matricea nu este disponibilă pentru scope-ul curent." />;
+  const handleMatrixEvent = (event: EChartEvent) => {
+    const cell = event.dataIndex === undefined ? undefined : data.matrix[event.dataIndex];
+    if (cell) {
+      onUrlStateChange?.({
+        dimensionId: `${data.module}.matrix`,
+        value: `${cell.x}|${cell.y}`,
+        label: cell.label ?? `${cell.y} · ${cell.x}`,
+      });
+    }
+  };
   return (
     <EChart
       option={option}
       className="chart--fill"
       ariaLabel={`Matrice temporală ${data.title}`}
-      onEvent={(event) => {
-        const cell = event.dataIndex === undefined ? undefined : data.matrix[event.dataIndex];
-        if (cell) {
-          onUrlStateChange?.({
-            dimensionId: `${data.module}.matrix`,
-            value: `${cell.x}|${cell.y}`,
-            label: cell.label ?? `${cell.y} · ${cell.x}`,
-          });
-        }
-      }}
+      onEvent={handleMatrixEvent}
+      onDoubleEvent={handleMatrixEvent}
+      {...(onUrlStateReset ? { onBlankReset: onUrlStateReset } : {})}
     />
   );
 }

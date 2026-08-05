@@ -64,6 +64,11 @@ class ChartKind(StrEnum):
     HEATMAP = "heatmap"
     SCATTER = "scatter"
     WATERFALL = "waterfall"
+    HISTOGRAM = "histogram"
+    BOXPLOT = "boxplot"
+    TREEMAP = "treemap"
+    CALENDAR = "calendar"
+    FORECAST_BAND = "forecast-band"
     TABLE = "table"
     KPI = "kpi"
 
@@ -166,6 +171,10 @@ class OverviewMeta(BaseModel):
     analytical_snapshot_id: str | None = None
     snapshot_contract_version: int = 1
     sources: dict[SourceDomain, SourceMetadata] = Field(default_factory=dict)
+    range_start: str | None = None
+    range_end: str | None = None
+    requested_comparisons: tuple[str, ...] = ()
+    warnings: tuple[str, ...] = ()
 
 
 class SourceMetadata(BaseModel):

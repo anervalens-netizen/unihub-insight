@@ -21,6 +21,7 @@
     "test": "npm --workspace @unihub-insight/web run test && uv run --project apps/api pytest apps/api/tests",
     "build": "npm --workspace @unihub-insight/web run build",
     "bundle:check": "node scripts/check-bundle.mjs",
+    "browser:qa": "npm --workspace @unihub-insight/web run browser:qa",
     "verify": "bash scripts/verify.sh"
   }
 }

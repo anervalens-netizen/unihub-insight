@@ -5,7 +5,12 @@ export type ProfessionalChartType =
   | 'donut'
   | 'waterfall'
   | 'heatmap'
-  | 'scatter';
+  | 'scatter'
+  | 'histogram'
+  | 'boxplot'
+  | 'treemap'
+  | 'calendar'
+  | 'forecast-band';
 
 const labels: Record<ProfessionalChartType, string> = {
   line: 'Linie',
@@ -15,6 +20,11 @@ const labels: Record<ProfessionalChartType, string> = {
   waterfall: 'Waterfall',
   heatmap: 'Heatmap',
   scatter: 'Scatter',
+  histogram: 'Histogramă',
+  boxplot: 'Box plot',
+  treemap: 'Treemap',
+  calendar: 'Calendar',
+  'forecast-band': 'Bandă forecast',
 };
 
 export function ChartTypeSelector<Type extends ProfessionalChartType>({

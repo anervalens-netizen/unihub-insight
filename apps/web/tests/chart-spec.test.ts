@@ -20,7 +20,7 @@ const metric: MetricDefinition = {
   missing_policy: 'null',
   required_capability: 'insight:analytics',
   formula_reference: 'retail',
-  allowed_shapes: ['line', 'table', 'waterfall'],
+  allowed_shapes: ['line', 'table', 'waterfall', 'scatter', 'heatmap'],
   suppressible: false,
   source_authority: 'retail',
   query_contract_version: 1,
@@ -56,10 +56,41 @@ describe('ChartSpec registry', () => {
     expect(resolved).toMatchObject({ kind: 'table', reason: expect.any(String) });
   });
 
-  it('does not render a fake waterfall', () => {
-    const resolved = resolveChartSpec(metric, 'waterfall', dataset);
-    expect(resolved).toMatchObject({ kind: 'table' });
-    if (resolved.kind === 'table') expect(resolved.reason).toContain('Waterfall');
+  it('renders only a reconciled start/delta/total waterfall', () => {
+    const waterfall: QueryDataset = {
+      dimensions: [
+        { id: 'label', label: 'Pas', kind: 'string', role: 'label' },
+        { id: 'value', label: 'Valoare', kind: 'number', role: 'value' },
+        { id: 'step_kind', label: 'Tip', kind: 'string', role: 'metadata' },
+      ],
+      rows: [
+        { label: 'Venit', value: 100, step_kind: 'start' },
+        { label: 'Costuri', value: -35, step_kind: 'delta' },
+        { label: 'EBIT', value: 65, step_kind: 'total' },
+      ],
+    };
+    expect(resolveChartSpec(metric, 'waterfall', waterfall)).toMatchObject({
+      kind: 'chart',
+      shape: 'waterfall',
+    });
+    waterfall.rows[2] = { label: 'EBIT', value: 64, step_kind: 'total' };
+    expect(resolveChartSpec(metric, 'waterfall', waterfall)).toMatchObject({ kind: 'table' });
+  });
+
+  it('requires explicit semantic x/y axes for scatter', () => {
+    expect(resolveChartSpec(metric, 'scatter', dataset)).toMatchObject({ kind: 'table' });
+    const scatter: QueryDataset = {
+      dimensions: [
+        { id: 'id', label: 'Magazin', kind: 'string', role: 'key' },
+        { id: 'x', label: 'Productivitate', kind: 'number', role: 'value' },
+        { id: 'y', label: 'Realizare', kind: 'number', role: 'metadata' },
+      ],
+      rows: [{ id: 'S001', x: 1200, y: 98 }],
+    };
+    expect(resolveChartSpec(metric, 'scatter', scatter)).toMatchObject({
+      kind: 'chart',
+      shape: 'scatter',
+    });
   });
 
   it('adapts internal chart events to URL-state callbacks', () => {

@@ -46,6 +46,8 @@ Measure at minimum:
 
 Chart POC also measures ECharts bundle/chunk, first render, resize, frame time and browser memory at 1180/1440/1920/ultrawide, including a 100×36 heatmap and scatter up to the documented Canvas threshold. Canvas/SVG is selected from evidence.
 
+Reproducible functional browser coverage runs with `npm run browser:qa`. It does not replace the production RUM/load gate or owner visual acceptance.
+
 ## Failure criteria
 
 - any ordinary request exceeds the hard deadline;

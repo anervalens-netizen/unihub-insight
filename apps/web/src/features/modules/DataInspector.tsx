@@ -1,5 +1,5 @@
 import { Download, X } from 'lucide-react';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 import type { ModuleAnalytics } from './schemas';
@@ -7,10 +7,10 @@ import type { ModuleAnalytics } from './schemas';
 type InspectValue = string | number | boolean | null;
 type InspectRow = Record<string, InspectValue>;
 
-function rowsFor(widgetId: string, data: ModuleAnalytics): InspectRow[] {
-  if (widgetId.startsWith('kpi-')) {
-    const index = Number(widgetId.slice(4));
-    const item = data.kpis[index];
+export function rowsFor(widgetId: string, data: ModuleAnalytics): InspectRow[] {
+  if (widgetId.startsWith('kpi:')) {
+    const metricId = widgetId.slice(4);
+    const item = data.kpis.find((metric) => metric.id === metricId);
     return item
       ? [
           {
@@ -68,9 +68,10 @@ function rowsFor(widgetId: string, data: ModuleAnalytics): InspectRow[] {
   return [];
 }
 
-function csvCell(value: InspectValue): string {
+export function csvCell(value: InspectValue): string {
   if (value === null) return '';
-  const text = String(value);
+  const raw = String(value);
+  const text = typeof value === 'string' && /^\s*[=+\-@]/.test(raw) ? `'${raw}` : raw;
   return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
@@ -97,22 +98,55 @@ export function DataInspector({
   data: ModuleAnalytics;
   onClose: () => void;
 }) {
+  const dialogRef = useRef<HTMLElement>(null);
   const rows = useMemo(() => rowsFor(widgetId, data), [data, widgetId]);
   const columns = useMemo(() => (rows[0] ? Object.keys(rows[0]) : []), [rows]);
   useEffect(() => {
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const dialog = dialogRef.current;
+    dialog?.focus();
     const handler = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab' || !dialog) return;
+      const focusable = [
+        ...dialog.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+        ),
+      ];
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
     };
     window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    return () => {
+      window.removeEventListener('keydown', handler);
+      previouslyFocused?.focus();
+    };
   }, [onClose]);
   return createPortal(
     <div className="widget-modal-backdrop">
       <section
+        ref={dialogRef}
         className="data-inspector"
         role="dialog"
         aria-modal="true"
         aria-labelledby="data-inspector-title"
+        tabIndex={-1}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="data-inspector-header">

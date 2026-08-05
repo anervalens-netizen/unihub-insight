@@ -32,7 +32,7 @@ flowchart LR
 app/                   shell, router, navigation, global filters
 features/overview/     live executive overview
 features/monthly-review rich historical monthly analysis
-features/modules/      current shared analytics module template
+features/modules/      sub-view-uri de domeniu peste primitive analitice comune
 features/dashboards/   persisted custom dashboard library/editor/preview
 features/identity/     verified user/capability context
 components/charts/   ECharts adapter and lifecycle
@@ -68,7 +68,9 @@ The API exposes:
 - `GET /readyz` — PostgreSQL read-only readiness in live mode;
 - `GET /api/v1/filters/options` — periods and dependent dimensions;
 - `GET /api/v1/overview` — one coherent Overview payload;
-- `GET /api/v1/modules/{module}` — actualul contract generic pentru cele șapte module;
+- `GET /api/v1/modules/{module}` — contractul nativ al modulului, cu interval finit și metadata explicită;
+- `POST /api/v1/query/batch` — maximum 12 widgeturi pe același snapshot eligibil;
+- `POST /api/v1/query/inspect` și `/query/export.csv` — exact query-ul widgetului și același snapshot;
 - `GET /api/v1/monthly-review` — raportul lunar istoric;
 - `GET /api/v1/catalog/metrics` — definiții canonice inițiale;
 - `/api/v1/dashboards` — CRUD metadata cu optimistic concurrency;
@@ -80,12 +82,12 @@ The API exposes:
 ## Data path
 
 1. Router validates query shape and finite comparison mode.
-2. Scope dependency deduplicates and preserves store ordering.
-3. Repository reads approved Retail reporting models.
-4. Repository computes only contracted metrics and explicit comparisons.
-5. Pydantic validates the response.
-6. Web validates JSON again with Zod before rendering.
-7. Query cache keys include the complete normalized scope.
+2. Scope/window dependencies normalizează magazinele, intervalul și comparațiile cerute.
+3. Resolverul de snapshot fixează generațiile eligibile per domeniu pentru query batch.
+4. Repository citește numai reporting models aprobate și query-uri parametrizate.
+5. Serviciile validează metrică × dimensiune × grain × chart și aplică deadline comun.
+6. Pydantic validează răspunsul; web-ul îl validează din nou cu Zod.
+7. Query cache keys includ scope-ul și fereastra normalizate complet.
 
 ## PostgreSQL read boundary
 
@@ -95,10 +97,10 @@ Adaptorul live folosește numai surse Retail aprobate, între care:
 - `reporting_agent_month`;
 - `reporting_item_month` și reporting categorie/Focus/lifecycle/profile;
 - targeturi agent/magazin și magazine;
-- status Grile, coloane salariale aprobate în prezent, `store_pnl_monthly` și forecast run-uri;
+- status Grile și read-model-urile v1 pentru Campaigns, Workforce, Compensation, Visits, Finance și Planning;
 - `import_snapshots` pentru coverage/cutoff unde contractul îl cere.
 
-Accesul salarial direct existent este tranzitoriu și trebuie înlocuit cu read-model agregat Retail, apoi revocat. Campaigns, Workforce/Visits, Compensation, Finance generation authority și Planning necesită read-model-urile descrise în [planul integrat](docs/PLAN_DEZVOLTARE_INTEGRAT.md).
+Compensation citește exclusiv agregatul aprobat și nu expune persoane sau filtre diferențiatoare. Granturile raw Finance/Planning păstrate pentru compatibilitatea N/N-1 se revocă numai după două release-uri de produs acceptate și rollback B→A; API-ul Insight nu le folosește.
 
 Connection safeguards:
 
@@ -131,7 +133,7 @@ Modul demo determinist există numai pentru dezvoltare/test și nu dovedește ma
 
 ### Baseline live
 
-Overview și Monthly Review sunt suprafețe distincte și mature. Sales, Performance, Campaigns, Workforce, Compensation, Finance și Planning sunt live ca rutare/date, dar folosesc predominant același payload și catalog generic de nouă widgeturi. Custom Dashboards persistă configurații, însă execută încă cereri independente pe widget și are sharing global, nu ACL per subject.
+Overview și Monthly Review sunt suprafețe distincte. Cele șapte module au sub-view-uri și rețete proprii, dar unele folosesc încă aceleași primitive și nu acoperă toate contractele din plan. Custom Dashboards folosește batch, versionare, ACL per subject și scope ceiling; editorul multi-dimensiune rămâne parțial.
 
 ### Arhitectura țintă
 

@@ -10,6 +10,10 @@ from unihub_insight_api.services.monthly_review_contract import (
     MONTHLY_REVIEW_METRICS,
 )
 
+KPI_TABLE = (ChartKind.KPI, ChartKind.TABLE)
+TREND = (ChartKind.KPI, ChartKind.LINE, ChartKind.AREA, ChartKind.BAR, ChartKind.TABLE)
+TREND_MIX = (*TREND[:-1], ChartKind.DONUT, ChartKind.TREEMAP, ChartKind.TABLE)
+
 
 def metric(
     metric_id: str,
@@ -23,16 +27,7 @@ def metric(
     grains: tuple[str, ...] = ("day", "month", "year"),
     comparison: str = "previous-period-or-year",
     missing: str = "covered-empty-is-zero",
-    shapes: tuple[ChartKind, ...] = (
-        ChartKind.KPI,
-        ChartKind.LINE,
-        ChartKind.AREA,
-        ChartKind.BAR,
-        ChartKind.DONUT,
-        ChartKind.HEATMAP,
-        ChartKind.SCATTER,
-        ChartKind.TABLE,
-    ),
+    shapes: tuple[ChartKind, ...] = TREND,
     suppressible: bool = False,
     source_authority: str = "unihub-retail",
 ) -> MetricDefinition:
@@ -60,6 +55,7 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         "Suma vânzărilor nete de accesorii.",
         MetricUnit.CURRENCY,
         dimensions=("firm", "regional", "asm", "store", "agent", "category", "time"),
+        shapes=TREND_MIX,
     ),
     metric(
         "target.progress_pct",
@@ -68,6 +64,7 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         MetricUnit.PERCENT,
         aggregation="ratio-of-sums",
         missing="null-when-target-non-positive",
+        shapes=(ChartKind.KPI, ChartKind.LINE, ChartKind.BAR, ChartKind.HEATMAP, ChartKind.TABLE),
     ),
     metric(
         "forecast.linear",
@@ -77,8 +74,16 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         aggregation="derived",
         grains=("month",),
         missing="null-without-cutoff",
+        shapes=KPI_TABLE,
     ),
-    metric("receipts.total", "Bonuri", "Numărul canonic de bonuri în scope.", MetricUnit.INTEGER),
+    metric(
+        "receipts.total",
+        "Bonuri",
+        "Numărul canonic de bonuri în scope.",
+        MetricUnit.INTEGER,
+        grains=("month",),
+        shapes=KPI_TABLE,
+    ),
     metric(
         "receipts.average_value",
         "Valoare medie bon",
@@ -86,6 +91,8 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         MetricUnit.CURRENCY,
         aggregation="ratio-of-sums",
         missing="null-when-no-receipts",
+        grains=("month",),
+        shapes=KPI_TABLE,
     ),
     metric(
         "receipt_2plus_pct",
@@ -94,6 +101,8 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         MetricUnit.PERCENT,
         aggregation="ratio-of-sums",
         missing="null-when-no-receipts",
+        grains=("month",),
+        shapes=KPI_TABLE,
     ),
     metric(
         "performance.average",
@@ -101,6 +110,16 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         "Media ponderată a realizării targetului.",
         MetricUnit.PERCENT,
         aggregation="ratio-of-sums",
+        shapes=(
+            ChartKind.KPI,
+            ChartKind.LINE,
+            ChartKind.BAR,
+            ChartKind.HEATMAP,
+            ChartKind.SCATTER,
+            ChartKind.HISTOGRAM,
+            ChartKind.BOXPLOT,
+            ChartKind.TABLE,
+        ),
     ),
     metric(
         "performance.at_target",
@@ -108,6 +127,8 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         "Numărul entităților cu realizare de minimum 100%.",
         MetricUnit.INTEGER,
         aggregation="count",
+        grains=("month",),
+        shapes=KPI_TABLE,
     ),
     metric(
         "performance.volatility",
@@ -115,6 +136,8 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         "Dispersia performanței în fereastra selectată.",
         MetricUnit.PERCENT,
         aggregation="derived",
+        grains=("month",),
+        shapes=KPI_TABLE,
     ),
     metric(
         "performance.daily_productivity",
@@ -122,6 +145,7 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         "Vânzări împărțite la totalul zilelor-agent acoperite.",
         MetricUnit.CURRENCY,
         aggregation="ratio-of-sums",
+        shapes=(ChartKind.KPI, ChartKind.BAR, ChartKind.HISTOGRAM, ChartKind.BOXPLOT, ChartKind.TABLE),
     ),
     metric(
         "campaigns.focus_sales",
@@ -129,6 +153,7 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         "Vânzările produselor Focus active.",
         MetricUnit.CURRENCY,
         dimensions=("firm", "regional", "asm", "store", "mechanism", "category", "time"),
+        shapes=TREND_MIX,
     ),
     metric(
         "campaigns.focus_share",
@@ -137,6 +162,7 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         MetricUnit.PERCENT,
         aggregation="ratio-of-sums",
         dimensions=("firm", "regional", "asm", "store", "mechanism", "category", "time"),
+        shapes=(ChartKind.KPI, ChartKind.LINE, ChartKind.BAR, ChartKind.HEATMAP, ChartKind.TABLE),
     ),
     metric(
         "campaigns.active_stores",
@@ -145,6 +171,8 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         MetricUnit.INTEGER,
         aggregation="distinct-count",
         dimensions=("firm", "regional", "asm", "store", "mechanism", "time"),
+        grains=("month",),
+        shapes=KPI_TABLE,
     ),
     metric(
         "campaigns.active_products",
@@ -154,7 +182,7 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         aggregation="distinct-count",
         dimensions=("firm", "regional", "asm", "store", "mechanism", "category", "time"),
         grains=("month",),
-        shapes=(ChartKind.KPI, ChartKind.TABLE),
+        shapes=KPI_TABLE,
         missing="null-without-focus-contract",
     ),
     metric(
@@ -164,6 +192,8 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         MetricUnit.INTEGER,
         aggregation="distinct-count",
         capability=Capability.MANAGEMENT,
+        dimensions=("firm", "regional", "asm", "store", "agent", "tenure", "time"),
+        shapes=TREND_MIX,
     ),
     metric(
         "workforce.productivity",
@@ -172,6 +202,15 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         MetricUnit.CURRENCY,
         aggregation="ratio-of-sums",
         capability=Capability.MANAGEMENT,
+        shapes=(
+            ChartKind.KPI,
+            ChartKind.LINE,
+            ChartKind.BAR,
+            ChartKind.HEATMAP,
+            ChartKind.HISTOGRAM,
+            ChartKind.BOXPLOT,
+            ChartKind.TABLE,
+        ),
     ),
     metric(
         "workforce.coverage",
@@ -180,6 +219,8 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         MetricUnit.PERCENT,
         aggregation="ratio-of-counts",
         capability=Capability.MANAGEMENT,
+        grains=("month",),
+        shapes=KPI_TABLE,
     ),
     metric(
         "workforce.stability",
@@ -189,6 +230,8 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         aggregation="ratio-of-counts",
         capability=Capability.MANAGEMENT,
         missing="null-without-effective-dated-roster",
+        grains=("month",),
+        shapes=KPI_TABLE,
     ),
     metric(
         "compensation.payroll",
@@ -199,6 +242,15 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         dimensions=("firm", "time"),
         suppressible=True,
         source_authority="reporting_compensation_month_v1",
+        shapes=(
+            ChartKind.KPI,
+            ChartKind.LINE,
+            ChartKind.BAR,
+            ChartKind.DONUT,
+            ChartKind.TREEMAP,
+            ChartKind.HEATMAP,
+            ChartKind.TABLE,
+        ),
     ),
     metric(
         "compensation.average",
@@ -210,6 +262,15 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         dimensions=("firm", "time"),
         suppressible=True,
         source_authority="reporting_compensation_month_v1",
+        shapes=(
+            ChartKind.KPI,
+            ChartKind.LINE,
+            ChartKind.BAR,
+            ChartKind.SCATTER,
+            ChartKind.HISTOGRAM,
+            ChartKind.BOXPLOT,
+            ChartKind.TABLE,
+        ),
     ),
     metric(
         "compensation.median",
@@ -221,6 +282,7 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         dimensions=("firm", "time"),
         suppressible=True,
         source_authority="reporting_compensation_month_v1",
+        shapes=(ChartKind.KPI, ChartKind.LINE, ChartKind.BAR, ChartKind.HISTOGRAM, ChartKind.BOXPLOT, ChartKind.TABLE),
     ),
     metric(
         "compensation.sales_ratio",
@@ -229,9 +291,11 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         MetricUnit.PERCENT,
         aggregation="ratio-of-sums",
         capability=Capability.HR,
-        dimensions=("firm", "time"),
         suppressible=True,
         source_authority="reporting_compensation_month_v1",
+        dimensions=("firm", "time"),
+        grains=("month",),
+        shapes=KPI_TABLE,
     ),
     metric(
         "finance.revenue",
@@ -239,6 +303,7 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         "Venit P&L din categoriile v1/v11/v2/v3.",
         MetricUnit.CURRENCY,
         capability=Capability.PNL,
+        shapes=TREND,
     ),
     metric(
         "finance.ebit",
@@ -247,6 +312,8 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         MetricUnit.CURRENCY,
         aggregation="derived",
         capability=Capability.PNL,
+        dimensions=("firm", "regional", "asm", "store", "category", "time"),
+        shapes=(ChartKind.KPI, ChartKind.LINE, ChartKind.BAR, ChartKind.WATERFALL, ChartKind.TABLE),
     ),
     metric(
         "finance.ebit_margin",
@@ -255,6 +322,7 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         MetricUnit.PERCENT,
         aggregation="ratio-of-sums",
         capability=Capability.PNL,
+        shapes=(ChartKind.KPI, ChartKind.LINE, ChartKind.BAR, ChartKind.HEATMAP, ChartKind.TABLE),
     ),
     metric(
         "finance.operating_costs",
@@ -263,6 +331,7 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         MetricUnit.CURRENCY,
         capability=Capability.PNL,
         dimensions=("firm", "regional", "asm", "store", "category", "time"),
+        shapes=(ChartKind.KPI, ChartKind.BAR, ChartKind.DONUT, ChartKind.TREEMAP, ChartKind.TABLE),
     ),
     metric(
         "planning.forecast",
@@ -271,6 +340,7 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         MetricUnit.CURRENCY,
         aggregation="sum",
         capability=Capability.MANAGEMENT,
+        shapes=(ChartKind.KPI, ChartKind.LINE, ChartKind.AREA, ChartKind.BAR, ChartKind.SCATTER, ChartKind.TABLE),
     ),
     metric(
         "planning.target_gap",
@@ -279,6 +349,7 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         MetricUnit.CURRENCY,
         aggregation="derived",
         capability=Capability.MANAGEMENT,
+        shapes=(ChartKind.KPI, ChartKind.LINE, ChartKind.BAR, ChartKind.TABLE),
     ),
     metric(
         "planning.accuracy",
@@ -287,6 +358,8 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         MetricUnit.PERCENT,
         aggregation="weighted-derived",
         capability=Capability.MANAGEMENT,
+        grains=("month",),
+        shapes=KPI_TABLE,
     ),
     metric(
         "planning.actual",
@@ -296,6 +369,7 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         aggregation="sum",
         capability=Capability.MANAGEMENT,
         missing="null-without-covered-actual",
+        shapes=(ChartKind.KPI, ChartKind.LINE, ChartKind.BAR, ChartKind.TABLE),
     ),
     *MONTHLY_REVIEW_METRICS,
 )
@@ -336,6 +410,15 @@ DIMENSION_CATALOG: tuple[DimensionDefinition, ...] = (
         description="Cheia operațională stabilă este site_code.",
         stable_key="site_code",
         allowed_grains=("day", "week", "month", "quarter", "year"),
+    ),
+    DimensionDefinition(
+        id="tenure",
+        display_name="Vechime",
+        description="Bandă de vechime agregată din read-model-ul workforce.",
+        stable_key="tenure_band",
+        allowed_grains=("month", "quarter", "year"),
+        required_capability=Capability.MANAGEMENT,
+        source_authority="reporting_workforce_month_v1",
     ),
     DimensionDefinition(
         id="agent",

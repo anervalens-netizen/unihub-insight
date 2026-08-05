@@ -1,6 +1,15 @@
-import { BarChart, HeatmapChart, LineChart, PieChart, ScatterChart } from 'echarts/charts';
+import {
+  BarChart,
+  BoxplotChart,
+  HeatmapChart,
+  LineChart,
+  PieChart,
+  ScatterChart,
+  TreemapChart,
+} from 'echarts/charts';
 import {
   AriaComponent,
+  CalendarComponent,
   DatasetComponent,
   DataZoomComponent,
   GridComponent,
@@ -21,6 +30,8 @@ import type { ChartPngExportConfig } from './chart-spec';
 echarts.use([
   AriaComponent,
   BarChart,
+  BoxplotChart,
+  CalendarComponent,
   CanvasRenderer,
   DataZoomComponent,
   DatasetComponent,
@@ -33,6 +44,7 @@ echarts.use([
   TitleComponent,
   ToolboxComponent,
   TooltipComponent,
+  TreemapChart,
   UniversalTransition,
   VisualMapComponent,
 ]);
@@ -70,12 +82,16 @@ export function EChart({
   className = '',
   ariaLabel,
   onEvent,
+  onDoubleEvent,
+  onBlankReset,
   pngExport,
 }: {
   option: EChartsCoreOption;
   className?: string;
   ariaLabel: string;
   onEvent?: (event: EChartEvent) => void;
+  onDoubleEvent?: (event: EChartEvent) => void;
+  onBlankReset?: () => void;
   pngExport?: ChartPngExportConfig;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -95,7 +111,9 @@ export function EChart({
       locale: 'EN',
     });
     chartRef.current = chart;
-    const resizeObserver = new ResizeObserver(() => chart.resize({ animation: { duration: 120 } }));
+    const resizeObserver = new ResizeObserver(() => {
+      if (!chart.isDisposed()) chart.resize({ animation: { duration: 120 } });
+    });
     resizeObserver.observe(host);
     return () => {
       resizeObserver.disconnect();
@@ -110,12 +128,37 @@ export function EChart({
     const handleClick = (event: EChartEvent) => onEvent(event);
     chart.on('click', handleClick);
     return () => {
-      chart.off('click', handleClick);
+      if (!chart.isDisposed()) chart.off('click', handleClick);
     };
   }, [onEvent]);
 
   useEffect(() => {
-    chartRef.current?.setOption(designedOption, {
+    const chart = chartRef.current;
+    if (!chart || !onDoubleEvent) return;
+    const handleDoubleClick = (event: EChartEvent) => onDoubleEvent(event);
+    chart.on('dblclick', handleDoubleClick);
+    return () => {
+      if (!chart.isDisposed()) chart.off('dblclick', handleDoubleClick);
+    };
+  }, [onDoubleEvent]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || !onBlankReset) return;
+    const handleBlankClick = (event: { target?: unknown }) => {
+      if (!event.target) onBlankReset();
+    };
+    const renderer = chart.getZr();
+    renderer.on('click', handleBlankClick);
+    return () => {
+      if (!chart.isDisposed()) renderer.off('click', handleBlankClick);
+    };
+  }, [onBlankReset]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || chart.isDisposed()) return;
+    chart.setOption(designedOption, {
       notMerge: true,
       lazyUpdate: true,
       silent: false,

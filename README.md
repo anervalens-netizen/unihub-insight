@@ -14,9 +14,9 @@ Producția existentă rămâne operațională, iar `1.0.0-rc.1` este candidatul 
 | Shell desktop, filtre în URL, Overview | `LIVE` |
 | Raport lunar cu istoric/comparații și XLSX numeric | `LIVE` |
 | Snapshot comun, catalog metrici/dimensiuni, query batch/inspect/CSV | `RC1` |
-| Sales, Performance, Campaigns, Workforce, Compensation, Finance, Planning | `RC1` — sub-view-uri specializate; starea sursei este `LIVE/PARTIAL/UNAVAILABLE` |
+| Sales, Performance, Campaigns, Workforce, Compensation, Finance, Planning | `PARȚIAL` — sub-view-uri distincte peste primitive comune; starea sursei este `LIVE/PARTIAL/UNAVAILABLE` |
 | Custom Dashboards, preseturi, clone, versiuni, ACL/scope ceiling | `RC1` |
-| `ChartSpec` ECharts Canvas, URL drill, backing table și PNG sigur | `RC1` |
+| `ChartSpec` ECharts Canvas, URL drill, backing table și PNG sigur | `PARȚIAL` — formele fără dataset autoritativ revin la tabel |
 | Compensation și Finance live | `UNAVAILABLE` până la promovarea unei generații autoritative Retail |
 | Reconciliere completă, pilot owner, șapte zile de performanță | `POARTĂ 1.0` |
 
@@ -36,7 +36,7 @@ Producția existentă rămâne operațională, iar `1.0.0-rc.1` este candidatul 
 | API | FastAPI 0.139, Pydantic v2 |
 | Date | PostgreSQL prin `asyncpg`, rol read-only |
 | Tooling Python | Python 3.13, uv, Ruff, mypy, pytest |
-| Testare web | Vitest + Chrome/CDP smoke și fluxuri analitice |
+| Testare web | Vitest + Playwright/Chrome pentru rute, viewporturi, teme, densități și fluxuri critice |
 
 ## Pornire locală
 
@@ -78,6 +78,7 @@ npm run typecheck
 npm run test
 npm run build
 npm run verify
+npm run browser:qa
 ```
 
 ## Documentație

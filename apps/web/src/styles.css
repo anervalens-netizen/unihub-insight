@@ -275,9 +275,15 @@ button {
   flex: 1;
   min-width: 0;
   height: 100vh;
-  grid-template-rows: var(--topbar-height) var(--filterbar-height) minmax(0, 1fr);
+  grid-template-rows: var(--topbar-height) auto minmax(0, 1fr);
   background: var(--canvas);
   overflow: hidden;
+}
+
+.global-filter-stack {
+  position: relative;
+  z-index: 35;
+  min-width: 0;
 }
 
 .topbar {
@@ -365,7 +371,6 @@ button {
 
 .global-filters {
   position: relative;
-  z-index: 35;
   display: grid;
   grid-template-columns: 34px minmax(92px, 0.8fr) minmax(92px, 0.8fr) minmax(100px, 0.9fr) repeat(4, minmax(72px, 0.75fr)) minmax(100px, 1fr) minmax(92px, 0.8fr) auto;
   align-items: end;
@@ -623,6 +628,60 @@ button {
 .filter-reset:disabled {
   cursor: default;
   opacity: 0.4;
+}
+
+.drill-breadcrumb {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 18px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-soft);
+}
+
+.drill-breadcrumb > span {
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.drill-breadcrumb button {
+  display: inline-flex;
+  height: 24px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-soft);
+  cursor: pointer;
+}
+
+.drill-breadcrumb button:hover {
+  border-color: var(--indigo);
+  color: var(--text);
+}
+
+.drill-breadcrumb small {
+  color: var(--text-muted);
+  font-size: 8px;
+  text-transform: uppercase;
+}
+
+.drill-breadcrumb strong {
+  font-size: 9px;
+}
+
+.drill-breadcrumb .drill-breadcrumb-reset {
+  margin-left: auto;
+  border-color: transparent;
+  background: transparent;
 }
 
 .content-canvas {

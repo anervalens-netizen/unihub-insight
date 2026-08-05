@@ -37,7 +37,7 @@ const DEFAULT_PREFERENCES: ChartPreferences = {
   showLegend: true,
   showLabels: false,
   animate: true,
-  smoothLines: true,
+  smoothLines: false,
 };
 
 const ChartPreferencesContext = createContext<ChartPreferencesContextValue | null>(null);

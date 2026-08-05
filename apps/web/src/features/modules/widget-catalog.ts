@@ -261,7 +261,7 @@ export function moduleWidgets(
         : componentByKind[recipe.kind as Exclude<RecipeKind, 'kpi'>];
     if (!component) continue;
     definitions.push({
-      id: isKpi ? `kpi-${index}` : recipe.kind,
+      id: isKpi && metricId ? `kpi:${metricId}` : recipe.kind,
       title: recipeTitle(data, recipe),
       subtitle: recipe.subtitle ?? subviewForId(data.module, subviewId).description,
       component,

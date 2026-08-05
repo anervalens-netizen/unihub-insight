@@ -23,6 +23,7 @@ export function CustomDashboardPreview({
   resetToken,
   onLayoutChange,
   onUrlStateChange,
+  onUrlStateReset,
 }: {
   dashboard: DashboardDocument;
   search: GlobalSearch & { period: string };
@@ -30,6 +31,7 @@ export function CustomDashboardPreview({
   resetToken: number;
   onLayoutChange: (items: DashboardLayoutItem[]) => void;
   onUrlStateChange?: (event: ChartUrlStateEvent) => void;
+  onUrlStateReset?: () => void;
 }) {
   const catalogQuery = useQuery(analyticsCatalogQuery());
   const batchRequest = useMemo(() => dashboardBatchRequest(dashboard, search), [dashboard, search]);
@@ -72,6 +74,7 @@ export function CustomDashboardPreview({
         }
         onRetry={retry}
         {...(onUrlStateChange ? { onUrlStateChange } : {})}
+        {...(onUrlStateReset ? { onUrlStateReset } : {})}
       />
     );
     return {

@@ -35,14 +35,29 @@ ALLOWED_SORT_FIELDS = frozenset(
     {"id", "key", "label", "value", "comparison", "target", "secondary", "tertiary", "progress_pct", "risk"}
 )
 METRICS = {metric.id: metric for metric in METRIC_CATALOG}
-MODULE_PREFIXES: dict[ModuleId, tuple[str, ...]] = {
-    ModuleId.SALES: ("sales.", "target.", "forecast.", "receipts.", "receipt_", "quantity."),
-    ModuleId.PERFORMANCE: ("performance.",),
-    ModuleId.CAMPAIGNS: ("campaigns.",),
-    ModuleId.WORKFORCE: ("workforce.",),
-    ModuleId.COMPENSATION: ("compensation.",),
-    ModuleId.FINANCE: ("finance.",),
-    ModuleId.PLANNING: ("planning.",),
+MODULE_METRICS: dict[ModuleId, frozenset[str]] = {
+    ModuleId.SALES: frozenset(
+        {"sales.total", "target.progress_pct", "receipts.total", "receipts.average_value", "receipt_2plus_pct"}
+    ),
+    ModuleId.PERFORMANCE: frozenset(
+        {
+            "performance.average",
+            "performance.at_target",
+            "performance.volatility",
+            "performance.daily_productivity",
+        }
+    ),
+    ModuleId.CAMPAIGNS: frozenset(
+        {"campaigns.focus_sales", "campaigns.focus_share", "campaigns.active_stores", "campaigns.active_products"}
+    ),
+    ModuleId.WORKFORCE: frozenset(
+        {"workforce.headcount", "workforce.productivity", "workforce.coverage", "workforce.stability"}
+    ),
+    ModuleId.COMPENSATION: frozenset(
+        {"compensation.payroll", "compensation.average", "compensation.median", "compensation.sales_ratio"}
+    ),
+    ModuleId.FINANCE: frozenset({"finance.revenue", "finance.ebit", "finance.ebit_margin", "finance.operating_costs"}),
+    ModuleId.PLANNING: frozenset({"planning.forecast", "planning.target_gap", "planning.accuracy", "planning.actual"}),
 }
 MODULE_SOURCE_DOMAINS: dict[ModuleId, SourceDomain] = {
     ModuleId.SALES: SourceDomain.SALES,
@@ -62,6 +77,21 @@ MODULE_CAPABILITIES: dict[ModuleId, Capability] = {
     ModuleId.FINANCE: Capability.PNL,
     ModuleId.PLANNING: Capability.MANAGEMENT,
 }
+SCALAR_ONLY_METRICS = frozenset(
+    {
+        "receipts.total",
+        "receipts.average_value",
+        "receipt_2plus_pct",
+        "performance.at_target",
+        "performance.volatility",
+        "campaigns.active_stores",
+        "campaigns.active_products",
+        "workforce.coverage",
+        "workforce.stability",
+        "compensation.sales_ratio",
+        "planning.accuracy",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -79,7 +109,7 @@ def _metric_for(query: WidgetQuery, user: UserContext) -> MetricDefinition:
     metric = METRICS.get(query.metric_id)
     if metric is None or metric.version != query.metric_version:
         raise QueryValidationFailure(f"Metrica {query.metric_id} v{query.metric_version} nu este în catalogul activ.")
-    if not query.metric_id.startswith(MODULE_PREFIXES[query.module]):
+    if query.metric_id not in MODULE_METRICS[query.module]:
         raise QueryValidationFailure(f"Metrica {query.metric_id} nu aparține modulului {query.module.value}.")
     required = MODULE_CAPABILITIES[query.module]
     if required not in user.capabilities or metric.required_capability not in user.capabilities:
@@ -96,6 +126,31 @@ def _metric_for(query: WidgetQuery, user: UserContext) -> MetricDefinition:
         raise QueryValidationFailure("Granularitatea nu este permisă pentru metrică.")
     if query.visualization not in metric.allowed_shapes:
         raise QueryValidationFailure("Vizualizarea nu este permisă de ChartSpec-ul metricii.")
+    if query.metric_id in SCALAR_ONLY_METRICS and query.dimensions:
+        raise QueryValidationFailure("Metrica este disponibilă numai ca agregat fără dimensiuni.")
+    if query.visualization in {ChartKind.LINE, ChartKind.AREA} and query.dimensions != ("time",):
+        raise QueryValidationFailure("Trendul cere exact dimensiunea time.")
+    distribution_dimensions = {
+        "sales.total": "category",
+        "campaigns.focus_sales": "category",
+        "workforce.headcount": "tenure",
+        "compensation.payroll": "firm",
+        "finance.operating_costs": "category",
+    }
+    if query.visualization in {ChartKind.DONUT, ChartKind.TREEMAP} and query.dimensions != (
+        distribution_dimensions.get(query.metric_id),
+    ):
+        raise QueryValidationFailure("Mixul cere dimensiunea agregată aprobată pentru metrică.")
+    if query.visualization is ChartKind.WATERFALL and (
+        query.metric_id != "finance.ebit" or query.dimensions != ("category",)
+    ):
+        raise QueryValidationFailure("Waterfall cere reconcilierea Finance EBIT pe category.")
+    if query.visualization is ChartKind.HEATMAP and "time" not in query.dimensions:
+        raise QueryValidationFailure("Heatmap cere dimensiunea time.")
+    if query.visualization in {ChartKind.HISTOGRAM, ChartKind.BOXPLOT, ChartKind.SCATTER} and (
+        not query.dimensions or "time" in query.dimensions
+    ):
+        raise QueryValidationFailure("Distribuția/relația cere o dimensiune de entitate, nu time.")
     if query.module is ModuleId.COMPENSATION and (
         set(query.filters) - {"firm"} or set(query.dimensions) - {"firm", "time"}
     ):
@@ -158,6 +213,7 @@ def _sorted_rows(
 def _field_for(module: ModuleId, metric_id: str, *, breakdown: bool = False) -> str:
     mappings: dict[str, str] = {
         "sales.total": "primary",
+        "target.progress_pct": "progress_pct" if breakdown else "primary",
         "performance.average": "progress_pct" if breakdown else "primary",
         "performance.daily_productivity": "tertiary" if breakdown else "secondary",
         "campaigns.focus_sales": "primary",
@@ -167,6 +223,7 @@ def _field_for(module: ModuleId, metric_id: str, *, breakdown: bool = False) -> 
         "workforce.stability": "comparison" if not breakdown else "progress_pct",
         "compensation.payroll": "primary",
         "compensation.average": "secondary",
+        "compensation.median": "tertiary" if breakdown else "comparison",
         "finance.revenue": "primary",
         "finance.ebit": "secondary",
         "finance.ebit_margin": "target" if not breakdown else "progress_pct",
@@ -193,6 +250,56 @@ def _dataset(query: WidgetQuery, response: ModuleAnalyticsResponse) -> QueryData
             rows=[{"value": metric.value if metric else None}],
         )
 
+    if query.visualization is ChartKind.WATERFALL:
+        start_metric = next((item for item in response.kpis if item.id == "finance.revenue"), None)
+        total_metric = next((item for item in response.kpis if item.id == "finance.ebit"), None)
+        rows: list[dict[str, str | Decimal | int | bool | None]] = []
+        if start_metric is not None and total_metric is not None:
+            rows.append({"label": start_metric.label, "value": start_metric.value, "step_kind": "start"})
+            rows.extend(
+                {"label": item.label, "value": -item.value, "step_kind": "delta"} for item in response.distribution
+            )
+            rows.append({"label": total_metric.label, "value": total_metric.value, "step_kind": "total"})
+        return QueryDataset(
+            dimensions=[
+                DatasetDimension(id="label", label="Pas reconciliere", kind="string", role="label"),
+                DatasetDimension(id="value", label=query.metric_id, kind="number"),
+                DatasetDimension(id="step_kind", label="Tip pas", kind="string", role="metadata"),
+            ],
+            rows=rows,
+        )
+
+    if query.visualization is ChartKind.SCATTER:
+        axes: dict[str, tuple[tuple[str, str], tuple[str, str]]] = {
+            "performance.average": (("tertiary", "Productivitate / zi-agent"), ("progress_pct", "Realizare target")),
+            "compensation.average": (("tertiary", "Salariu median"), ("secondary", "Salariu mediu")),
+            "planning.forecast": (("secondary", "Actual"), ("primary", "Forecast")),
+        }
+        axis = axes.get(query.metric_id)
+        rows = []
+        if axis is not None:
+            (x_field, x_label), (y_field, y_label) = axis
+            for item in response.breakdown:
+                x_value = getattr(item, x_field, None)
+                y_value = getattr(item, y_field, None)
+                if x_value is not None and y_value is not None:
+                    rows.append(
+                        {"id": item.id, "label": item.label, "x": x_value, "y": y_value, "risk": item.risk.value}
+                    )
+        else:
+            x_label = "X"
+            y_label = "Y"
+        return QueryDataset(
+            dimensions=[
+                DatasetDimension(id="id", label="Cheie", kind="string", role="key"),
+                DatasetDimension(id="label", label="Entitate", kind="string", role="label"),
+                DatasetDimension(id="x", label=x_label, kind="number"),
+                DatasetDimension(id="y", label=y_label, kind="number", role="metadata"),
+                DatasetDimension(id="risk", label="Risc", kind="string", role="metadata"),
+            ],
+            rows=_sorted_rows(rows, query.sort, query.limit),
+        )
+
     if query.visualization is ChartKind.HEATMAP:
         heatmap_rows: list[dict[str, str | Decimal | int | bool | None]] = [
             {"x": cell.x, "y": cell.y, "value": cell.value, "label": cell.label}
@@ -216,6 +323,12 @@ def _dataset(query: WidgetQuery, response: ModuleAnalyticsResponse) -> QueryData
             points = [point for point in points if query.time_range.start <= point.key <= query.time_range.end]
         for point in points:
             value = getattr(point, field, None)
+            if query.metric_id == "target.progress_pct":
+                value = (
+                    point.primary / point.target * Decimal("100")
+                    if point.primary is not None and point.target is not None and point.target > 0
+                    else None
+                )
             if query.metric_id == "planning.target_gap":
                 value = point.primary - point.target if point.primary is not None and point.target is not None else None
             trend_rows.append(
@@ -240,7 +353,10 @@ def _dataset(query: WidgetQuery, response: ModuleAnalyticsResponse) -> QueryData
             rows=_sorted_rows(trend_rows, query.sort, query.limit),
         )
 
-    if query.visualization is ChartKind.DONUT or query.dimensions[0] in {"category", "mechanism"}:
+    if query.visualization in {ChartKind.DONUT, ChartKind.TREEMAP} or query.dimensions[0] in {
+        "category",
+        "mechanism",
+    }:
         return QueryDataset(
             dimensions=[
                 DatasetDimension(id="id", label="Cheie", kind="string", role="key"),
@@ -256,19 +372,25 @@ def _dataset(query: WidgetQuery, response: ModuleAnalyticsResponse) -> QueryData
         )
 
     field = _field_for(query.module, query.metric_id, breakdown=True)
-    breakdown_rows: list[dict[str, str | Decimal | int | bool | None]] = [
-        {
-            "id": row.id,
-            "label": row.label,
-            "context": row.context,
-            "value": _decimal_or_none(getattr(row, field, None)),
-            "secondary": row.secondary,
-            "tertiary": row.tertiary,
-            "progress_pct": row.progress_pct,
-            "risk": row.risk.value,
-        }
-        for row in response.breakdown
-    ]
+    breakdown_rows: list[dict[str, str | Decimal | int | bool | None]] = []
+    for row in response.breakdown:
+        value = _decimal_or_none(getattr(row, field, None))
+        if query.metric_id == "workforce.headcount":
+            value = 1
+        elif query.metric_id == "planning.target_gap":
+            value = row.primary - row.tertiary if row.tertiary is not None else None
+        breakdown_rows.append(
+            {
+                "id": row.id,
+                "label": row.label,
+                "context": row.context,
+                "value": value,
+                "secondary": row.secondary,
+                "tertiary": row.tertiary,
+                "progress_pct": row.progress_pct,
+                "risk": row.risk.value,
+            }
+        )
     return QueryDataset(
         dimensions=[
             DatasetDimension(id="id", label="Cheie", kind="string", role="key"),

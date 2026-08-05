@@ -81,8 +81,8 @@ MODULE_CHARTS: dict[ModuleId, frozenset[ChartKind]] = {
             ChartKind.AREA,
             ChartKind.BAR,
             ChartKind.DONUT,
+            ChartKind.TREEMAP,
             ChartKind.HEATMAP,
-            ChartKind.SCATTER,
             ChartKind.TABLE,
         }
     ),
@@ -93,6 +93,8 @@ MODULE_CHARTS: dict[ModuleId, frozenset[ChartKind]] = {
             ChartKind.BAR,
             ChartKind.HEATMAP,
             ChartKind.SCATTER,
+            ChartKind.HISTOGRAM,
+            ChartKind.BOXPLOT,
             ChartKind.TABLE,
         }
     ),
@@ -103,6 +105,7 @@ MODULE_CHARTS: dict[ModuleId, frozenset[ChartKind]] = {
             ChartKind.AREA,
             ChartKind.BAR,
             ChartKind.DONUT,
+            ChartKind.TREEMAP,
             ChartKind.HEATMAP,
             ChartKind.TABLE,
         }
@@ -113,7 +116,10 @@ MODULE_CHARTS: dict[ModuleId, frozenset[ChartKind]] = {
             ChartKind.LINE,
             ChartKind.BAR,
             ChartKind.DONUT,
+            ChartKind.TREEMAP,
             ChartKind.HEATMAP,
+            ChartKind.HISTOGRAM,
+            ChartKind.BOXPLOT,
             ChartKind.TABLE,
         }
     ),
@@ -123,8 +129,11 @@ MODULE_CHARTS: dict[ModuleId, frozenset[ChartKind]] = {
             ChartKind.LINE,
             ChartKind.BAR,
             ChartKind.DONUT,
+            ChartKind.TREEMAP,
             ChartKind.HEATMAP,
             ChartKind.SCATTER,
+            ChartKind.HISTOGRAM,
+            ChartKind.BOXPLOT,
             ChartKind.TABLE,
         }
     ),
@@ -135,7 +144,9 @@ MODULE_CHARTS: dict[ModuleId, frozenset[ChartKind]] = {
             ChartKind.AREA,
             ChartKind.BAR,
             ChartKind.DONUT,
+            ChartKind.TREEMAP,
             ChartKind.HEATMAP,
+            ChartKind.WATERFALL,
             ChartKind.TABLE,
         }
     ),
@@ -154,6 +165,21 @@ MODULE_CHARTS: dict[ModuleId, frozenset[ChartKind]] = {
 
 ALLOWED_FILTER_KEYS = frozenset({"firm", "regional", "asm", "stores", "agent"})
 ALLOWED_OPTION_KEYS = frozenset({"show_legend", "show_labels", "top_n", "renderer", "smooth", "stacked", "pixel_ratio"})
+SCALAR_ONLY_METRICS = frozenset(
+    {
+        "receipts.total",
+        "receipts.average_value",
+        "receipt_2plus_pct",
+        "performance.at_target",
+        "performance.volatility",
+        "campaigns.active_stores",
+        "campaigns.active_products",
+        "workforce.coverage",
+        "workforce.stability",
+        "compensation.sales_ratio",
+        "planning.accuracy",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -262,6 +288,32 @@ def validate_dashboard(request: DashboardCreateRequest, user: UserContext) -> No
             errors.append(f"{prefix}.dimension is incompatible with {widget.metric_id}")
         elif widget.time_grain not in metric.allowed_grains:
             errors.append(f"{prefix}.time_grain is incompatible with {widget.metric_id}")
+        if widget.metric_id in SCALAR_ONLY_METRICS and widget.dimension is not None:
+            errors.append(f"{prefix}.metric_id supports only an aggregate without dimension")
+        if widget.visualization in {ChartKind.LINE, ChartKind.AREA} and widget.dimension != "time":
+            errors.append(f"{prefix}.visualization requires dimension=time")
+        mix_dimensions = {
+            "sales.total": "category",
+            "campaigns.focus_sales": "category",
+            "workforce.headcount": "tenure",
+            "compensation.payroll": "firm",
+            "finance.operating_costs": "category",
+        }
+        if widget.visualization in {ChartKind.DONUT, ChartKind.TREEMAP} and widget.dimension != mix_dimensions.get(
+            widget.metric_id
+        ):
+            errors.append(f"{prefix}.visualization requires the approved aggregate dimension")
+        if widget.visualization is ChartKind.WATERFALL and (
+            widget.metric_id != "finance.ebit" or widget.dimension != "category"
+        ):
+            errors.append(f"{prefix}.waterfall requires finance.ebit × category")
+        if widget.visualization is ChartKind.HEATMAP and widget.dimension != "time":
+            errors.append(f"{prefix}.heatmap requires dimension=time")
+        if widget.visualization in {ChartKind.HISTOGRAM, ChartKind.BOXPLOT, ChartKind.SCATTER} and widget.dimension in {
+            None,
+            "time",
+        }:
+            errors.append(f"{prefix}.visualization requires an entity dimension")
         if widget.visualization not in MODULE_CHARTS[widget.module]:
             errors.append(f"{prefix}.visualization is incompatible with {widget.module.value}")
         if widget.layout.x + widget.layout.w > 24:

@@ -41,17 +41,17 @@ Dependențele se implementează vertical: o suprafață ajunge `LIVE` numai cân
 
 ## Registru de workstream-uri
 
-- [x] Read-model-uri canonice Retail v1 pentru Campaigns, Workforce, Compensation, Visits, Finance și Planning, publicate aditiv prin migrarea Retail 047.
-- [x] Catalog versionat metrică/dimensiune/grain/comparison/capability și metadata de snapshot/generație per domeniu.
+- [ ] Read-model-uri Retail v1 sunt publicate aditiv; Workforce/Visits/Campaigns rămân `partial`, iar Finance/Compensation nu au încă head eligibil.
+- [ ] Catalogul și snapshotul sunt versionate; matricea metrică × dimensiune × chart este în curs de restrângere la combinații dovedite.
 - [x] Query batch finit, snapshot fail-closed, deadline comun, izolare per widget, inspect și CSV server-side.
-- [x] Lună/YTD/3–12 luni/an/interval, comparații multiple, URL state, drill și preseturi.
-- [x] `ChartSpec` ECharts 6.1 Canvas, dataset/encode, evenimente URL, backing table, accesibilitate și PNG sigur; SVG rămâne respins până la motiv măsurat.
-- [x] Sales, Performance, Campaigns, Workforce, Compensation, Finance și Planning au sub-view-uri și rețete distincte; contractele absente sunt afișate `UNAVAILABLE`, nu simulate.
+- [ ] Intervalele și URL state există; drill-ul de bază cu breadcrumb/reset/reload trece browser QA, dar comparațiile multiple simultane și toate nivelurile de cross-filter rămân deschise.
+- [ ] `ChartSpec` ECharts 6.1 Canvas are dataset/encode, fallback, PNG și interacțiuni de bază; POC-ul Canvas/SVG, keyboard QA și toate formele specializate rămân deschise.
+- [ ] Cele șapte module au sub-view-uri/rețete distincte, dar încă reutilizează componente generice și nu acoperă toate contractele specializate din plan.
 - [x] Compensation folosește exclusiv agregatul aprobat, fără persoană/nume/filtre diferențiatoare.
-- [x] Custom dashboards: blank/template/clone, duplicate, editor, layout/versionare, preseturi, ACL per subject, scope ceiling și batch execution.
-- [x] XLSX/CSV/PNG, metric dictionary, audit/version history și autorizare comună.
-- [x] Matrice negativă rol/capabilitate/export, reconciliere curent/închis, accessibility, backup/restore izolat, rollback compatibil, monitorizare și exact-SHA.
-- [x] Browser QA pentru fluxurile critice, viewport/temă/densitate, URL drill/reload, inspector și export.
+- [ ] Custom dashboards acoperă blank/template/clone/duplicate/layout/versionare/ACL/scope/batch; editorul multi-dimensiune și toate opțiunile semantice rămân deschise.
+- [ ] XLSX/CSV/PNG și audit există; paritatea metrică modul→dashboard→inspect→export nu este încă demonstrată pentru toate modulele.
+- [ ] Matricea negativă, reconcilierea și restore/rollback tehnic trec; load/concurrency, RUM, off-host post-schema și N/N-1 acceptat rămân deschise.
+- [ ] Suita Playwright trece 29/29 pentru cele 10 rute, 1180/1440/1920/ultrawide, light/dark, densități, inspector, drill/reload și 403; toate sub-view-urile și stările empty/partial/stale rămân deschise.
 - [ ] Acceptare vizuală owner și șapte zile curate de SLI producție.
 
 ## Porți deschise după RC1

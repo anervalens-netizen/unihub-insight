@@ -16,9 +16,11 @@ import {
   currentBusinessMonth,
   globalSearchSchema,
   parseComparisons,
+  parseDrillPath,
   parseStoreSelection,
   type rangePresets,
   serializeComparisons,
+  serializeDrillPath,
   serializeStoreSelection,
 } from '../lib/search';
 import { useGlobalSearch, useUpdateGlobalSearch } from './search-hooks';
@@ -344,244 +346,285 @@ export function GlobalFilters() {
     [options?.agents, search.asm, search.firm, search.regional, selectedStores],
   );
 
-  const count = activeFilterCount(search);
+  const drillPath = parseDrillPath(search.drill);
+  const count = activeFilterCount(search) + drillPath.length;
 
   return (
-    <div className="global-filters">
-      <div className="filter-heading" title={`${count} filtre business active`}>
-        <Filter size={16} />
-        {count > 0 ? <span>{count}</span> : null}
-      </div>
+    <div className="global-filter-stack">
+      <div className="global-filters">
+        <div className="filter-heading" title={`${count} filtre business active`}>
+          <Filter size={16} />
+          {count > 0 ? <span>{count}</span> : null}
+        </div>
 
-      <details className="filter-popover filter-popover--presets">
-        <summary>
-          <span className="filter-summary-label">Preset</span>
-          <strong>{selectedPreset?.name ?? 'Alege'}</strong>
-        </summary>
-        <div className="filter-popover-panel filter-preset-panel">
+        <details className="filter-popover filter-popover--presets">
+          <summary>
+            <span className="filter-summary-label">Preset</span>
+            <strong>{selectedPreset?.name ?? 'Alege'}</strong>
+          </summary>
+          <div className="filter-popover-panel filter-preset-panel">
+            <select
+              value={presetId}
+              disabled={presetsQuery.isPending}
+              onChange={(event) => {
+                const id = event.target.value;
+                setPresetId(id);
+                const preset = presetsQuery.data?.find((item) => item.id === id);
+                if (!preset) return;
+                setPresetName(preset.name);
+                setPresetShared(preset.shared);
+                const parsed = globalSearchSchema.safeParse(preset.filters);
+                if (parsed.success) {
+                  updateSearch({ ...clearPresetFilters, ...parsed.data }, true);
+                  setPresetMessage('Preset aplicat.');
+                } else {
+                  setPresetMessage('Preset incompatibil cu contractul curent.');
+                }
+              }}
+            >
+              <option value="">Alege un preset…</option>
+              {(presetsQuery.data ?? []).map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.name}
+                  {preset.shared ? ' · shared' : ''}
+                </option>
+              ))}
+            </select>
+            <input
+              value={presetName}
+              maxLength={160}
+              placeholder="Nume preset"
+              onChange={(event) => setPresetName(event.target.value)}
+            />
+            <label className="comparison-option">
+              <input
+                type="checkbox"
+                checked={presetShared}
+                onChange={(event) => setPresetShared(event.target.checked)}
+              />
+              <span>Partajat</span>
+            </label>
+            <div className="filter-preset-actions">
+              <button
+                type="button"
+                disabled={!presetName.trim() || createPresetMutation.isPending}
+                onClick={() =>
+                  createPresetMutation.mutate({
+                    name: presetName.trim(),
+                    shared: presetShared,
+                    filters: presetFilters(search),
+                  })
+                }
+              >
+                <BookmarkPlus size={13} /> Nou
+              </button>
+              {selectedPreset?.owner_subject === identity.subject ? (
+                <>
+                  <button
+                    type="button"
+                    disabled={!presetName.trim() || updatePresetMutation.isPending}
+                    onClick={() =>
+                      updatePresetMutation.mutate({
+                        id: selectedPreset.id,
+                        version: selectedPreset.version,
+                      })
+                    }
+                  >
+                    <Save size={13} /> Actualizează
+                  </button>
+                  <button
+                    type="button"
+                    disabled={deletePresetMutation.isPending}
+                    onClick={() => deletePresetMutation.mutate(selectedPreset.id)}
+                  >
+                    <Trash2 size={13} /> Șterge
+                  </button>
+                </>
+              ) : null}
+            </div>
+            {presetMessage ? <small>{presetMessage}</small> : null}
+          </div>
+        </details>
+
+        <label className="filter-field filter-field--period">
+          <span>Perioadă</span>
           <select
-            value={presetId}
-            disabled={presetsQuery.isPending}
-            onChange={(event) => {
-              const id = event.target.value;
-              setPresetId(id);
-              const preset = presetsQuery.data?.find((item) => item.id === id);
-              if (!preset) return;
-              setPresetName(preset.name);
-              setPresetShared(preset.shared);
-              const parsed = globalSearchSchema.safeParse(preset.filters);
-              if (parsed.success) {
-                updateSearch({ ...clearPresetFilters, ...parsed.data }, true);
-                setPresetMessage('Preset aplicat.');
-              } else {
-                setPresetMessage('Preset incompatibil cu contractul curent.');
-              }
-            }}
+            value={search.period ?? requestedPeriod}
+            disabled={optionsQuery.isPending}
+            onChange={(event) => updateSearch({ period: event.target.value })}
           >
-            <option value="">Alege un preset…</option>
-            {(presetsQuery.data ?? []).map((preset) => (
-              <option key={preset.id} value={preset.id}>
-                {preset.name}
-                {preset.shared ? ' · shared' : ''}
+            {(options?.periods ?? [requestedPeriod]).map((period) => (
+              <option key={period} value={period}>
+                {period}
               </option>
             ))}
           </select>
-          <input
-            value={presetName}
-            maxLength={160}
-            placeholder="Nume preset"
-            onChange={(event) => setPresetName(event.target.value)}
-          />
-          <label className="comparison-option">
-            <input
-              type="checkbox"
-              checked={presetShared}
-              onChange={(event) => setPresetShared(event.target.checked)}
-            />
-            <span>Partajat</span>
-          </label>
-          <div className="filter-preset-actions">
-            <button
-              type="button"
-              disabled={!presetName.trim() || createPresetMutation.isPending}
-              onClick={() =>
-                createPresetMutation.mutate({
-                  name: presetName.trim(),
-                  shared: presetShared,
-                  filters: presetFilters(search),
-                })
-              }
-            >
-              <BookmarkPlus size={13} /> Nou
-            </button>
-            {selectedPreset?.owner_subject === identity.subject ? (
-              <>
-                <button
-                  type="button"
-                  disabled={!presetName.trim() || updatePresetMutation.isPending}
-                  onClick={() =>
-                    updatePresetMutation.mutate({
-                      id: selectedPreset.id,
-                      version: selectedPreset.version,
-                    })
-                  }
-                >
-                  <Save size={13} /> Actualizează
-                </button>
-                <button
-                  type="button"
-                  disabled={deletePresetMutation.isPending}
-                  onClick={() => deletePresetMutation.mutate(selectedPreset.id)}
-                >
-                  <Trash2 size={13} /> Șterge
-                </button>
-              </>
-            ) : null}
-          </div>
-          {presetMessage ? <small>{presetMessage}</small> : null}
-        </div>
-      </details>
+        </label>
 
-      <label className="filter-field filter-field--period">
-        <span>Perioadă</span>
-        <select
-          value={search.period ?? requestedPeriod}
-          disabled={optionsQuery.isPending}
-          onChange={(event) => updateSearch({ period: event.target.value })}
-        >
-          {(options?.periods ?? [requestedPeriod]).map((period) => (
-            <option key={period} value={period}>
-              {period}
-            </option>
-          ))}
-        </select>
-      </label>
+        <label className="filter-field filter-field--range">
+          <span>Interval</span>
+          <select
+            value={search.range ?? 'month'}
+            onChange={(event) => {
+              const range = event.target.value as (typeof rangePresets)[number];
+              updateSearch({
+                range,
+                ...(range === 'custom'
+                  ? { start: search.start ?? requestedPeriod, end: search.end ?? requestedPeriod }
+                  : { start: undefined, end: undefined }),
+              });
+            }}
+          >
+            <option value="month">Luna selectată</option>
+            <option value="ytd">YTD</option>
+            <option value="3">Ultimele 3 luni</option>
+            <option value="6">Ultimele 6 luni</option>
+            <option value="12">Ultimele 12 luni</option>
+            <option value="year">An</option>
+            <option value="custom">Custom</option>
+          </select>
+        </label>
 
-      <label className="filter-field filter-field--range">
-        <span>Interval</span>
-        <select
-          value={search.range ?? 'month'}
-          onChange={(event) => {
-            const range = event.target.value as (typeof rangePresets)[number];
+        {search.range === 'custom' ? (
+          <>
+            <label className="filter-field filter-field--period">
+              <span>De la</span>
+              <input
+                type="month"
+                value={search.start ?? requestedPeriod}
+                onChange={(event) => updateSearch({ start: event.target.value || undefined })}
+              />
+            </label>
+            <label className="filter-field filter-field--period">
+              <span>Până la</span>
+              <input
+                type="month"
+                value={search.end ?? requestedPeriod}
+                onChange={(event) => {
+                  const end = event.target.value || undefined;
+                  updateSearch({ end, period: end });
+                }}
+              />
+            </label>
+          </>
+        ) : null}
+
+        <ComparisonMultiSelect
+          selected={selectedComparisons}
+          onChange={(values) =>
             updateSearch({
-              range,
-              ...(range === 'custom'
-                ? { start: search.start ?? requestedPeriod, end: search.end ?? requestedPeriod }
-                : { start: undefined, end: undefined }),
-            });
-          }}
-        >
-          <option value="month">Luna selectată</option>
-          <option value="ytd">YTD</option>
-          <option value="3">Ultimele 3 luni</option>
-          <option value="6">Ultimele 6 luni</option>
-          <option value="12">Ultimele 12 luni</option>
-          <option value="year">An</option>
-          <option value="custom">Custom</option>
-        </select>
-      </label>
+              comparisons: serializeComparisons(values),
+              comparison: values.includes('previous-year')
+                ? 'previous-year'
+                : values.includes('previous-period')
+                  ? 'previous-month'
+                  : 'none',
+            })
+          }
+        />
 
-      {search.range === 'custom' ? (
-        <>
-          <label className="filter-field filter-field--period">
-            <span>De la</span>
-            <input
-              type="month"
-              value={search.start ?? requestedPeriod}
-              onChange={(event) => updateSearch({ start: event.target.value || undefined })}
-            />
-          </label>
-          <label className="filter-field filter-field--period">
-            <span>Până la</span>
-            <input
-              type="month"
-              value={search.end ?? requestedPeriod}
-              onChange={(event) => updateSearch({ end: event.target.value || undefined })}
-            />
-          </label>
-        </>
-      ) : null}
-
-      <ComparisonMultiSelect
-        selected={selectedComparisons}
-        onChange={(values) =>
-          updateSearch({
-            comparisons: serializeComparisons(values),
-            comparison: values.includes('previous-year')
-              ? 'previous-year'
-              : values.includes('previous-period')
-                ? 'previous-month'
-                : 'none',
-          })
-        }
-      />
-
-      <SelectFilter
-        label="Firmă"
-        value={search.firm}
-        options={options?.firms ?? []}
-        disabled={optionsQuery.isPending}
-        onChange={(firm) =>
-          updateSearch({
-            firm,
-            regional: undefined,
-            asm: undefined,
-            stores: undefined,
-            agent: undefined,
-          })
-        }
-      />
-      <SelectFilter
-        label="RM"
-        value={search.regional}
-        options={regionals}
-        disabled={optionsQuery.isPending}
-        onChange={(regional) =>
-          updateSearch({ regional, asm: undefined, stores: undefined, agent: undefined })
-        }
-      />
-      <SelectFilter
-        label="ASM"
-        value={search.asm}
-        options={asms}
-        disabled={optionsQuery.isPending}
-        onChange={(asm) => updateSearch({ asm, stores: undefined, agent: undefined })}
-      />
-      <StoreMultiSelect
-        stores={filteredStores}
-        selected={selectedStores}
-        onChange={(stores) =>
-          updateSearch({ stores: serializeStoreSelection(stores), agent: undefined })
-        }
-      />
-      <SelectFilter
-        label="Agent"
-        value={search.agent}
-        options={agents}
-        disabled={optionsQuery.isPending}
-        onChange={(agent) => updateSearch({ agent })}
-      />
-
-      <button
-        type="button"
-        className="filter-reset"
-        disabled={count === 0}
-        onClick={() =>
-          updateSearch(
-            {
-              firm: undefined,
+        <SelectFilter
+          label="Firmă"
+          value={search.firm}
+          options={options?.firms ?? []}
+          disabled={optionsQuery.isPending}
+          onChange={(firm) =>
+            updateSearch({
+              firm,
               regional: undefined,
               asm: undefined,
               stores: undefined,
               agent: undefined,
-            },
-            true,
-          )
-        }
-      >
-        <RotateCcw size={14} />
-        Reset
-      </button>
+            })
+          }
+        />
+        <SelectFilter
+          label="RM"
+          value={search.regional}
+          options={regionals}
+          disabled={optionsQuery.isPending}
+          onChange={(regional) =>
+            updateSearch({ regional, asm: undefined, stores: undefined, agent: undefined })
+          }
+        />
+        <SelectFilter
+          label="ASM"
+          value={search.asm}
+          options={asms}
+          disabled={optionsQuery.isPending}
+          onChange={(asm) => updateSearch({ asm, stores: undefined, agent: undefined })}
+        />
+        <StoreMultiSelect
+          stores={filteredStores}
+          selected={selectedStores}
+          onChange={(stores) =>
+            updateSearch({ stores: serializeStoreSelection(stores), agent: undefined })
+          }
+        />
+        <SelectFilter
+          label="Agent"
+          value={search.agent}
+          options={agents}
+          disabled={optionsQuery.isPending}
+          onChange={(agent) => updateSearch({ agent })}
+        />
+
+        <button
+          type="button"
+          className="filter-reset"
+          disabled={count === 0}
+          onClick={() =>
+            updateSearch(
+              {
+                firm: undefined,
+                regional: undefined,
+                asm: undefined,
+                stores: undefined,
+                agent: undefined,
+                drill: undefined,
+              },
+              true,
+            )
+          }
+        >
+          <RotateCcw size={14} />
+          Reset
+        </button>
+      </div>
+      {drillPath.length > 0 ? (
+        <nav className="drill-breadcrumb" aria-label="Traseu drill-down">
+          <span>Drill</span>
+          {drillPath.map((item, index) => (
+            <button
+              type="button"
+              key={`${item.dimension}:${item.value}`}
+              title={`Elimină ${item.label ?? item.value} și nivelurile următoare`}
+              onClick={() =>
+                updateSearch(
+                  {
+                    drill: serializeDrillPath(drillPath.slice(0, index)),
+                    ...(item.dimension === 'store' || item.dimension === 'site_code'
+                      ? { stores: undefined }
+                      : {}),
+                  },
+                  true,
+                )
+              }
+            >
+              <small>{item.dimension}</small>
+              <strong>{item.label ?? item.value}</strong>
+              <X size={12} />
+            </button>
+          ))}
+          <button
+            type="button"
+            className="drill-breadcrumb-reset"
+            onClick={() => updateSearch({ drill: undefined, stores: undefined }, true)}
+          >
+            <RotateCcw size={12} /> Reset drill
+          </button>
+        </nav>
+      ) : null}
     </div>
   );
 }

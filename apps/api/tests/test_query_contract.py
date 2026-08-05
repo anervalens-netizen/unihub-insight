@@ -37,6 +37,8 @@ def test_versioned_catalog_exposes_query_and_dimension_contract(client: TestClie
     sales = next(item for item in payload["metrics"] if item["id"] == "sales.total")
     assert sales["version"] == 1
     assert sales["source_authority"] == "unihub-retail"
+    assert "scatter" not in sales["allowed_shapes"]
+    assert "treemap" in sales["allowed_shapes"]
 
 
 def test_batch_reuses_one_snapshot_and_isolates_invalid_widget(client: TestClient) -> None:
@@ -65,6 +67,56 @@ def test_batch_reuses_one_snapshot_and_isolates_invalid_widget(client: TestClien
     assert by_id["finance"]["meta"]["snapshot_id"] == payload["snapshot"]["id"]
     assert by_id["invalid"]["error"]["code"] == "invalid-query"
     assert by_id["sales"]["dataset"]["rows"]
+
+
+def test_scatter_uses_explicit_business_axes(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/query/batch",
+        params={"period": "2026-08"},
+        json={
+            "widgets": [
+                widget(
+                    "performance-relation",
+                    module="performance",
+                    metric_id="performance.average",
+                    visualization="scatter",
+                    dimensions=["store"],
+                )
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    result = response.json()["results"][0]
+    assert result["error"] is None
+    dimensions = {item["id"]: item["label"] for item in result["dataset"]["dimensions"]}
+    assert dimensions["x"] == "Productivitate / zi-agent"
+    assert dimensions["y"] == "Realizare target"
+    assert result["dataset"]["rows"]
+
+
+def test_waterfall_dataset_carries_reconciliation_roles(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/query/batch",
+        params={"period": "2026-08"},
+        json={
+            "widgets": [
+                widget(
+                    "finance-bridge",
+                    module="finance",
+                    metric_id="finance.ebit",
+                    visualization="waterfall",
+                    dimensions=["category"],
+                )
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    result = response.json()["results"][0]
+    assert result["error"] is None
+    assert result["dataset"]["rows"][0]["step_kind"] == "start"
+    assert result["dataset"]["rows"][-1]["step_kind"] == "total"
 
 
 def test_batch_fails_closed_when_snapshot_changes_during_execution(client: TestClient) -> None:

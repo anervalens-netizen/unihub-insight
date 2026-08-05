@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
-from unihub_insight_api.api.dependencies import RepositoryDependency, ScopeDependency
+from unihub_insight_api.api.dependencies import ModuleWindowDependency, RepositoryDependency, ScopeDependency
 from unihub_insight_api.auth import require_capability
 from unihub_insight_api.domain import Capability, ModuleId, UserContext
 from unihub_insight_api.services.excel_export import (
@@ -17,6 +17,7 @@ from unihub_insight_api.services.excel_export import (
     monthly_review_workbook,
     overview_workbook,
 )
+from unihub_insight_api.services.module_window import apply_module_window
 
 router = APIRouter(prefix="/api/v1/exports", tags=["exports"])
 
@@ -81,6 +82,7 @@ async def export_module(
     module: ModuleId,
     repository: RepositoryDependency,
     scope: ScopeDependency,
+    window: ModuleWindowDependency,
     user: Annotated[
         UserContext,
         Depends(require_capability(Capability.ANALYTICS)),
@@ -105,7 +107,7 @@ async def export_module(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Filtrul Agent nu este compatibil cu modulul {module.value}.",
         )
-    data = await repository.get_module(module, scope)
+    data = apply_module_window(await repository.get_module(module, scope), window)
     return _response(
         module_workbook(data),
         f"unihub-insight-{module.value}-{scope.period}.xlsx",

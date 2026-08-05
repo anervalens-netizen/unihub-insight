@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from unihub_insight_api.api.dependencies import RepositoryDependency, ScopeDependency
+from unihub_insight_api.api.dependencies import ModuleWindowDependency, RepositoryDependency, ScopeDependency
 from unihub_insight_api.auth import require_capability
 from unihub_insight_api.domain import (
     AnalyticsCatalogResponse,
@@ -17,6 +17,7 @@ from unihub_insight_api.domain import (
     UserContext,
 )
 from unihub_insight_api.services import ANALYTICS_CATALOG, METRIC_CATALOG
+from unihub_insight_api.services.module_window import apply_module_window
 
 router = APIRouter(prefix="/api/v1", tags=["analytics"])
 
@@ -54,6 +55,7 @@ async def module_analytics(
     module: ModuleId,
     repository: RepositoryDependency,
     scope: ScopeDependency,
+    window: ModuleWindowDependency,
     user: Annotated[UserContext, Depends(require_capability(Capability.ANALYTICS))],
 ) -> ModuleAnalyticsResponse:
     required = MODULE_CAPABILITIES[module]
@@ -75,7 +77,7 @@ async def module_analytics(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Filtrul Agent nu este compatibil cu modulul {module.value}.",
         )
-    return await repository.get_module(module, scope)
+    return apply_module_window(await repository.get_module(module, scope), window)
 
 
 @router.get("/catalog/metrics", response_model=list[MetricDefinition])

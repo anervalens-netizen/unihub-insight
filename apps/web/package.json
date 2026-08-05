@@ -7,12 +7,13 @@
     "dev": "vite --host 0.0.0.0 --port 3100",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0 --port 3100",
-    "lint": "biome check src tests vite.config.ts",
-    "format": "biome format --write src tests vite.config.ts",
-    "format:check": "biome format src tests vite.config.ts",
+    "lint": "biome check src tests e2e vite.config.ts playwright.config.ts",
+    "format": "biome format --write src tests e2e vite.config.ts playwright.config.ts",
+    "format:check": "biome format src tests e2e vite.config.ts playwright.config.ts",
     "typecheck": "tsc -b --pretty false",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "vitest run tests",
+    "test:watch": "vitest tests",
+    "browser:qa": "playwright test"
   },
   "dependencies": {
     "@tanstack/react-query": "5.101.4",
@@ -28,6 +29,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.5",
+    "@playwright/test": "1.62.1",
     "@types/node": "24.10.0",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
