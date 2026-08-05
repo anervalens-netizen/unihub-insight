@@ -35,7 +35,7 @@ def _validate(request: DashboardCreateRequest, user: AnalyticsUserDependency) ->
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     except DashboardValidationError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail={"message": "Dashboard configuration is invalid.", "errors": list(exc.errors)},
         ) from exc
 
