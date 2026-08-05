@@ -216,6 +216,7 @@ async def run(arguments: argparse.Namespace) -> int:
     if not dsn:
         raise RuntimeError("UNIHUB_INSIGHT_DATABASE_URL is required")
     settings = Settings(
+        environment="test",
         data_mode="postgres",
         auth_mode="demo",
         database_url=dsn,
