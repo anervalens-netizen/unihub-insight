@@ -79,10 +79,16 @@ jobs:
           npm ci --ignore-scripts
           uv sync --project apps/api --frozen --all-groups
 
-      - name: Apply safe and unsafe Biome fixes
+      - name: Apply Biome fixes and capture remaining diagnostics
+        shell: bash
         run: |
+          set +e
           cd apps/web
-          npx biome check --write --unsafe src tests vite.config.ts
+          npx biome check --write --unsafe src tests vite.config.ts > ../../biome-output.txt 2>&1
+          status=$?
+          cat ../../biome-output.txt
+          echo "$status" > /tmp/biome-status
+          exit 0
 
       - name: Format and verify
         shell: bash
@@ -95,13 +101,13 @@ jobs:
           echo "$status" > /tmp/verify-status
           exit 0
 
-      - name: Publish corrections
+      - name: Publish corrections and evidence
         shell: bash
         run: |
           set -euo pipefail
           status="$(cat /tmp/verify-status)"
           if [[ "$status" == "0" ]]; then
-            rm -f verification-output.txt
+            rm -f verification-output.txt biome-output.txt
           fi
           rm -f .github/workflows/monthly-review-autofix.yml
           git add -A
