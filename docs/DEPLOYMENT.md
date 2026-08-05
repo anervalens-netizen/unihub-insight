@@ -48,8 +48,8 @@ already has these read-only mounts:
 
 The API unit preserves the runtime directory inode across service restarts so
 the Caddy bind mount remains valid. Caddy serves the application through the
-socket and exposes only `/metrics` on its unpublished Docker-network port
-`8100` for Prometheus.
+socket and exposes `/metrics` plus `/ready-metrics` only on its unpublished
+Docker-network port `8100` for Prometheus. Both paths remain public `404`.
 
 Set the same random value in the API environment as
 `UNIHUB_INSIGHT_TRUSTED_PROXY_SECRET` and in the private Caddy environment as
@@ -76,6 +76,13 @@ socket and internal metrics bridge, migration registry and read-only database
 boundary. `smoke.sh` checks local
 liveness/readiness, public SPA reachability and public 404 responses for
 diagnostics.
+
+For a non-destructive restore drill, restore the latest custom-format dump
+into a disposable database. Seed only the empty `public.sales_transactions`
+contract required by `insight.monthly_review_item_month`, restore with
+`--exit-on-error --no-owner --no-privileges`, verify the migration registry and
+metadata relations, then drop the disposable database. Never use the production
+restore command for this drill.
 
 Rollback is code-only and keeps the database at its current schema. Before
 switching the symlink it verifies that the target contains every applied

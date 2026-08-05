@@ -50,15 +50,16 @@ Dependențele se implementează vertical: o suprafață ajunge `LIVE` numai cân
 - [x] Compensation folosește exclusiv agregatul aprobat, fără persoană/nume/filtre diferențiatoare.
 - [x] Custom dashboards: blank/template/clone, duplicate, editor, layout/versionare, preseturi, ACL per subject, scope ceiling și batch execution.
 - [x] XLSX/CSV/PNG, metric dictionary, audit/version history și autorizare comună.
-- [ ] Matrice negativă rol/capabilitate/export; performanță, accessibility, backup/restore, rollback și exact-SHA.
-- [ ] Browser QA toate modulele și view-urile, comparație cu Retail, viewport/temă/densitate și acceptare vizuală owner.
+- [x] Matrice negativă rol/capabilitate/export, reconciliere curent/închis, accessibility, backup/restore izolat, rollback compatibil, monitorizare și exact-SHA.
+- [x] Browser QA pentru fluxurile critice, viewport/temă/densitate, URL drill/reload, inspector și export.
+- [ ] Acceptare vizuală owner și șapte zile curate de SLI producție.
 
 ## Porți deschise după RC1
 
 - Finance și Compensation sunt corect `UNAVAILABLE` în producție: tabelele de generații/head nu publică încă o generație eligibilă. Datele legacy nu sunt promovate implicit.
-- Migrarea Retail 047 este aditivă pentru compatibilitatea N/N-1. Granturile raw Finance/Planning se revocă numai după două release-uri Insight compatibile și rollback B→A verificat. Release-ul pre-RC1 nu conține migrarea metadata 003 și este refuzat preventiv ca țintă; rollback-ul eligibil este RC B→RC A.
-- RC1 trebuie promovat prin artifact immutable, reconciliat live, trecut prin backup/restore și rollback, apoi acceptat vizual de owner.
-- Versiunea `1.0.0` cere șapte zile curate conform [Performance Acceptance](docs/PERFORMANCE_ACCEPTANCE.md).
+- Migrarea Retail 047 este aditivă pentru compatibilitatea N/N-1. Granturile raw Finance/Planning se revocă numai după două release-uri de produs acceptate și rollback B→A; drill-ul tehnic între artefacte RC1 nu autorizează încă revocarea.
+- RC1 este publicat ca artefact immutable, reconciliat live, restaurat izolat și acoperit de rollback fail-closed. Release-urile pre-RC1 incompatibile sunt refuzate înainte de schimbarea symlinkului.
+- Promovarea `1.0.0` mai cere acceptarea vizuală owner și șapte zile curate conform [Performance Acceptance](docs/PERFORMANCE_ACCEPTANCE.md).
 
 ## Reguli de execuție
 
