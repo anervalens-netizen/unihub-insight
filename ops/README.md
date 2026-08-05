@@ -20,7 +20,9 @@ This directory contains the complete pre-deploy package. No script executes agai
 - Docker PostgreSQL `unihub_postgres` remains the database runtime; the host
   API reaches its published `127.0.0.1:5432` port;
 - Docker Caddy `unihub-caddy` and Authentik remain the public identity
-  boundary. Caddy reaches the host API through `172.23.0.1:8100`.
+  boundary. The API binds only to `/run/unihub-insight/api.sock`; Caddy mounts
+  that runtime directory read-only and exposes only `/metrics` on its
+  unpublished Docker-network port `8100` for Prometheus.
 
 ## First installation sequence
 
@@ -31,8 +33,9 @@ This directory contains the complete pre-deploy package. No script executes agai
    `env/insight.production.example` and `env/migration.production.example`;
    generate the proxy secret with `openssl rand -hex 32`.
 3. Install the systemd units from `systemd/` and run `systemctl daemon-reload`.
-4. Add `caddy/unihub-insight.caddy.template` to the existing Docker Caddyfile,
-   mount `/opt/unihub-insight:/opt/unihub-insight:ro` in `unihub-caddy`, and set
+4. Add `caddy/unihub-insight.caddy.template` to the existing Docker Caddyfile;
+   mount `/opt/unihub-insight:/opt/unihub-insight:ro` and
+   `/run/unihub-insight:/run/unihub-insight:ro` in `unihub-caddy`; set
    `UNIHUB_INSIGHT_PROXY_SECRET` in Caddy's private `.env`.
 5. On Dell, run `scripts/prepare-release.sh` to install, verify and build one
    exact source SHA. Transfer that immutable artifact to primary and run

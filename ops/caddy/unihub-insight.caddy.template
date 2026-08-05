@@ -1,6 +1,7 @@
 # Add this site block to the existing /opt/Mobiup/infra/caddy/Caddyfile.
 # The unihub-caddy compose service must also mount the release root read-only:
 #   - /opt/unihub-insight:/opt/unihub-insight:ro
+#   - /run/unihub-insight:/run/unihub-insight:ro
 # Its existing .env must define UNIHUB_INSIGHT_PROXY_SECRET. Caddy reads it at
 # request time so the value is not expanded into the adapted JSON config.
 
@@ -39,7 +40,7 @@ http://insight.unihub.ro, insight.unihub.ro {
 			# Never trust browser-supplied identity or boundary headers. The
 			# imported authentik_forward snippet also strips X-Authentik-*.
 			import authentik_forward
-			reverse_proxy 172.23.0.1:8100 {
+			reverse_proxy unix//run/unihub-insight/api.sock {
 				header_up X-UniHub-Proxy-Secret {env.UNIHUB_INSIGHT_PROXY_SECRET}
 			}
 		}
@@ -61,5 +62,16 @@ http://insight.unihub.ro, insight.unihub.ro {
 			try_files {path} /index.html
 			file_server
 		}
+	}
+}
+
+# Docker-internal metrics bridge. Port 8100 is not published by Compose and
+# every non-metrics path remains closed.
+http://:8100 {
+	handle /metrics {
+		reverse_proxy unix//run/unihub-insight/api.sock
+	}
+	handle {
+		respond 404
 	}
 }

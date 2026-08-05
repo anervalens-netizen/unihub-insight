@@ -2,7 +2,7 @@
   metrics_path: /metrics
   scheme: http
   static_configs:
-    - targets: ['host.docker.internal:8100']
+    - targets: ['unihub-caddy:8100']
       labels:
         service: unihub-insight
         environment: production

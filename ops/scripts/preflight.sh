@@ -6,14 +6,14 @@ ENV_FILE="${1:-/etc/unihub-insight/insight.env}"
 MIGRATION_ENV_FILE="${2:-/etc/unihub-insight/migration.env}"
 BASE="${UNIHUB_INSIGHT_BASE:-/opt/unihub-insight}"
 RELEASE="${3:-$BASE/current}"
-LOCAL_API="${UNIHUB_INSIGHT_LOCAL_API:-http://172.23.0.1:8100}"
+LOCAL_API_SOCKET="${UNIHUB_INSIGHT_LOCAL_API_SOCKET:-/run/unihub-insight/api.sock}"
 
 [[ $EUID -eq 0 ]] || {
   echo "run as root so private environment files can be verified" >&2
   exit 1
 }
 
-required=(python3 psql curl systemctl docker sha256sum ss)
+required=(python3 psql curl systemctl docker sha256sum)
 for command in "${required[@]}"; do
   command -v "$command" >/dev/null || {
     echo "missing command: $command" >&2
@@ -138,9 +138,11 @@ docker exec unihub_postgres pg_isready -q
 docker inspect unihub-caddy --format '{{.State.Running}}' | grep -qx true
 docker inspect unihub-caddy --format '{{range .Mounts}}{{if eq .Destination "/opt/unihub-insight"}}{{println .Source .Destination .Mode}}{{end}}{{end}}' \
   | grep -Fqx '/opt/unihub-insight /opt/unihub-insight ro'
+docker inspect unihub-caddy --format '{{range .Mounts}}{{if eq .Destination "/run/unihub-insight"}}{{println .Source .Destination .Mode}}{{end}}{{end}}' \
+  | grep -Fqx '/run/unihub-insight /run/unihub-insight ro'
 docker exec unihub-caddy caddy validate \
   --config /etc/caddy/Caddyfile --adapter caddyfile
-ss -ltnH | awk '$4 ~ /172\.23\.0\.1:8100$/ { found = 1 } END { exit !found }'
+[[ -S "$LOCAL_API_SOCKET" ]]
 
 psql "$UNIHUB_INSIGHT_DATABASE_URL" -Atqc \
   "SELECT current_setting('transaction_read_only')" | grep -qx on
@@ -161,7 +163,8 @@ psql "$UNIHUB_INSIGHT_METADATA_DATABASE_URL" -Atqc \
 
 cd "$RELEASE"
 "$RELEASE/apps/api/.venv/bin/python" ops/scripts/migrate.py --check
-curl --fail --silent --show-error --max-time 5 "$LOCAL_API/livez" \
+curl --fail --silent --show-error --max-time 5 --unix-socket "$LOCAL_API_SOCKET" \
+  http://localhost/livez \
   | grep -q '"status":"ok"'
 
 echo "preflight complete"

@@ -2,29 +2,30 @@
 set -euo pipefail
 
 PUBLIC_URL="${1:-https://insight.unihub.ro}"
-LOCAL_API="${2:-http://172.23.0.1:8100}"
+LOCAL_API_SOCKET="${2:-/run/unihub-insight/api.sock}"
 EXPECTED_SHA="${3:-}"
 if [[ -z "$EXPECTED_SHA" && -f /opt/unihub-insight/current/SOURCE_SHA ]]; then
   EXPECTED_SHA="$(</opt/unihub-insight/current/SOURCE_SHA)"
 fi
 
 wait_for_status() {
-  local url="$1"
+  local path="$1"
   local expected="$2"
 
   for _attempt in {1..30}; do
-    if curl --fail --silent --max-time 2 "$url" | grep -q "$expected"; then
+    if curl --fail --silent --max-time 2 --unix-socket "$LOCAL_API_SOCKET" \
+      "http://localhost$path" | grep -q "$expected"; then
       return 0
     fi
     sleep 1
   done
 
-  echo "timed out waiting for $url" >&2
+  echo "timed out waiting for $LOCAL_API_SOCKET$path" >&2
   return 1
 }
 
-wait_for_status "$LOCAL_API/livez" '"status":"ok"'
-wait_for_status "$LOCAL_API/readyz" '"status":"ready"'
+wait_for_status "/livez" '"status":"ok"'
+wait_for_status "/readyz" '"status":"ready"'
 status="$(curl --silent --show-error --max-time 10 --output /dev/null --write-out '%{http_code}' "$PUBLIC_URL/")"
 [[ "$status" =~ ^(200|3[0-9][0-9])$ ]] || {
   echo "public SPA returned HTTP $status" >&2

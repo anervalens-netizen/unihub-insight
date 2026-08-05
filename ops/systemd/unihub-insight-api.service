@@ -10,7 +10,10 @@ User=unihub-insight
 Group=unihub-insight
 WorkingDirectory=/opt/unihub-insight/current
 EnvironmentFile=/etc/unihub-insight/insight.env
-ExecStart=/opt/unihub-insight/current/apps/api/.venv/bin/uvicorn unihub_insight_api.main:app --host 172.23.0.1 --port 8100 --workers 1 --proxy-headers --forwarded-allow-ips=172.23.0.2
+RuntimeDirectory=unihub-insight
+RuntimeDirectoryMode=0750
+ExecStartPre=/usr/bin/rm -f /run/unihub-insight/api.sock
+ExecStart=/opt/unihub-insight/current/apps/api/.venv/bin/uvicorn unihub_insight_api.main:app --uds /run/unihub-insight/api.sock --workers 1 --proxy-headers --forwarded-allow-ips=172.23.0.2
 Restart=on-failure
 RestartSec=3
 TimeoutStartSec=45
