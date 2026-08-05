@@ -15,9 +15,29 @@ set -a
 # shellcheck disable=SC1090
 source "$ENV_FILE"
 set +a
-systemctl stop unihub-insight-api.service
+
+api_was_active=0
+if systemctl is-active --quiet unihub-insight-api.service; then
+  api_was_active=1
+  systemctl stop unihub-insight-api.service
+fi
+restart_api_on_exit() {
+  local status=$?
+  if [[ $api_was_active -eq 1 ]]; then
+    systemctl start unihub-insight-api.service || status=1
+  fi
+  return "$status"
+}
+trap restart_api_on_exit EXIT
+
 pg_restore "$UNIHUB_INSIGHT_MIGRATION_DATABASE_URL" \
   --role=unihub_insight_schema_owner \
   --clean --if-exists --no-owner --schema=insight "$BACKUP"
-systemctl start unihub-insight-api.service
-"$(dirname "$0")/smoke.sh"
+
+if [[ $api_was_active -eq 1 ]]; then
+  systemctl start unihub-insight-api.service
+fi
+trap - EXIT
+if [[ $api_was_active -eq 1 ]]; then
+  "$(dirname "$0")/smoke.sh"
+fi
