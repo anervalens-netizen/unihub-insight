@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from contextlib import suppress
 from pathlib import Path
 from typing import Annotated
 
@@ -45,10 +46,8 @@ REPORT_SECTIONS = {
 
 
 def _remove_file(path: Path) -> None:
-    try:
+    with suppress(FileNotFoundError):
         os.unlink(path)
-    except FileNotFoundError:
-        pass
 
 
 def _response(path: Path, filename: str) -> FileResponse:
