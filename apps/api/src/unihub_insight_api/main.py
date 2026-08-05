@@ -8,7 +8,6 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import ORJSONResponse
 
 from unihub_insight_api.api.routes import (
     analytics_router,
@@ -64,7 +63,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(
         title=resolved_settings.app_name,
         version=resolved_settings.version,
-        default_response_class=ORJSONResponse,
         lifespan=lifespan,
         docs_url="/docs" if resolved_settings.environment != "production" else None,
         redoc_url=None,
