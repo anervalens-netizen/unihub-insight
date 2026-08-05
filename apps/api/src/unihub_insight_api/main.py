@@ -24,9 +24,9 @@ from unihub_insight_api.repositories.dashboards import (
     MemoryDashboardStore,
     PostgresDashboardStore,
 )
-from unihub_insight_api.repositories.monthly_review import (
-    DemoMonthlyReviewRepository,
-    PostgresMonthlyReviewRepository,
+from unihub_insight_api.repositories.monthly_review import DemoMonthlyReviewRepository
+from unihub_insight_api.repositories.monthly_review_reporting import (
+    ReportingMonthlyReviewRepository,
 )
 
 REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
@@ -47,7 +47,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.metadata_pool = None
         if resolved_settings.data_mode == "postgres":
             app.state.pool = await create_pool(resolved_settings)
-            app.state.analytics_repository = PostgresMonthlyReviewRepository(app.state.pool)
+            app.state.analytics_repository = ReportingMonthlyReviewRepository(
+                app.state.pool
+            )
         else:
             app.state.analytics_repository = DemoMonthlyReviewRepository()
         if resolved_settings.metadata_database_url:
