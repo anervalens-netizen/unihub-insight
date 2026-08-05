@@ -37,34 +37,14 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Install web dependencies
-        run: npm install --no-audit --no-fund
+      - name: Install locked web dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Install API dependencies
-        run: uv sync --project apps/api --all-groups
+      - name: Install locked API dependencies
+        run: uv sync --project apps/api --frozen --all-groups
 
       - name: Normalize source
         run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path("apps/api/src/unihub_insight_api/repositories/monthly_review_reporting.py")
-          source = path.read_text(encoding="utf-8")
-          source = source.replace("from typing import Any\n", "from typing import Any, cast\n")
-          source = source.replace(
-              "            return await connection.fetch(\n",
-              "            return cast(\n"
-              "                Sequence[asyncpg.Record],\n"
-              "                await connection.fetch(\n",
-          )
-          source = source.replace(
-              "                *params,\n            )",
-              "                    *params,\n"
-              "                ),\n"
-              "            )",
-          )
-          path.write_text(source, encoding="utf-8")
-          PY
           npm run format
           npm --workspace @unihub-insight/web exec -- biome check --write src tests vite.config.ts
           uv run --project apps/api ruff check --fix apps/api/src apps/api/tests
@@ -72,7 +52,7 @@ jobs:
       - name: Verify source
         run: npm run verify
 
-      - name: Persist verified locks and formatting
+      - name: Persist verified normalization
         run: |
           rm -rf .bootstrap
           rm -f .github/verify-now
@@ -80,6 +60,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           if ! git diff --cached --quiet; then
-            git commit -m "build: persist verified dependency locks"
+            git commit -m "build: persist verified normalization"
             git push
           fi
