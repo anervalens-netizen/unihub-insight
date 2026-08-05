@@ -1,21 +1,24 @@
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useCallback } from 'react';
 
-import type { GlobalSearch, GlobalSearchPatch } from '../lib/search';
+import {
+  type GlobalSearch,
+  type GlobalSearchPatch,
+  globalSearchSchema,
+} from '../lib/search';
 
 export function useGlobalSearch(): GlobalSearch {
   return useSearch({ from: '__root__' });
 }
 
 export function useUpdateGlobalSearch() {
-  const navigate = useNavigate();
+  const navigate = useNavigate({ from: '__root__' });
+  const search = useGlobalSearch();
   return useCallback(
     (patch: GlobalSearchPatch, replace = false): void => {
-      void navigate({
-        search: (previous) => ({ ...previous, ...patch }),
-        replace,
-      });
+      const nextSearch = globalSearchSchema.parse({ ...search, ...patch });
+      void navigate({ search: nextSearch, replace });
     },
-    [navigate],
+    [navigate, search],
   );
 }
