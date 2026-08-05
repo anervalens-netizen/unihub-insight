@@ -22,7 +22,8 @@ This directory contains the complete pre-deploy package. No script executes agai
 - Docker Caddy `unihub-caddy` and Authentik remain the public identity
   boundary. The API binds only to `/run/unihub-insight/api.sock`; Caddy mounts
   that runtime directory read-only and exposes only `/metrics` on its
-  unpublished Docker-network port `8100` for Prometheus.
+  unpublished Docker-network port `8100` for Prometheus. The systemd runtime
+  directory is preserved across API restarts so Caddy keeps the same inode.
 
 ## First installation sequence
 

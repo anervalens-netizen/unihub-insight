@@ -32,8 +32,8 @@ rsync -a "/var/tmp/unihub-insight-releases/$SHA/" \
 Install the units from `ops/systemd/` and configure the root-owned `0600` files
 `/etc/unihub-insight/insight.env` and `/etc/unihub-insight/migration.env`.
 The API unit loads only the first; migrations and backups use only the second.
-The API listens only on Docker's host bridge `172.23.0.1:8100`; PostgreSQL is
-the Docker container `unihub_postgres` published to host `127.0.0.1:5432`.
+The API listens only on `/run/unihub-insight/api.sock`; PostgreSQL is the
+Docker container `unihub_postgres` published to host `127.0.0.1:5432`.
 Metadata backup/restore runs PostgreSQL 18's `pg_dump`/`pg_restore` inside that
 container, avoiding host-client version drift.
 
@@ -43,7 +43,13 @@ Add `ops/caddy/unihub-insight.caddy.template` to the existing
 
 ```yaml
 - /opt/unihub-insight:/opt/unihub-insight:ro
+- /run/unihub-insight:/run/unihub-insight:ro
 ```
+
+The API unit preserves the runtime directory inode across service restarts so
+the Caddy bind mount remains valid. Caddy serves the application through the
+socket and exposes only `/metrics` on its unpublished Docker-network port
+`8100` for Prometheus.
 
 Set the same random value in the API environment as
 `UNIHUB_INSIGHT_TRUSTED_PROXY_SECRET` and in the private Caddy environment as
@@ -65,8 +71,9 @@ sudo /opt/unihub-insight/current/ops/scripts/smoke.sh
 ```
 
 `preflight.sh` checks the Dell evidence, immutable build digest and public
-`build-info.json`, Docker PostgreSQL/Caddy state, Caddy configuration, API bind,
-migration registry and read-only database boundary. `smoke.sh` checks local
+`build-info.json`, Docker PostgreSQL/Caddy state, Caddy configuration, the API
+socket and internal metrics bridge, migration registry and read-only database
+boundary. `smoke.sh` checks local
 liveness/readiness, public SPA reachability and public 404 responses for
 diagnostics.
 

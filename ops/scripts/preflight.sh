@@ -143,6 +143,9 @@ docker inspect unihub-caddy --format '{{range .Mounts}}{{if eq .Destination "/ru
 docker exec unihub-caddy caddy validate \
   --config /etc/caddy/Caddyfile --adapter caddyfile
 [[ -S "$LOCAL_API_SOCKET" ]]
+metrics="$(docker exec unihub-caddy wget -qO- --timeout=5 \
+  http://127.0.0.1:8100/metrics)"
+grep -q '^unihub_insight_' <<<"$metrics"
 
 psql "$UNIHUB_INSIGHT_DATABASE_URL" -Atqc \
   "SELECT current_setting('transaction_read_only')" | grep -qx on
