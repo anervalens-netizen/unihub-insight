@@ -63,7 +63,7 @@ async def module_analytics(
         )
     if module in {ModuleId.FINANCE, ModuleId.PLANNING} and scope.agent:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Filtrul Agent nu este compatibil cu modulul {module.value}.",
         )
     return await repository.get_module(module, scope)
