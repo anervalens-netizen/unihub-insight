@@ -64,6 +64,12 @@ psql "$UNIHUB_INSIGHT_DATABASE_URL" -Atqc \
   | grep -qx f
 psql "$UNIHUB_INSIGHT_METADATA_DATABASE_URL" -Atqc \
   "SELECT has_database_privilege(current_user, current_database(), 'CONNECT')" | grep -qx t
+psql "$UNIHUB_INSIGHT_METADATA_DATABASE_URL" -Atqc \
+  "SELECT has_table_privilege(current_user, 'insight.dashboards', 'SELECT,INSERT,UPDATE,DELETE')" \
+  | grep -qx t
+psql "$UNIHUB_INSIGHT_METADATA_DATABASE_URL" -Atqc \
+  "SELECT has_table_privilege(current_user, 'insight.schema_migrations', 'UPDATE')" \
+  | grep -qx f
 
 cd "$ROOT"
 npm ci --ignore-scripts

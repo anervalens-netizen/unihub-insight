@@ -14,9 +14,9 @@ import asyncpg
 ROOT = Path(__file__).resolve().parents[2]
 MIGRATIONS = ROOT / "apps" / "api" / "migrations"
 LOCK_NAME = "unihub-insight-migrations-v1"
+SCHEMA_OWNER_ROLE = "unihub_insight_schema_owner"
 VERSION_PATTERN = re.compile(r"^(\d{3})_[a-z0-9_]+\.sql$")
 BOOTSTRAP_SQL = """
-CREATE SCHEMA IF NOT EXISTS insight;
 CREATE TABLE IF NOT EXISTS insight.schema_migrations (
     version TEXT PRIMARY KEY,
     checksum TEXT NOT NULL,
@@ -31,7 +31,9 @@ def checksum(path: Path) -> str:
 
 def migration_files() -> list[Path]:
     files = sorted(
-        path for path in MIGRATIONS.glob("*.sql") if VERSION_PATTERN.fullmatch(path.name)
+        path
+        for path in MIGRATIONS.glob("*.sql")
+        if VERSION_PATTERN.fullmatch(path.name)
     )
     if not files:
         raise RuntimeError(f"No migrations found in {MIGRATIONS}")
@@ -49,7 +51,15 @@ def transactional_sql(path: Path) -> str:
     return "\n".join(cleaned).strip()
 
 
-async def check_existing(connection: asyncpg.Connection, files: list[Path]) -> None:
+async def activate_schema_owner(connection: asyncpg.Connection) -> None:
+    """Enter the isolated schema-owner role for one migration transaction."""
+    await connection.execute(f"SET LOCAL ROLE {SCHEMA_OWNER_ROLE}")
+    active = await connection.fetchval("SELECT current_user = $1", SCHEMA_OWNER_ROLE)
+    if active is not True:
+        raise RuntimeError("Insight migration schema-owner elevation failed")
+
+
+async def _check_existing(connection: asyncpg.Connection, files: list[Path]) -> None:
     exists = await connection.fetchval(
         "SELECT to_regclass('insight.schema_migrations') IS NOT NULL"
     )
@@ -75,14 +85,32 @@ async def check_existing(connection: asyncpg.Connection, files: list[Path]) -> N
         )
 
 
-async def apply(connection: asyncpg.Connection, files: list[Path]) -> None:
-    await connection.execute("SELECT pg_advisory_lock(hashtext($1))", LOCK_NAME)
-    try:
-        await connection.execute(BOOTSTRAP_SQL)
+async def check_existing(connection: asyncpg.Connection, files: list[Path]) -> None:
+    async with connection.transaction():
+        await activate_schema_owner(connection)
+        await _check_existing(connection, files)
+
+
+async def _recorded_migrations(connection: asyncpg.Connection) -> dict[str, str]:
+    async with connection.transaction():
+        await activate_schema_owner(connection)
         rows = await connection.fetch(
             "SELECT version, checksum FROM insight.schema_migrations"
         )
-        recorded = {str(row["version"]): str(row["checksum"]) for row in rows}
+    return {str(row["version"]): str(row["checksum"]) for row in rows}
+
+
+async def _bootstrap_registry(connection: asyncpg.Connection) -> None:
+    async with connection.transaction():
+        await activate_schema_owner(connection)
+        await connection.execute(BOOTSTRAP_SQL)
+
+
+async def apply(connection: asyncpg.Connection, files: list[Path]) -> None:
+    await connection.execute("SELECT pg_advisory_lock(hashtext($1))", LOCK_NAME)
+    try:
+        await _bootstrap_registry(connection)
+        recorded = await _recorded_migrations(connection)
         expected_names = {path.name for path in files}
         unknown = sorted(set(recorded) - expected_names)
         if unknown:
@@ -100,6 +128,7 @@ async def apply(connection: asyncpg.Connection, files: list[Path]) -> None:
                 print(f"verified {path.name} {digest[:12]}")
                 continue
             async with connection.transaction():
+                await activate_schema_owner(connection)
                 await connection.execute(transactional_sql(path))
                 await connection.execute(
                     "INSERT INTO insight.schema_migrations(version, checksum) VALUES($1, $2)",
@@ -108,9 +137,7 @@ async def apply(connection: asyncpg.Connection, files: list[Path]) -> None:
                 )
             print(f"applied {path.name} {digest[:12]}")
     finally:
-        await connection.execute(
-            "SELECT pg_advisory_unlock(hashtext($1))", LOCK_NAME
-        )
+        await connection.execute("SELECT pg_advisory_unlock(hashtext($1))", LOCK_NAME)
 
 
 async def run(check_only: bool) -> None:

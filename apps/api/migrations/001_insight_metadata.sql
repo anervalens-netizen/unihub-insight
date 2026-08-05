@@ -1,7 +1,5 @@
 BEGIN;
 
-CREATE SCHEMA IF NOT EXISTS insight;
-
 CREATE TABLE IF NOT EXISTS insight.schema_migrations (
     version TEXT PRIMARY KEY,
     checksum TEXT NOT NULL,
@@ -29,5 +27,11 @@ CREATE INDEX IF NOT EXISTS dashboards_shared_updated_idx
 
 COMMENT ON SCHEMA insight IS 'UniHub Insight-owned metadata only; Retail business data remains read-only.';
 COMMENT ON TABLE insight.dashboards IS 'Versioned dashboard definitions without embedded analytical result snapshots.';
+
+-- The metadata API may manage dashboards only. Migration state remains owned
+-- exclusively by the schema owner and cannot be changed by the runtime API.
+GRANT USAGE ON SCHEMA insight TO unihub_insight_metadata;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE insight.dashboards
+    TO unihub_insight_metadata;
 
 COMMIT;

@@ -1,5 +1,7 @@
-GRANT USAGE ON SCHEMA insight TO unihub_insight_metadata;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA insight
-    TO unihub_insight_metadata;
-ALTER DEFAULT PRIVILEGES FOR ROLE unihub_insight_migrator IN SCHEMA insight
-    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO unihub_insight_metadata;
+-- Compatibility check only. Migration 001 grants the metadata authority
+-- explicitly on insight.dashboards; no runtime role receives DML on the
+-- migration registry or catch-all/default privileges for future tables.
+SELECT has_schema_privilege('unihub_insight_metadata', 'insight', 'USAGE')
+   AND has_table_privilege('unihub_insight_metadata', 'insight.dashboards', 'SELECT,INSERT,UPDATE,DELETE')
+   AND NOT has_table_privilege('unihub_insight_metadata', 'insight.schema_migrations', 'UPDATE')
+   AS metadata_authority_is_exact;

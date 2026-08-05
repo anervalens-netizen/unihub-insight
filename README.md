@@ -53,11 +53,14 @@ Modul implicit este `demo`, deci aplicația pornește fără baza de date Retail
 
 ## Conectare la PostgreSQL UniHub
 
-Creează un rol PostgreSQL dedicat, cu `default_transaction_read_only=on` și acces `SELECT` numai la read models aprobate. Apoi:
+Creează prin `ops/postgres/roles-before-migration.sql.template` autorități
+NOLOGIN și login-uri de proces separate. Login-ul analitic are
+`default_transaction_read_only=on` și acces `SELECT` numai la read models
+aprobate; nu primește acces raw la tranzacții. Apoi:
 
 ```env
 UNIHUB_INSIGHT_DATA_MODE=postgres
-UNIHUB_INSIGHT_DATABASE_URL=postgresql://unihub_insight_reader:...@host:5432/unihub
+UNIHUB_INSIGHT_DATABASE_URL=postgresql://unihub_insight_api_reader:...@host:5432/unihub
 ```
 
 API-ul mai impune `default_transaction_read_only=on`, `statement_timeout` și un pool limitat. Insight nu execută importuri, DDL sau mutații business.

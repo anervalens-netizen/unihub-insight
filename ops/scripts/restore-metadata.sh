@@ -17,6 +17,7 @@ source "$ENV_FILE"
 set +a
 systemctl stop unihub-insight-api.service
 pg_restore "$UNIHUB_INSIGHT_MIGRATION_DATABASE_URL" \
+  --role=unihub_insight_schema_owner \
   --clean --if-exists --no-owner --schema=insight "$BACKUP"
 systemctl start unihub-insight-api.service
 "$(dirname "$0")/smoke.sh"
