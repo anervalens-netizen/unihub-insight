@@ -7,7 +7,9 @@ from typing import Any
 import asyncpg
 
 from unihub_insight_api.domain import AnalyticsScope, OverviewMeta
-from unihub_insight_api.repositories.monthly_review import PostgresMonthlyReviewRepository
+from unihub_insight_api.repositories.monthly_review import (
+    PostgresMonthlyReviewRepository,
+)
 
 
 MAX_REVIEW_PERIODS = 16
