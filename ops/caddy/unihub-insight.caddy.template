@@ -17,7 +17,9 @@ http://insight.unihub.ro, insight.unihub.ro {
 
 	# Diagnostics are for host-local/service checks only, never public traffic.
 	@insight_diagnostics path /livez /readyz /metrics /docs /redoc /openapi.json
-	respond @insight_diagnostics 404
+	handle @insight_diagnostics {
+		respond 404
+	}
 
 	# Exact, non-sensitive release identity stays public for deployment checks.
 	handle /build-info.json {
