@@ -80,9 +80,7 @@ async def check_pool(pool: PoolLike | None, *, expect_read_only: bool) -> bool:
         return False
     try:
         async with pool.acquire() as connection:
-            value: Any = await connection.fetchval(
-                "SELECT current_setting('transaction_read_only') = 'on'"
-            )
+            value: Any = await connection.fetchval("SELECT current_setting('transaction_read_only') = 'on'")
         return bool(value) is expect_read_only
     except Exception:
         return False

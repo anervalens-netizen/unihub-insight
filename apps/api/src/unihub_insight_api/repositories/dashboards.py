@@ -54,8 +54,7 @@ class MemoryDashboardStore:
                 (
                     item
                     for item in self._items.values()
-                    if item.owner_subject == subject
-                    or item.visibility is DashboardVisibility.SHARED
+                    if item.owner_subject == subject or item.visibility is DashboardVisibility.SHARED
                 ),
                 key=lambda item: item.updated_at,
                 reverse=True,

@@ -187,19 +187,9 @@ def classify_status(
         return ReviewStatus.NEW
     if current == 0 and (previous_year > 0 or recent_average > 0):
         return ReviewStatus.EXITED
-    if (
-        target_pct is not None
-        and target_pct >= HUNDRED
-        and (yoy_pct or ZERO) >= 0
-        and (recent_pct or ZERO) >= 0
-    ):
+    if target_pct is not None and target_pct >= HUNDRED and (yoy_pct or ZERO) >= 0 and (recent_pct or ZERO) >= 0:
         return ReviewStatus.OUTPERFORMING
-    if (
-        target_pct is not None
-        and target_pct < Decimal("85")
-        and (yoy_pct or ZERO) < 0
-        and (recent_pct or ZERO) < 0
-    ):
+    if target_pct is not None and target_pct < Decimal("85") and (yoy_pct or ZERO) < 0 and (recent_pct or ZERO) < 0:
         return ReviewStatus.RISK
     if yoy_pct is not None and recent_pct is not None:
         if yoy_pct < 0 and recent_pct >= Decimal("5"):
@@ -225,9 +215,7 @@ def score_entity(
     consistency: Decimal,
 ) -> Decimal:
     target_component = (
-        bounded((target_pct or Decimal("90")) / Decimal("1.2"))
-        if target_pct is not None
-        else Decimal("75")
+        bounded((target_pct or Decimal("90")) / Decimal("1.2")) if target_pct is not None else Decimal("75")
     )
     yoy_component = bounded(Decimal("50") + (yoy_pct or ZERO) * Decimal("1.8"))
     recent_component = bounded(Decimal("50") + (recent_pct or ZERO) * Decimal("2.2"))
@@ -528,12 +516,8 @@ def seasonality_points(
         previous_period = shift_month(current_period, -1)
         current = values.get((current_period, "network"), Aggregate())
         previous = values.get((previous_period, "network"), Aggregate())
-        current_productivity = (
-            current.sales / current.working_days if current.working_days > 0 else None
-        )
-        previous_productivity = (
-            previous.sales / previous.working_days if previous.working_days > 0 else None
-        )
+        current_productivity = current.sales / current.working_days if current.working_days > 0 else None
+        previous_productivity = previous.sales / previous.working_days if previous.working_days > 0 else None
         result.append(
             SeasonalityPoint(
                 year=int(current_period[:4]),
@@ -667,21 +651,11 @@ class DemoMonthlyReviewRepository(DemoInsightRepository):
     ) -> MonthlyReviewResponse:
         previous_year_period = shift_month(scope.period, -12)
         previous_month_period = shift_month(scope.period, -1)
-        recent_periods = [
-            shift_month(scope.period, -offset) for offset in range(1, recent_months + 1)
-        ]
-        trend_periods = [
-            shift_month(scope.period, offset) for offset in range(-max(5, recent_months), 1)
-        ]
-        seasonal_periods = [
-            shift_month(scope.period, offset) for offset in (-25, -24, -13, -12, -1, 0)
-        ]
-        periods = unique_periods(
-            [scope.period, previous_year_period, *trend_periods, *seasonal_periods]
-        )
-        rng = random.Random(
-            int.from_bytes(hashlib.sha256(scope.model_dump_json().encode()).digest()[:8], "big")
-        )
+        recent_periods = [shift_month(scope.period, -offset) for offset in range(1, recent_months + 1)]
+        trend_periods = [shift_month(scope.period, offset) for offset in range(-max(5, recent_months), 1)]
+        seasonal_periods = [shift_month(scope.period, offset) for offset in (-25, -24, -13, -12, -1, 0)]
+        periods = unique_periods([scope.period, previous_year_period, *trend_periods, *seasonal_periods])
+        rng = random.Random(int.from_bytes(hashlib.sha256(scope.model_dump_json().encode()).digest()[:8], "big"))
         selected_stores = self._selected_stores(scope)
         store_entities = [
             Entity(
@@ -731,14 +705,8 @@ class DemoMonthlyReviewRepository(DemoInsightRepository):
             manager_groups[store.regional].append(entity.id)
         company_values = aggregate_groups(values, company_groups, periods)
         manager_values = aggregate_groups(values, manager_groups, periods)
-        company_entities = [
-            Entity(key, key, f"{len(ids)} magazine", "company")
-            for key, ids in company_groups.items()
-        ]
-        manager_entities = [
-            Entity(key, key, f"{len(ids)} magazine", "manager")
-            for key, ids in manager_groups.items()
-        ]
+        company_entities = [Entity(key, key, f"{len(ids)} magazine", "company") for key, ids in company_groups.items()]
+        manager_entities = [Entity(key, key, f"{len(ids)} magazine", "manager") for key, ids in manager_groups.items()]
 
         products: list[ProductReviewRow] = []
         product_names = [
@@ -770,9 +738,7 @@ class DemoMonthlyReviewRepository(DemoInsightRepository):
                     gross_sales=gross,
                     return_value=_money(gross - sales),
                 )
-                product_distributions[(period, product_id)] = rng.randint(
-                    1, max(1, len(selected_stores))
-                )
+                product_distributions[(period, product_id)] = rng.randint(1, max(1, len(selected_stores)))
             entity = ProductEntity(product_id, label, brand, category)
             products.append(
                 product_row(
@@ -884,12 +850,8 @@ class DemoMonthlyReviewRepository(DemoInsightRepository):
                     network_values.get((period, "network"), Aggregate()).sales,
                     network_values.get((period, "network"), Aggregate()).target,
                 ),
-                average_receipt=network_values.get(
-                    (period, "network"), Aggregate()
-                ).average_receipt,
-                return_rate_pct=network_values.get(
-                    (period, "network"), Aggregate()
-                ).return_rate_pct,
+                average_receipt=network_values.get((period, "network"), Aggregate()).average_receipt,
+                return_rate_pct=network_values.get((period, "network"), Aggregate()).return_rate_pct,
             )
             for period in trend_periods
         ]
@@ -965,23 +927,13 @@ class DemoMonthlyReviewRepository(DemoInsightRepository):
 
 
 class PostgresMonthlyReviewRepository(PostgresHardenedInsightRepository):
-    async def get_monthly_review(
-        self, scope: AnalyticsScope, recent_months: int
-    ) -> MonthlyReviewResponse:
+    async def get_monthly_review(self, scope: AnalyticsScope, recent_months: int) -> MonthlyReviewResponse:
         previous_year_period = shift_month(scope.period, -12)
         previous_month_period = shift_month(scope.period, -1)
-        recent_periods = [
-            shift_month(scope.period, -offset) for offset in range(1, recent_months + 1)
-        ]
-        trend_periods = [
-            shift_month(scope.period, offset) for offset in range(-max(5, recent_months), 1)
-        ]
-        seasonal_periods = [
-            shift_month(scope.period, offset) for offset in (-25, -24, -13, -12, -1, 0)
-        ]
-        periods = unique_periods(
-            [scope.period, previous_year_period, *trend_periods, *seasonal_periods]
-        )
+        recent_periods = [shift_month(scope.period, -offset) for offset in range(1, recent_months + 1)]
+        trend_periods = [shift_month(scope.period, offset) for offset in range(-max(5, recent_months), 1)]
+        seasonal_periods = [shift_month(scope.period, offset) for offset in (-25, -24, -13, -12, -1, 0)]
+        periods = unique_periods([scope.period, previous_year_period, *trend_periods, *seasonal_periods])
         product_periods = unique_periods([scope.period, previous_year_period, *recent_periods])
         store_records, agent_records, product_records, meta = await asyncio.gather(
             self._review_store_rows(scope, periods),
@@ -1013,14 +965,8 @@ class PostgresMonthlyReviewRepository(PostgresHardenedInsightRepository):
         company_values = aggregate_groups(store_values, company_groups, periods)
         manager_values = aggregate_groups(store_values, manager_groups, periods)
         network_values = aggregate_groups(store_values, {"network": list(store_entities)}, periods)
-        company_entities = [
-            Entity(key, key, f"{len(ids)} magazine", "company")
-            for key, ids in company_groups.items()
-        ]
-        manager_entities = [
-            Entity(key, key, f"{len(ids)} magazine", "manager")
-            for key, ids in manager_groups.items()
-        ]
+        company_entities = [Entity(key, key, f"{len(ids)} magazine", "company") for key, ids in company_groups.items()]
+        manager_entities = [Entity(key, key, f"{len(ids)} magazine", "manager") for key, ids in manager_groups.items()]
         current = network_values.get((scope.period, "network"), Aggregate())
         previous_year = network_values.get((previous_year_period, "network"), Aggregate())
         previous_month = network_values.get((previous_month_period, "network"), Aggregate())
@@ -1150,8 +1096,7 @@ class PostgresMonthlyReviewRepository(PostgresHardenedInsightRepository):
         )
         returns = sorted(returns, key=lambda item: item.current_value, reverse=True)[:100]
         trend = [
-            self._trend_point(period, network_values.get((period, "network"), Aggregate()))
-            for period in trend_periods
+            self._trend_point(period, network_values.get((period, "network"), Aggregate())) for period in trend_periods
         ]
         alerts = self._review_alerts(meta, stores, products, returns, recent_months)
         return MonthlyReviewResponse(
@@ -1255,9 +1200,7 @@ class PostgresMonthlyReviewRepository(PostgresHardenedInsightRepository):
                     clauses.append(f"{alias}.{column} = ${len(params)}")
         return clauses
 
-    async def _review_store_rows(
-        self, scope: AnalyticsScope, periods: Sequence[str]
-    ) -> Sequence[asyncpg.Record]:
+    async def _review_store_rows(self, scope: AnalyticsScope, periods: Sequence[str]) -> Sequence[asyncpg.Record]:
         params: list[Any] = [list(periods), scope.agent]
         clauses = self._scope_clauses(scope, params)
         where_scope = " AND ".join(clauses)
@@ -1317,9 +1260,7 @@ class PostgresMonthlyReviewRepository(PostgresHardenedInsightRepository):
                 *params,
             )
 
-    async def _review_agent_rows(
-        self, scope: AnalyticsScope, periods: Sequence[str]
-    ) -> Sequence[asyncpg.Record]:
+    async def _review_agent_rows(self, scope: AnalyticsScope, periods: Sequence[str]) -> Sequence[asyncpg.Record]:
         params: list[Any] = [list(periods)]
         clauses = self._scope_clauses(scope, params)
         if scope.agent:
@@ -1371,9 +1312,7 @@ class PostgresMonthlyReviewRepository(PostgresHardenedInsightRepository):
                 *params,
             )
 
-    async def _review_product_rows(
-        self, scope: AnalyticsScope, periods: Sequence[str]
-    ) -> Sequence[asyncpg.Record]:
+    async def _review_product_rows(self, scope: AnalyticsScope, periods: Sequence[str]) -> Sequence[asyncpg.Record]:
         params: list[Any] = [list(periods)]
         clauses = self._scope_clauses(scope, params)
         if scope.agent:
@@ -1440,9 +1379,7 @@ class PostgresMonthlyReviewRepository(PostgresHardenedInsightRepository):
                     description=f"{len(slowing)} magazine sunt încă pozitive YoY, dar au coborât sub reperul recent.",
                 )
             )
-        product_risks = [
-            row for row in products if row.status in {ReviewStatus.RISK, ReviewStatus.EXITED}
-        ]
+        product_risks = [row for row in products if row.status in {ReviewStatus.RISK, ReviewStatus.EXITED}]
         if product_risks:
             alerts.append(
                 InsightAlert(

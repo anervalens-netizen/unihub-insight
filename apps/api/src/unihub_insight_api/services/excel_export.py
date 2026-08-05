@@ -53,9 +53,7 @@ class ExcelBuilder:
         self.currency = self.workbook.add_format({"num_format": '#,##0.00 "RON"', "valign": "top"})
         self.percent = self.workbook.add_format({"num_format": "0.00%", "valign": "top"})
         self.date = self.workbook.add_format({"num_format": "yyyy-mm-dd", "valign": "top"})
-        self.datetime = self.workbook.add_format(
-            {"num_format": "yyyy-mm-dd hh:mm:ss", "valign": "top"}
-        )
+        self.datetime = self.workbook.add_format({"num_format": "yyyy-mm-dd hh:mm:ss", "valign": "top"})
 
     def close(self) -> Path:
         self.workbook.close()
@@ -268,9 +266,7 @@ def module_workbook(data: ModuleAnalyticsResponse) -> Path:
             Column("primary", data.axes[0].label if data.axes else "Principal", "decimal", 18),
             Column("comparison", "Comparație", "decimal", 18),
             Column("target", "Target", "decimal", 18),
-            Column(
-                "secondary", data.axes[1].label if len(data.axes) > 1 else "Secundar", "decimal", 18
-            ),
+            Column("secondary", data.axes[1].label if len(data.axes) > 1 else "Secundar", "decimal", 18),
             Column("is_estimate", "Estimat", width=12),
         ],
         data.trend,
@@ -292,12 +288,8 @@ def module_workbook(data: ModuleAnalyticsResponse) -> Path:
             Column("label", "Entitate", width=36),
             Column("context", "Context", width=44),
             Column("primary", data.axes[0].label if data.axes else "Principal", "decimal", 18),
-            Column(
-                "secondary", data.axes[1].label if len(data.axes) > 1 else "Secundar", "decimal", 18
-            ),
-            Column(
-                "tertiary", data.axes[2].label if len(data.axes) > 2 else "Terțiar", "decimal", 18
-            ),
+            Column("secondary", data.axes[1].label if len(data.axes) > 1 else "Secundar", "decimal", 18),
+            Column("tertiary", data.axes[2].label if len(data.axes) > 2 else "Terțiar", "decimal", 18),
             Column("progress_pct", "Progres", "percent", 14),
             Column("delta_pct", "Delta", "percent", 14),
             Column("risk", "Risc", width=14),

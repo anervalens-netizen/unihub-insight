@@ -41,9 +41,7 @@ def _validate(request: DashboardCreateRequest, user: AnalyticsUserDependency) ->
 
 
 @router.get("", response_model=DashboardListResponse)
-async def list_dashboards(
-    store: DashboardStoreDependency, user: AnalyticsUserDependency
-) -> DashboardListResponse:
+async def list_dashboards(store: DashboardStoreDependency, user: AnalyticsUserDependency) -> DashboardListResponse:
     items = await store.list_for_user(user.subject)
     return DashboardListResponse(items=[item for item in items if user_can_read(item, user)])
 
@@ -87,9 +85,7 @@ async def update_dashboard(
             detail="Dashboard was modified by another request.",
         ) from exc
     except DashboardNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Dashboard not found."
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dashboard not found.") from exc
 
 
 @router.delete("/{dashboard_id}", status_code=status.HTTP_204_NO_CONTENT)

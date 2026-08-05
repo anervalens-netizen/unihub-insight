@@ -138,9 +138,7 @@ class PostgresAnalyticsRepository:
                 self._fetch_performance(scope, comparison_period),
             )
         else:
-            summary, daily_rows, contribution_rows, performance_rows = await asyncio.gather(
-                *current_tasks
-            )
+            summary, daily_rows, contribution_rows, performance_rows = await asyncio.gather(*current_tasks)
             comparison_summary = None
             comparison_daily = []
             comparison_performance = []
@@ -167,11 +165,7 @@ class PostgresAnalyticsRepository:
             else Decimal(0)
         )
 
-        previous_sales = (
-            _money(comparison_summary["total_sales"])
-            if comparison_summary is not None
-            else Decimal(0)
-        )
+        previous_sales = _money(comparison_summary["total_sales"]) if comparison_summary is not None else Decimal(0)
         sales_delta = _delta(total_sales, previous_sales) if comparison_period else None
         comparison_by_day = self._cumulative_by_day(comparison_daily)
         current_by_day = self._cumulative_by_day(daily_rows)
@@ -189,9 +183,7 @@ class PostgresAnalyticsRepository:
                     day=day,
                     sales=actual,
                     target_pace=(
-                        _money(total_target * Decimal(day) / Decimal(days_in_month))
-                        if total_target > 0
-                        else Decimal(0)
+                        _money(total_target * Decimal(day) / Decimal(days_in_month)) if total_target > 0 else Decimal(0)
                     ),
                     forecast=projected,
                     comparison=last_comparison,
@@ -225,11 +217,7 @@ class PostgresAnalyticsRepository:
                     unit=MetricUnit.CURRENCY,
                     delta_pct=sales_delta,
                     delta_label="față de reper" if comparison_period else None,
-                    risk=(
-                        RiskLevel.HEALTHY
-                        if sales_delta is not None and sales_delta >= 0
-                        else RiskLevel.WATCH
-                    ),
+                    risk=(RiskLevel.HEALTHY if sales_delta is not None and sales_delta >= 0 else RiskLevel.WATCH),
                     supporting_value=average_daily,
                     supporting_label="Medie / zi acoperită",
                 ),
@@ -256,9 +244,7 @@ class PostgresAnalyticsRepository:
                     label="Bonuri 2+",
                     value=receipt_2plus_pct,
                     unit=MetricUnit.PERCENT,
-                    risk=(
-                        RiskLevel.HEALTHY if receipt_2plus_pct >= Decimal("32") else RiskLevel.WATCH
-                    ),
+                    risk=(RiskLevel.HEALTHY if receipt_2plus_pct >= Decimal("32") else RiskLevel.WATCH),
                     supporting_value=Decimal(total_receipts),
                     supporting_label="Bonuri totale",
                 ),
@@ -370,9 +356,7 @@ class PostgresAnalyticsRepository:
                 *params,
             )
 
-    async def _fetch_contribution(
-        self, scope: AnalyticsScope, period: str
-    ) -> Sequence[asyncpg.Record]:
+    async def _fetch_contribution(self, scope: AnalyticsScope, period: str) -> Sequence[asyncpg.Record]:
         clauses, params = self._scope_sql(scope, period)
         async with self.pool.acquire() as connection:
             return await connection.fetch(
@@ -388,9 +372,7 @@ class PostgresAnalyticsRepository:
                 *params,
             )
 
-    async def _fetch_performance(
-        self, scope: AnalyticsScope, period: str
-    ) -> Sequence[asyncpg.Record]:
+    async def _fetch_performance(self, scope: AnalyticsScope, period: str) -> Sequence[asyncpg.Record]:
         clauses, params = self._scope_sql(scope, period)
         async with self.pool.acquire() as connection:
             return await connection.fetch(
@@ -452,16 +434,10 @@ class PostgresAnalyticsRepository:
 
     @staticmethod
     def _cumulative_by_day(rows: Sequence[asyncpg.Record]) -> dict[int, Decimal]:
-        return {
-            int(row["day"]): _money(row["cumulative_sales"])
-            for row in rows
-            if row["day"] is not None
-        }
+        return {int(row["day"]): _money(row["cumulative_sales"]) for row in rows if row["day"] is not None}
 
     @staticmethod
-    def _contribution_view(
-        rows: Sequence[asyncpg.Record], total_sales: Decimal
-    ) -> list[DimensionShare]:
+    def _contribution_view(rows: Sequence[asyncpg.Record], total_sales: Decimal) -> list[DimensionShare]:
         if total_sales <= 0:
             return []
         return [
@@ -475,9 +451,7 @@ class PostgresAnalyticsRepository:
         ]
 
     @staticmethod
-    def _performance_view(
-        rows: Sequence[asyncpg.Record], comparison_sales: dict[str, Decimal]
-    ) -> list[PerformanceRow]:
+    def _performance_view(rows: Sequence[asyncpg.Record], comparison_sales: dict[str, Decimal]) -> list[PerformanceRow]:
         result: list[PerformanceRow] = []
         for row in rows:
             site_code = str(row["site_code"])
@@ -521,11 +495,7 @@ class PostgresAnalyticsRepository:
             alerts.append(
                 InsightAlert(
                     id="forecast-gap",
-                    severity=(
-                        AlertSeverity.CRITICAL
-                        if forecast_progress < Decimal("85")
-                        else AlertSeverity.WARNING
-                    ),
+                    severity=(AlertSeverity.CRITICAL if forecast_progress < Decimal("85") else AlertSeverity.WARNING),
                     title="Forecast sub target",
                     description=f"Run-rate-ul liniar indică {forecast_progress}% din target.",
                 )

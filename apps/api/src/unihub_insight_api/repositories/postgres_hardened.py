@@ -44,9 +44,7 @@ def salary_statistics(values: Sequence[Decimal]) -> SalaryStatistics:
     else:
         middle = len(salaries) // 2
         median = (
-            salaries[middle]
-            if len(salaries) % 2
-            else _money((salaries[middle - 1] + salaries[middle]) / Decimal(2))
+            salaries[middle] if len(salaries) % 2 else _money((salaries[middle - 1] + salaries[middle]) / Decimal(2))
         )
     return SalaryStatistics(
         total=_money(total),
@@ -108,11 +106,7 @@ class PostgresHardenedInsightRepository(PostgresInsightRepository):
     async def _workforce(self, scope: AnalyticsScope) -> ModuleAnalyticsResponse:
         response = await super()._workforce(scope)
         eligible, staffed = await self._workforce_coverage(scope)
-        coverage = (
-            _percent(Decimal(staffed) * Decimal("100") / Decimal(eligible))
-            if eligible > 0
-            else None
-        )
+        coverage = _percent(Decimal(staffed) * Decimal("100") / Decimal(eligible)) if eligible > 0 else None
         kpis: list[KpiMetric] = []
         for kpi in response.kpis:
             if kpi.id == "workforce.coverage":
@@ -207,9 +201,7 @@ class PostgresHardenedInsightRepository(PostgresInsightRepository):
             if row["period"].strftime("%Y-%m") == scope.period
             and str(row["source_site_code"]) != "__FINANCE_UNALLOCATED__"
         ]
-        amounts_by_store: dict[tuple[str, str], dict[str, Decimal]] = defaultdict(
-            lambda: defaultdict(Decimal)
-        )
+        amounts_by_store: dict[tuple[str, str], dict[str, Decimal]] = defaultdict(lambda: defaultdict(Decimal))
         labels: dict[tuple[str, str], tuple[str, str]] = {}
         for row in current_rows:
             key = (str(row["company_name"]), str(row["canonical_site_code"]))
@@ -236,9 +228,7 @@ class PostgresHardenedInsightRepository(PostgresInsightRepository):
         breakdown.sort(key=lambda item: item.secondary or Decimal(0))
 
         alerts = [alert for alert in response.alerts if alert.id != "finance-negative"]
-        negative_count = sum(
-            1 for item in breakdown if item.secondary is not None and item.secondary < 0
-        )
+        negative_count = sum(1 for item in breakdown if item.secondary is not None and item.secondary < 0)
         if negative_count:
             alerts.insert(
                 0,
@@ -246,9 +236,7 @@ class PostgresHardenedInsightRepository(PostgresInsightRepository):
                     id="finance-negative",
                     severity=AlertSeverity.CRITICAL,
                     title="Magazine cu EBIT negativ",
-                    description=(
-                        f"{negative_count} magazine au EBIT negativ în luna {scope.period}."
-                    ),
+                    description=(f"{negative_count} magazine au EBIT negativ în luna {scope.period}."),
                 ),
             )
         return response.model_copy(update={"breakdown": breakdown, "alerts": alerts[:8]})

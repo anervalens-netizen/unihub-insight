@@ -41,9 +41,7 @@ def test_rejects_duplicate_widget_ids(client: TestClient) -> None:
 
 
 def test_manager_cannot_save_finance_widget() -> None:
-    settings = Settings(
-        environment="test", data_mode="demo", auth_mode="proxy", trusted_proxy_secret="secret"
-    )
+    settings = Settings(environment="test", data_mode="demo", auth_mode="proxy", trusted_proxy_secret="secret")
     headers = {
         "X-UniHub-Proxy-Secret": "secret",
         "X-Authentik-Uid": "manager",

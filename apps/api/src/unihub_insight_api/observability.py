@@ -102,21 +102,13 @@ class MetricsRegistry:
                 base = {"route": route, "method": method}
                 for boundary, count in zip(state.buckets, state.counts, strict=True):
                     labels = _labels({**base, "le": str(boundary)})
-                    lines.append(
-                        f"unihub_insight_http_request_duration_seconds_bucket{labels} {count}"
-                    )
+                    lines.append(f"unihub_insight_http_request_duration_seconds_bucket{labels} {count}")
                 lines.append(
                     "unihub_insight_http_request_duration_seconds_bucket"
                     f"{_labels({**base, 'le': '+Inf'})} {state.count}"
                 )
-                lines.append(
-                    "unihub_insight_http_request_duration_seconds_sum"
-                    f"{_labels(base)} {state.total:.9f}"
-                )
-                lines.append(
-                    "unihub_insight_http_request_duration_seconds_count"
-                    f"{_labels(base)} {state.count}"
-                )
+                lines.append(f"unihub_insight_http_request_duration_seconds_sum{_labels(base)} {state.total:.9f}")
+                lines.append(f"unihub_insight_http_request_duration_seconds_count{_labels(base)} {state.count}")
 
             lines.extend(
                 [
@@ -132,19 +124,13 @@ class MetricsRegistry:
                 }
                 for boundary, count in zip(state.buckets, state.counts, strict=True):
                     lines.append(
-                        "unihub_insight_web_vital_milliseconds_bucket"
-                        f"{_labels({**base, 'le': str(boundary)})} {count}"
+                        f"unihub_insight_web_vital_milliseconds_bucket{_labels({**base, 'le': str(boundary)})} {count}"
                     )
                 lines.append(
-                    "unihub_insight_web_vital_milliseconds_bucket"
-                    f"{_labels({**base, 'le': '+Inf'})} {state.count}"
+                    f"unihub_insight_web_vital_milliseconds_bucket{_labels({**base, 'le': '+Inf'})} {state.count}"
                 )
-                lines.append(
-                    f"unihub_insight_web_vital_milliseconds_sum{_labels(base)} {state.total:.6f}"
-                )
-                lines.append(
-                    f"unihub_insight_web_vital_milliseconds_count{_labels(base)} {state.count}"
-                )
+                lines.append(f"unihub_insight_web_vital_milliseconds_sum{_labels(base)} {state.total:.6f}")
+                lines.append(f"unihub_insight_web_vital_milliseconds_count{_labels(base)} {state.count}")
         return "\n".join(lines) + "\n"
 
 

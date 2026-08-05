@@ -232,10 +232,7 @@ def _meta(module: ModuleId, scope: AnalyticsScope) -> OverviewMeta:
 def _entities(module: ModuleId, scope: AnalyticsScope) -> list[tuple[str, str, str]]:
     stores = DemoAnalyticsRepository._selected_stores(scope)
     if module is ModuleId.CAMPAIGNS:
-        return [
-            (f"product-{index}", product, "Portofoliu Focus")
-            for index, product in enumerate(PRODUCTS, 1)
-        ]
+        return [(f"product-{index}", product, "Portofoliu Focus") for index, product in enumerate(PRODUCTS, 1)]
     if module in {ModuleId.WORKFORCE, ModuleId.COMPENSATION}:
         store_codes = {store.site_code for store in stores}
         agents = [agent for agent in DEMO_AGENTS if agent.site_code in store_codes]
@@ -243,9 +240,7 @@ def _entities(module: ModuleId, scope: AnalyticsScope) -> list[tuple[str, str, s
             (f"{agent.site_code}:{agent.name}", agent.name, f"{agent.site_code} · {agent.regional}")
             for agent in agents[:16]
         ]
-    return [
-        (store.site_code, store.label, f"{store.firm} · {store.regional}") for store in stores[:16]
-    ]
+    return [(store.site_code, store.label, f"{store.firm} · {store.regional}") for store in stores[:16]]
 
 
 def _kpis(module: ModuleId, scope: AnalyticsScope, entity_count: int) -> list[KpiMetric]:
@@ -552,11 +547,7 @@ def _distribution(module: ModuleId, scope: AnalyticsScope) -> list[DimensionShar
     allocated = Decimal(0)
     result: list[DimensionShare] = []
     for index, (label, weight) in enumerate(zip(profile.categories, weights, strict=True)):
-        value = (
-            total_value - allocated
-            if index == len(weights) - 1
-            else _number(total_value * weight / total_weight)
-        )
+        value = total_value - allocated if index == len(weights) - 1 else _number(total_value * weight / total_weight)
         allocated += value
         result.append(
             DimensionShare(

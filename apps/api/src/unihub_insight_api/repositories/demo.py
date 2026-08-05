@@ -213,28 +213,18 @@ class DemoAnalyticsRepository:
         target_total = _money(store_count * rng.uniform(72_000, 96_000))
         final_progress = Decimal(str(rng.uniform(0.87, 1.09)))
         expected_final_sales = _money(target_total * final_progress)
-        covered_ratio = (
-            Decimal(cutoff_day) / Decimal(days_in_month) if days_in_month else Decimal(0)
-        )
-        total_sales = (
-            expected_final_sales if is_final else _money(expected_final_sales * covered_ratio)
-        )
+        covered_ratio = Decimal(cutoff_day) / Decimal(days_in_month) if days_in_month else Decimal(0)
+        total_sales = expected_final_sales if is_final else _money(expected_final_sales * covered_ratio)
         forecast = (
             _money(total_sales / Decimal(cutoff_day) * Decimal(days_in_month))
             if cutoff_day > 0 and not is_final
             else total_sales
         )
-        target_progress = (
-            _percent(total_sales * Decimal("100") / target_total) if target_total > 0 else None
-        )
-        forecast_progress = (
-            _percent(forecast * Decimal("100") / target_total) if target_total > 0 else None
-        )
+        target_progress = _percent(total_sales * Decimal("100") / target_total) if target_total > 0 else None
+        forecast_progress = _percent(forecast * Decimal("100") / target_total) if target_total > 0 else None
 
         comparison_factor = Decimal(str(rng.uniform(0.89, 1.08)))
-        previous_sales = (
-            _money(total_sales / comparison_factor) if comparison_factor else Decimal(0)
-        )
+        previous_sales = _money(total_sales / comparison_factor) if comparison_factor else Decimal(0)
         sales_delta = _delta(total_sales, previous_sales)
         receipt_count = max(int(total_sales / Decimal(str(rng.uniform(85, 120)))), 0)
         receipt_2plus_pct = _percent(rng.uniform(23, 41)) if receipt_count else Decimal(0)
@@ -298,15 +288,9 @@ class DemoAnalyticsRepository:
                     label="Vânzări",
                     value=total_sales,
                     unit=MetricUnit.CURRENCY,
-                    delta_pct=sales_delta
-                    if previous_period(scope.period, scope.comparison)
-                    else None,
+                    delta_pct=sales_delta if previous_period(scope.period, scope.comparison) else None,
                     delta_label="față de reper",
-                    risk=(
-                        RiskLevel.HEALTHY
-                        if sales_delta is not None and sales_delta >= 0
-                        else RiskLevel.WATCH
-                    ),
+                    risk=(RiskLevel.HEALTHY if sales_delta is not None and sales_delta >= 0 else RiskLevel.WATCH),
                     supporting_value=_money(total_sales / Decimal(max(cutoff_day, 1))),
                     supporting_label="Medie / zi acoperită",
                 ),
@@ -333,9 +317,7 @@ class DemoAnalyticsRepository:
                     label="Bonuri 2+",
                     value=receipt_2plus_pct,
                     unit=MetricUnit.PERCENT,
-                    risk=(
-                        RiskLevel.HEALTHY if receipt_2plus_pct >= Decimal("32") else RiskLevel.WATCH
-                    ),
+                    risk=(RiskLevel.HEALTHY if receipt_2plus_pct >= Decimal("32") else RiskLevel.WATCH),
                     supporting_value=Decimal(receipt_count),
                     supporting_label="Bonuri totale",
                 ),
@@ -444,11 +426,7 @@ class DemoAnalyticsRepository:
             alerts.append(
                 InsightAlert(
                     id="forecast-gap",
-                    severity=(
-                        AlertSeverity.CRITICAL
-                        if forecast_progress < Decimal("85")
-                        else AlertSeverity.WARNING
-                    ),
+                    severity=(AlertSeverity.CRITICAL if forecast_progress < Decimal("85") else AlertSeverity.WARNING),
                     title="Forecast sub target",
                     description=(
                         f"Run-rate-ul curent indică {forecast_progress}% din target. "
@@ -463,9 +441,7 @@ class DemoAnalyticsRepository:
                         id=f"store-risk-{row.id}",
                         severity=AlertSeverity.WARNING,
                         title="Magazin sub ritmul necesar",
-                        description=(
-                            f"Realizarea este {row.progress_pct}% pentru perioada acoperită."
-                        ),
+                        description=(f"Realizarea este {row.progress_pct}% pentru perioada acoperită."),
                         entity_label=row.label,
                     )
                 )

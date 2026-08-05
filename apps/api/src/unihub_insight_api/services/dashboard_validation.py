@@ -64,12 +64,8 @@ MODULE_METRICS: dict[ModuleId, frozenset[str]] = {
             "compensation.sales_ratio",
         }
     ),
-    ModuleId.FINANCE: frozenset(
-        {"finance.revenue", "finance.ebit", "finance.ebit_margin", "finance.operating_costs"}
-    ),
-    ModuleId.PLANNING: frozenset(
-        {"planning.forecast", "planning.target_gap", "planning.accuracy", "planning.actual"}
-    ),
+    ModuleId.FINANCE: frozenset({"finance.revenue", "finance.ebit", "finance.ebit_margin", "finance.operating_costs"}),
+    ModuleId.PLANNING: frozenset({"planning.forecast", "planning.target_gap", "planning.accuracy", "planning.actual"}),
 }
 
 MODULE_CHARTS: dict[ModuleId, frozenset[ChartKind]] = {
@@ -203,9 +199,7 @@ def validate_dashboard(request: DashboardCreateRequest, user: UserContext) -> No
             errors.append(f"{prefix}.layout exceeds the 24-column canvas")
         unknown_filters = set(widget.filters) - ALLOWED_FILTER_KEYS
         if unknown_filters:
-            errors.append(
-                f"{prefix}.filters contains unsupported keys: {', '.join(sorted(unknown_filters))}"
-            )
+            errors.append(f"{prefix}.filters contains unsupported keys: {', '.join(sorted(unknown_filters))}")
         if widget.filter_mode is FilterMode.IGNORE and widget.filters:
             errors.append(f"{prefix}.filters must be empty when filter_mode=ignore")
         if widget.module in {ModuleId.FINANCE, ModuleId.PLANNING} and "agent" in widget.filters:
