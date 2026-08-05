@@ -72,11 +72,14 @@ class MemoryDashboardStore:
         now = datetime.now(UTC)
         document = DashboardDocument(
             id=uuid.uuid4().hex,
+            name=request.name,
+            description=request.description,
             owner_subject=subject,
+            visibility=request.visibility,
             version=1,
+            widgets=request.widgets,
             created_at=now,
             updated_at=now,
-            **request.model_dump(),
         )
         async with self._lock:
             self._items[document.id] = document
@@ -93,10 +96,12 @@ class MemoryDashboardStore:
                 raise DashboardNotFoundError(dashboard_id)
             if current.version != request.version:
                 raise DashboardConflictError(dashboard_id)
-            payload = request.model_dump(exclude={"version"})
             updated = current.model_copy(
                 update={
-                    **payload,
+                    "name": request.name,
+                    "description": request.description,
+                    "visibility": request.visibility,
+                    "widgets": request.widgets,
                     "version": current.version + 1,
                     "updated_at": datetime.now(UTC),
                 }
