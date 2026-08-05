@@ -13,7 +13,8 @@ Create or reuse a Proxy Provider for `https://insight.unihub.ro` and attach it t
 - `X-Authentik-Uid` — stable subject;
 - `X-Authentik-Email`;
 - `X-Authentik-Name`;
-- `X-Authentik-Groups` — comma-delimited groups.
+- `X-Authentik-Groups` — pipe-delimited groups, per the Authentik proxy
+  contract (commas and semicolons are accepted only for compatibility).
 
 The Caddy site imports the existing `authentik_outpost` and
 `authentik_forward` snippets. `authentik_forward` removes browser-supplied

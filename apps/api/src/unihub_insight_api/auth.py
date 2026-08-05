@@ -22,7 +22,9 @@ ADMIN_CAPABILITIES = frozenset(
 def _groups(value: str | None) -> tuple[str, ...]:
     if not value:
         return ()
-    normalized = value.replace(";", ",")
+    # Authentik's proxy contract uses pipes; accept commas/semicolons as
+    # compatibility separators for existing tests and alternate proxies.
+    normalized = value.replace("|", ",").replace(";", ",")
     return tuple(dict.fromkeys(item.strip() for item in normalized.split(",") if item.strip()))
 
 

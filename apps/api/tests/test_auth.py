@@ -43,6 +43,36 @@ def test_proxy_identity_requires_trusted_boundary() -> None:
         }
 
 
+def test_proxy_identity_parses_authentik_pipe_separated_groups() -> None:
+    settings = Settings(
+        environment="test",
+        data_mode="demo",
+        auth_mode="proxy",
+        trusted_proxy_secret="test-secret",
+        analytics_groups="unihub-insight-access",
+        management_groups="unihub-manager",
+        hr_groups="unihub-hr",
+        pnl_groups="unihub-pnl",
+        admin_groups="unihub-admin",
+    )
+    with TestClient(create_app(settings)) as proxy_client:
+        response = proxy_client.get(
+            "/api/v1/me",
+            headers={
+                "X-UniHub-Proxy-Secret": "test-secret",
+                "X-Authentik-Uid": "user-1",
+                "X-Authentik-Groups": "unihub-insight-access|unihub-manager|unihub-hr",
+            },
+        )
+
+    assert response.status_code == 200
+    assert set(response.json()["capabilities"]) == {
+        "insight:analytics",
+        "insight:management",
+        "insight:hr",
+    }
+
+
 def test_admin_group_does_not_bypass_hr_or_pnl_group_configuration() -> None:
     settings = Settings(
         environment="test",
