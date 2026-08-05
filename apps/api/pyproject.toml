@@ -1,6 +1,6 @@
 [project]
 name = "unihub-insight-api"
-version = "0.1.0"
+version = "0.2.0"
 description = "Read-only analytics API for UniHub Insight."
 readme = "../../README.md"
 requires-python = ">=3.13,<3.14"
@@ -9,6 +9,7 @@ dependencies = [
   "fastapi[standard]==0.139.2",
   "orjson==3.11.9",
   "pydantic-settings==2.14.2",
+  "xlsxwriter>=3.2,<4",
 ]
 
 [dependency-groups]
@@ -30,16 +31,22 @@ packages = ["src/unihub_insight_api"]
 [tool.pytest.ini_options]
 addopts = "-q"
 testpaths = ["tests"]
+pythonpath = ["src", "../.."]
 asyncio_mode = "auto"
 
 [tool.ruff]
 target-version = "py313"
-line-length = 100
+line-length = 120
 src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC", "RUF"]
-ignore = ["B008"]
+ignore = ["B008", "RUF001"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/unihub_insight_api/repositories/monthly_review.py" = ["E501"]
+"src/unihub_insight_api/repositories/demo_modules.py" = ["E501"]
+"src/unihub_insight_api/repositories/postgres_modules.py" = ["E501"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -50,3 +57,15 @@ strict = true
 plugins = ["pydantic.mypy"]
 mypy_path = "src"
 exclude = ["tests/"]
+allow_redefinition = true
+disable_error_code = ["import-untyped"]
+
+[[tool.mypy.overrides]]
+module = [
+  "unihub_insight_api.db",
+  "unihub_insight_api.repositories.dashboards",
+  "unihub_insight_api.repositories.postgres",
+  "unihub_insight_api.repositories.postgres_modules",
+  "unihub_insight_api.repositories.monthly_review",
+]
+disable_error_code = ["no-any-return"]

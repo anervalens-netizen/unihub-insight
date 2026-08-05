@@ -13,7 +13,12 @@ const modulePlans = {
     eyebrow: 'P1.2',
     title: 'Sales Intelligence',
     statement: 'Analiză comercială multi-perioadă, fără a fragmenta luna curentă de istoric.',
-    capabilities: ['Pace și forecast', 'Trend MTD / YTD / 12 luni', 'Mix și tranzacții', 'Calendar heatmap'],
+    capabilities: [
+      'Pace și forecast',
+      'Trend MTD / YTD / 12 luni',
+      'Mix și tranzacții',
+      'Calendar heatmap',
+    ],
   },
   performance: {
     eyebrow: 'P1.3',
@@ -24,13 +29,15 @@ const modulePlans = {
   campaigns: {
     eyebrow: 'P2.1',
     title: 'Campaigns',
-    statement: 'Promo, Incentive, Concurs și Focus analizate în același model de perioadă și scope.',
+    statement:
+      'Promo, Incentive, Concurs și Focus analizate în același model de perioadă și scope.',
     capabilities: ['Coverage', 'Adopție', 'Discount', 'Contribuție'],
   },
   workforce: {
     eyebrow: 'P2.2–P2.3',
     title: 'Workforce',
-    statement: 'O vedere unificată asupra structurii, stabilității, productivității și compensației.',
+    statement:
+      'O vedere unificată asupra structurii, stabilității, productivității și compensației.',
     capabilities: ['Headcount', 'Mișcări', 'Grile', 'Compensații RBAC'],
   },
   finance: {

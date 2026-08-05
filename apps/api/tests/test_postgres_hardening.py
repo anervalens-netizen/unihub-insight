@@ -8,9 +8,7 @@ from unihub_insight_api.repositories.postgres_hardened import (
 
 
 def test_salary_average_uses_retail_minimum_only_for_average() -> None:
-    stats = salary_statistics(
-        [Decimal("1500"), Decimal("2500"), Decimal("3500")]
-    )
+    stats = salary_statistics([Decimal("1500"), Decimal("2500"), Decimal("3500")])
 
     assert stats.total == Decimal("7500.00")
     assert stats.average == Decimal("3000.00")

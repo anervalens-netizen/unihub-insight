@@ -26,18 +26,23 @@ export function currentBusinessMonth(now = new Date()): string {
     year: 'numeric',
     month: '2-digit',
   });
-  const parts = Object.fromEntries(
-    formatter.formatToParts(now).map((part) => [part.type, part.value]),
-  );
-  const year = parts['year'];
-  const month = parts['month'];
+  const parts = formatter.formatToParts(now);
+  const year = parts.find((part) => part.type === 'year')?.value;
+  const month = parts.find((part) => part.type === 'month')?.value;
   if (!year || !month) throw new Error('Business month could not be resolved.');
   return `${year}-${month}`;
 }
 
 export function parseStoreSelection(value: string | undefined): string[] {
   if (!value) return [];
-  return [...new Set(value.split(',').map((item) => item.trim()).filter(Boolean))];
+  return [
+    ...new Set(
+      value
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  ];
 }
 
 export function serializeStoreSelection(values: readonly string[]): string | undefined {

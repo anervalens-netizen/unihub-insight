@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 from typing import Any
 
 from unihub_insight_api.domain import (
@@ -12,7 +12,6 @@ from unihub_insight_api.domain import (
     BreakdownRow,
     InsightAlert,
     KpiMetric,
-    MetricUnit,
     ModuleAnalyticsResponse,
     RiskLevel,
 )
@@ -22,7 +21,6 @@ from unihub_insight_api.repositories.postgres_modules import (
     append_reporting_scope,
     finance_metrics,
 )
-
 
 MIN_SALARY_FOR_AVERAGE = Decimal("2000")
 MIN_COMPENSATION_POPULATION = 3
@@ -40,19 +38,13 @@ def salary_statistics(values: Sequence[Decimal]) -> SalaryStatistics:
     salaries = sorted(_money(value) for value in values)
     total = sum(salaries, Decimal(0))
     eligible = [value for value in salaries if value >= MIN_SALARY_FOR_AVERAGE]
-    average = (
-        _money(sum(eligible, Decimal(0)) / Decimal(len(eligible)))
-        if eligible
-        else Decimal(0)
-    )
+    average = _money(sum(eligible, Decimal(0)) / Decimal(len(eligible))) if eligible else Decimal(0)
     if not salaries:
         median = Decimal(0)
     else:
         middle = len(salaries) // 2
         median = (
-            salaries[middle]
-            if len(salaries) % 2
-            else _money((salaries[middle - 1] + salaries[middle]) / Decimal(2))
+            salaries[middle] if len(salaries) % 2 else _money((salaries[middle - 1] + salaries[middle]) / Decimal(2))
         )
     return SalaryStatistics(
         total=_money(total),
@@ -96,7 +88,7 @@ class PostgresHardenedInsightRepository(PostgresInsightRepository):
                 f"""
                 SELECT COUNT(DISTINCT store.site_code)::INT
                 FROM stores store
-                WHERE {' AND '.join(eligible_clauses)}
+                WHERE {" AND ".join(eligible_clauses)}
                 """,
                 *eligible_params,
             )
@@ -104,7 +96,7 @@ class PostgresHardenedInsightRepository(PostgresInsightRepository):
                 f"""
                 SELECT COUNT(DISTINCT agg.site_code)::INT
                 FROM reporting_agent_month agg
-                WHERE {' AND '.join(staffed_clauses)}
+                WHERE {" AND ".join(staffed_clauses)}
                   AND agg.working_days > 0
                 """,
                 *staffed_params,
@@ -114,11 +106,7 @@ class PostgresHardenedInsightRepository(PostgresInsightRepository):
     async def _workforce(self, scope: AnalyticsScope) -> ModuleAnalyticsResponse:
         response = await super()._workforce(scope)
         eligible, staffed = await self._workforce_coverage(scope)
-        coverage = (
-            _percent(Decimal(staffed) * Decimal("100") / Decimal(eligible))
-            if eligible > 0
-            else None
-        )
+        coverage = _percent(Decimal(staffed) * Decimal("100") / Decimal(eligible)) if eligible > 0 else None
         kpis: list[KpiMetric] = []
         for kpi in response.kpis:
             if kpi.id == "workforce.coverage":
@@ -157,11 +145,7 @@ class PostgresHardenedInsightRepository(PostgresInsightRepository):
         response = await super()._compensation(scope)
         rows = await self._salary_rows(scope)
         year, month = (int(part) for part in scope.period.split("-"))
-        current = [
-            row
-            for row in rows
-            if int(row["year"]) == year and int(row["month"]) == month
-        ]
+        current = [row for row in rows if int(row["year"]) == year and int(row["month"]) == month]
         values = [_money(row["total_salary"]) for row in current]
         stats = salary_statistics(values)
 
@@ -217,9 +201,7 @@ class PostgresHardenedInsightRepository(PostgresInsightRepository):
             if row["period"].strftime("%Y-%m") == scope.period
             and str(row["source_site_code"]) != "__FINANCE_UNALLOCATED__"
         ]
-        amounts_by_store: dict[tuple[str, str], dict[str, Decimal]] = defaultdict(
-            lambda: defaultdict(Decimal)
-        )
+        amounts_by_store: dict[tuple[str, str], dict[str, Decimal]] = defaultdict(lambda: defaultdict(Decimal))
         labels: dict[tuple[str, str], tuple[str, str]] = {}
         for row in current_rows:
             key = (str(row["company_name"]), str(row["canonical_site_code"]))
@@ -240,19 +222,13 @@ class PostgresHardenedInsightRepository(PostgresInsightRepository):
                     secondary=metrics["ebit"],
                     tertiary=metrics["operating_costs"],
                     progress_pct=margin,
-                    risk=(
-                        RiskLevel.RISK
-                        if metrics["ebit"] < 0
-                        else RiskLevel.HEALTHY
-                    ),
+                    risk=(RiskLevel.RISK if metrics["ebit"] < 0 else RiskLevel.HEALTHY),
                 )
             )
         breakdown.sort(key=lambda item: item.secondary or Decimal(0))
 
         alerts = [alert for alert in response.alerts if alert.id != "finance-negative"]
-        negative_count = sum(
-            1 for item in breakdown if item.secondary is not None and item.secondary < 0
-        )
+        negative_count = sum(1 for item in breakdown if item.secondary is not None and item.secondary < 0)
         if negative_count:
             alerts.insert(
                 0,
@@ -260,9 +236,7 @@ class PostgresHardenedInsightRepository(PostgresInsightRepository):
                     id="finance-negative",
                     severity=AlertSeverity.CRITICAL,
                     title="Magazine cu EBIT negativ",
-                    description=(
-                        f"{negative_count} magazine au EBIT negativ în luna {scope.period}."
-                    ),
+                    description=(f"{negative_count} magazine au EBIT negativ în luna {scope.period}."),
                 ),
             )
         return response.model_copy(update={"breakdown": breakdown, "alerts": alerts[:8]})

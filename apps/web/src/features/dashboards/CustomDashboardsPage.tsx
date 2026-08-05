@@ -10,17 +10,12 @@ import { currentBusinessMonth } from '../../lib/search';
 import { useIdentity } from '../identity/context';
 import type { Capability } from '../identity/schemas';
 import type { ModuleId } from '../modules/schemas';
-import {
-  createDashboard,
-  dashboardsQuery,
-  deleteDashboard,
-  updateDashboard,
-} from './api';
+import { createDashboard, dashboardsQuery, deleteDashboard, updateDashboard } from './api';
 import { CustomDashboardPreview } from './CustomDashboardPreview';
 import { DashboardEditor } from './DashboardEditor';
 import { DashboardLibrary } from './DashboardLibrary';
 import type { DashboardDocument, DashboardWidget } from './schemas';
-import { dashboardTemplates, moduleMetrics, type DashboardTemplate } from './templates';
+import { type DashboardTemplate, dashboardTemplates, moduleMetrics } from './templates';
 
 const moduleCapability: Record<ModuleId, Capability> = {
   sales: 'insight:analytics',
@@ -38,10 +33,7 @@ function cloneDocument(document: DashboardDocument): DashboardDocument {
 
 function nextWidget(module: ModuleId, existing: DashboardWidget[]): DashboardWidget {
   const metric = moduleMetrics[module][0];
-  const y = existing.reduce(
-    (maximum, item) => Math.max(maximum, item.layout.y + item.layout.h),
-    0,
-  );
+  const y = existing.reduce((maximum, item) => Math.max(maximum, item.layout.y + item.layout.h), 0);
   return {
     id: crypto.randomUUID(),
     module,
@@ -83,8 +75,7 @@ export function CustomDashboardsPage() {
 
   const canEdit = Boolean(
     draft &&
-      (draft.owner_subject === identity.subject ||
-        identity.capabilities.includes('insight:admin')),
+      (draft.owner_subject === identity.subject || identity.capabilities.includes('insight:admin')),
   );
 
   useEffect(() => {
@@ -102,9 +93,7 @@ export function CustomDashboardsPage() {
     [identity.capabilities],
   );
   const availableTemplates = dashboardTemplates.filter((template) =>
-    template.requiredCapabilities.every((capability) =>
-      identity.capabilities.includes(capability),
-    ),
+    template.requiredCapabilities.every((capability) => identity.capabilities.includes(capability)),
   );
 
   const createMutation = useMutation({

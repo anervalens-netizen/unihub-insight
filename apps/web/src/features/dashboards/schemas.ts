@@ -17,7 +17,14 @@ export const dashboardWidgetSchema = z.object({
   filter_mode: z.enum(filterModes),
   filters: z.record(z.string(), z.string()),
   options: z.record(z.string(), optionValue),
-  layout: z.object({ x: z.number().int(), y: z.number().int(), w: z.number().int(), h: z.number().int(), min_w: z.number().int(), min_h: z.number().int() }),
+  layout: z.object({
+    x: z.number().int(),
+    y: z.number().int(),
+    w: z.number().int(),
+    h: z.number().int(),
+    min_w: z.number().int(),
+    min_h: z.number().int(),
+  }),
 });
 
 export const dashboardDocumentSchema = z.object({
@@ -35,5 +42,8 @@ export const dashboardDocumentSchema = z.object({
 export const dashboardListSchema = z.object({ items: z.array(dashboardDocumentSchema) });
 export type DashboardWidget = z.infer<typeof dashboardWidgetSchema>;
 export type DashboardDocument = z.infer<typeof dashboardDocumentSchema>;
-export type DashboardCreateInput = Pick<DashboardDocument, 'name' | 'description' | 'visibility' | 'widgets'>;
+export type DashboardCreateInput = Pick<
+  DashboardDocument,
+  'name' | 'description' | 'visibility' | 'widgets'
+>;
 export type DashboardUpdateInput = DashboardCreateInput & { version: number };

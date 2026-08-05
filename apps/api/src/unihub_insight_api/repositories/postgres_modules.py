@@ -39,7 +39,6 @@ from unihub_insight_api.repositories.postgres import (
 )
 from unihub_insight_api.services import previous_period, scope_label
 
-
 MODULE_DEFINITIONS: dict[ModuleId, tuple[str, str, Capability, tuple[ValueAxis, ...], tuple[ChartKind, ...]]] = {
     ModuleId.SALES: (
         "Sales Intelligence",
@@ -324,7 +323,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                         MAX(agg.working_days)::INT AS active_days,
                         COUNT(DISTINCT agg.agent)::INT AS agent_count
                     FROM reporting_agent_month agg
-                    WHERE {' AND '.join(clauses)}
+                    WHERE {" AND ".join(clauses)}
                     GROUP BY agg.import_month, agg.site_code
                 ), targets AS (
                     {target_cte}
@@ -350,7 +349,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                 SELECT agg.category AS label,
                        SUM(agg.total_sales) AS value
                 FROM reporting_category_month agg
-                WHERE {' AND '.join(clauses)}
+                WHERE {" AND ".join(clauses)}
                 GROUP BY agg.category
                 ORDER BY value DESC
                 LIMIT 10
@@ -389,9 +388,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         for row in rows:
             if str(row["import_month"]) in periods:
                 by_store_total[str(row["site_code"])] += _money(row["total_sales"])
-        selected = {
-            code for code, _ in sorted(by_store_total.items(), key=lambda item: item[1], reverse=True)[:8]
-        }
+        selected = {code for code, _ in sorted(by_store_total.items(), key=lambda item: item[1], reverse=True)[:8]}
         result: list[MatrixCell] = []
         for row in rows:
             period = str(row["import_month"])
@@ -430,7 +427,12 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             Decimal(0),
         )
         month_totals: dict[str, dict[str, Decimal]] = defaultdict(
-            lambda: {"sales": Decimal(0), "target": Decimal(0), "qty": Decimal(0), "receipts": Decimal(0)}
+            lambda: {
+                "sales": Decimal(0),
+                "target": Decimal(0),
+                "qty": Decimal(0),
+                "receipts": Decimal(0),
+            }
         )
         for row in history:
             item = month_totals[str(row["import_month"])]
@@ -459,14 +461,50 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         matrix_periods = {shift_month(scope.period, offset) for offset in range(-5, 1)}
         alerts = self._performance_alerts(breakdown)
         if not current:
-            alerts.insert(0, self._missing_alert(ModuleId.SALES, "Nu există vânzări pentru perioada și scope-ul selectat."))
+            alerts.insert(
+                0,
+                self._missing_alert(ModuleId.SALES, "Nu există vânzări pentru perioada și scope-ul selectat."),
+            )
         average_receipt = _money(total_sales / total_receipts) if total_receipts > 0 else Decimal(0)
-        kpis = [
-            KpiMetric(id="sales.total", label="Vânzări", value=_money(total_sales), unit=MetricUnit.CURRENCY, delta_pct=_delta(total_sales, previous_sales), risk=_risk(progress)),
-            KpiMetric(id="target.progress_pct", label="Realizare target", value=progress or Decimal(0), unit=MetricUnit.PERCENT, supporting_value=_money(total_target), supporting_label="Target", risk=_risk(progress)),
-            KpiMetric(id="receipts.average_value", label="Valoare medie bon", value=average_receipt, unit=MetricUnit.CURRENCY, supporting_value=total_receipts, supporting_label="Bonuri"),
-            KpiMetric(id="receipt_2plus_pct", label="Bonuri 2+", value=_ratio(receipt_2plus, total_receipts) or Decimal(0), unit=MetricUnit.PERCENT, supporting_value=total_qty, supporting_label="Cantitate netă"),
-        ] if current else []
+        kpis = (
+            [
+                KpiMetric(
+                    id="sales.total",
+                    label="Vânzări",
+                    value=_money(total_sales),
+                    unit=MetricUnit.CURRENCY,
+                    delta_pct=_delta(total_sales, previous_sales),
+                    risk=_risk(progress),
+                ),
+                KpiMetric(
+                    id="target.progress_pct",
+                    label="Realizare target",
+                    value=progress or Decimal(0),
+                    unit=MetricUnit.PERCENT,
+                    supporting_value=_money(total_target),
+                    supporting_label="Target",
+                    risk=_risk(progress),
+                ),
+                KpiMetric(
+                    id="receipts.average_value",
+                    label="Valoare medie bon",
+                    value=average_receipt,
+                    unit=MetricUnit.CURRENCY,
+                    supporting_value=total_receipts,
+                    supporting_label="Bonuri",
+                ),
+                KpiMetric(
+                    id="receipt_2plus_pct",
+                    label="Bonuri 2+",
+                    value=_ratio(receipt_2plus, total_receipts) or Decimal(0),
+                    unit=MetricUnit.PERCENT,
+                    supporting_value=total_qty,
+                    supporting_label="Cantitate netă",
+                ),
+            ]
+            if current
+            else []
+        )
         return self._response(
             ModuleId.SALES,
             meta,
@@ -495,7 +533,10 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         for row in history:
             period = str(row["import_month"])
             sales, target = monthly[period]
-            monthly[period] = (sales + _money(row["total_sales"]), target + _money(row["target_value"]))
+            monthly[period] = (
+                sales + _money(row["total_sales"]),
+                target + _money(row["target_value"]),
+            )
         trend = [
             TrendPoint(
                 key=period,
@@ -509,20 +550,54 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         ]
         bands = [
             ("La target", Decimal(sum(1 for value in progresses if value >= Decimal("100")))),
-            ("Aproape", Decimal(sum(1 for value in progresses if Decimal("90") <= value < Decimal("100")))),
+            (
+                "Aproape",
+                Decimal(sum(1 for value in progresses if Decimal("90") <= value < Decimal("100"))),
+            ),
             ("Sub ritm", Decimal(sum(1 for value in progresses if value < Decimal("90")))),
             ("Fără target", Decimal(len(breakdown) - len(progresses))),
         ]
         network_progress = _ratio(total_sales, total_target)
-        kpis = [
-            KpiMetric(id="performance.average", label="Realizare rețea", value=network_progress or Decimal(0), unit=MetricUnit.PERCENT, risk=_risk(network_progress)),
-            KpiMetric(id="performance.at_target", label="Magazine la target", value=Decimal(at_target), unit=MetricUnit.INTEGER, supporting_value=Decimal(len(breakdown)), supporting_label="Magazine analizate"),
-            KpiMetric(id="performance.volatility", label="Volatilitate", value=standard_deviation(progresses), unit=MetricUnit.PERCENT, risk=RiskLevel.WATCH),
-            KpiMetric(id="performance.daily_productivity", label="Productivitate / zi-agent", value=_money(total_sales / total_agent_days) if total_agent_days > 0 else Decimal(0), unit=MetricUnit.CURRENCY),
-        ] if current else []
+        kpis = (
+            [
+                KpiMetric(
+                    id="performance.average",
+                    label="Realizare rețea",
+                    value=network_progress or Decimal(0),
+                    unit=MetricUnit.PERCENT,
+                    risk=_risk(network_progress),
+                ),
+                KpiMetric(
+                    id="performance.at_target",
+                    label="Magazine la target",
+                    value=Decimal(at_target),
+                    unit=MetricUnit.INTEGER,
+                    supporting_value=Decimal(len(breakdown)),
+                    supporting_label="Magazine analizate",
+                ),
+                KpiMetric(
+                    id="performance.volatility",
+                    label="Volatilitate",
+                    value=standard_deviation(progresses),
+                    unit=MetricUnit.PERCENT,
+                    risk=RiskLevel.WATCH,
+                ),
+                KpiMetric(
+                    id="performance.daily_productivity",
+                    label="Productivitate / zi-agent",
+                    value=_money(total_sales / total_agent_days) if total_agent_days > 0 else Decimal(0),
+                    unit=MetricUnit.CURRENCY,
+                ),
+            ]
+            if current
+            else []
+        )
         alerts = self._performance_alerts(breakdown)
         if not current:
-            alerts.insert(0, self._missing_alert(ModuleId.PERFORMANCE, "Nu există performanță pentru perioada selectată."))
+            alerts.insert(
+                0,
+                self._missing_alert(ModuleId.PERFORMANCE, "Nu există performanță pentru perioada selectată."),
+            )
         return self._response(
             ModuleId.PERFORMANCE,
             meta,
@@ -563,13 +638,13 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                            SUM(focus.total_quantity)::INT AS focus_qty,
                            COUNT(DISTINCT focus.item_code)::INT AS active_products
                     FROM reporting_focus_item_month focus
-                    WHERE {' AND '.join(focus_clauses)}
+                    WHERE {" AND ".join(focus_clauses)}
                     GROUP BY focus.import_month, focus.site_code
                 ), totals AS (
                     SELECT tot.import_month, tot.site_code,
                            SUM(tot.total_quantity)::INT AS total_qty
                     FROM reporting_agent_month tot
-                    WHERE {' AND '.join(total_clauses)}
+                    WHERE {" AND ".join(total_clauses)}
                     GROUP BY tot.import_month, tot.site_code
                 )
                 SELECT focus.*, COALESCE(totals.total_qty, 0)::INT AS total_qty
@@ -591,7 +666,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                        SUM(agg.total_sales) AS sales,
                        SUM(agg.total_quantity)::INT AS quantity
                 FROM reporting_focus_item_month agg
-                WHERE {' AND '.join(clauses)}
+                WHERE {" AND ".join(clauses)}
                 GROUP BY agg.focus_subcategory
                 ORDER BY sales DESC
                 LIMIT 10
@@ -611,7 +686,9 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         focus_qty = sum((Decimal(int(row["focus_qty"] or 0)) for row in current), Decimal(0))
         total_qty = sum((Decimal(int(row["total_qty"] or 0)) for row in current), Decimal(0))
         active_products = max((int(row["active_products"] or 0) for row in current), default=0)
-        monthly: dict[str, dict[str, Decimal]] = defaultdict(lambda: {"sales": Decimal(0), "focus": Decimal(0), "total": Decimal(0)})
+        monthly: dict[str, dict[str, Decimal]] = defaultdict(
+            lambda: {"sales": Decimal(0), "focus": Decimal(0), "total": Decimal(0)}
+        )
         for row in rows:
             item = monthly[str(row["import_month"])]
             item["sales"] += _money(row["focus_sales"])
@@ -655,15 +732,51 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         alerts: list[InsightAlert] = []
         inactive = [row for row in breakdown if row.primary <= 0]
         if inactive:
-            alerts.append(InsightAlert(id="campaign-inactive", severity=AlertSeverity.WARNING, title="Magazine fără adopție", description=f"{len(inactive)} magazine nu au rezultat Focus în scope."))
+            alerts.append(
+                InsightAlert(
+                    id="campaign-inactive",
+                    severity=AlertSeverity.WARNING,
+                    title="Magazine fără adopție",
+                    description=f"{len(inactive)} magazine nu au rezultat Focus în scope.",
+                )
+            )
         if not current:
-            alerts.append(self._missing_alert(ModuleId.CAMPAIGNS, "Nu există date Focus materializate pentru perioada selectată."))
-        kpis = [
-            KpiMetric(id="campaigns.focus_sales", label="Vânzări Focus", value=_money(focus_sales), unit=MetricUnit.CURRENCY),
-            KpiMetric(id="campaigns.focus_share", label="Pondere Focus", value=_ratio(focus_qty, total_qty) or Decimal(0), unit=MetricUnit.PERCENT),
-            KpiMetric(id="campaigns.active_stores", label="Magazine active", value=Decimal(sum(1 for row in current if _money(row["focus_sales"]) > 0)), unit=MetricUnit.INTEGER),
-            KpiMetric(id="campaigns.active_products", label="Produse active", value=Decimal(active_products), unit=MetricUnit.INTEGER),
-        ] if current else []
+            alerts.append(
+                self._missing_alert(
+                    ModuleId.CAMPAIGNS,
+                    "Nu există date Focus materializate pentru perioada selectată.",
+                )
+            )
+        kpis = (
+            [
+                KpiMetric(
+                    id="campaigns.focus_sales",
+                    label="Vânzări Focus",
+                    value=_money(focus_sales),
+                    unit=MetricUnit.CURRENCY,
+                ),
+                KpiMetric(
+                    id="campaigns.focus_share",
+                    label="Pondere Focus",
+                    value=_ratio(focus_qty, total_qty) or Decimal(0),
+                    unit=MetricUnit.PERCENT,
+                ),
+                KpiMetric(
+                    id="campaigns.active_stores",
+                    label="Magazine active",
+                    value=Decimal(sum(1 for row in current if _money(row["focus_sales"]) > 0)),
+                    unit=MetricUnit.INTEGER,
+                ),
+                KpiMetric(
+                    id="campaigns.active_products",
+                    label="Produse active",
+                    value=Decimal(active_products),
+                    unit=MetricUnit.INTEGER,
+                ),
+            ]
+            if current
+            else []
+        )
         return self._response(
             ModuleId.CAMPAIGNS,
             meta,
@@ -700,7 +813,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                 LEFT JOIN reporting_agent_profile profile ON profile.agent = agg.agent
                 LEFT JOIN reporting_agent_lifecycle_month life
                   ON life.import_month = agg.import_month AND life.agent = agg.agent
-                WHERE {' AND '.join(clauses)}
+                WHERE {" AND ".join(clauses)}
                 GROUP BY agg.import_month, agg.agent
                 ORDER BY agg.import_month, agg.agent
                 """,
@@ -731,17 +844,38 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                        COUNT(*) FILTER (WHERE status.last_error_code IS NOT NULL)::INT AS errors
                 FROM grile_store_current_status status
                 JOIN stores store ON store.site_code = status.site_code
-                WHERE {' AND '.join(clauses)}
+                WHERE {" AND ".join(clauses)}
                 """,
                 *params,
             )
         if row is None or int(row["total"] or 0) == 0:
-            return [InsightAlert(id="grile-missing", severity=AlertSeverity.INFO, title="Grile fără observație", description="Nu există observații Grile pentru scope și perioadă.")]
+            return [
+                InsightAlert(
+                    id="grile-missing",
+                    severity=AlertSeverity.INFO,
+                    title="Grile fără observație",
+                    description="Nu există observații Grile pentru scope și perioadă.",
+                )
+            ]
         alerts: list[InsightAlert] = []
         if int(row["problems"] or 0) > 0:
-            alerts.append(InsightAlert(id="grile-problems", severity=AlertSeverity.WARNING, title="Grile cu neconcordanțe", description=f"{row['problems']} magazine au cel puțin o verificare diferită de OK."))
+            alerts.append(
+                InsightAlert(
+                    id="grile-problems",
+                    severity=AlertSeverity.WARNING,
+                    title="Grile cu neconcordanțe",
+                    description=f"{row['problems']} magazine au cel puțin o verificare diferită de OK.",
+                )
+            )
         if int(row["errors"] or 0) > 0:
-            alerts.append(InsightAlert(id="grile-errors", severity=AlertSeverity.CRITICAL, title="Erori Grile", description=f"{row['errors']} magazine păstrează o ultimă eroare de verificare."))
+            alerts.append(
+                InsightAlert(
+                    id="grile-errors",
+                    severity=AlertSeverity.CRITICAL,
+                    title="Erori Grile",
+                    description=f"{row['errors']} magazine păstrează o ultimă eroare de verificare.",
+                )
+            )
         return alerts
 
     async def _workforce(self, scope: AnalyticsScope) -> ModuleAnalyticsResponse:
@@ -756,9 +890,19 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         staffed_stores = {str(row["site_code"]) for row in current}
         selected_store_count = len(scope.stores) if scope.stores else len(staffed_stores)
         movement_count = sum(1 for row in current if row["is_new"] or row["is_reactivated"])
-        stability = _percent(Decimal(max(headcount - movement_count, 0)) * Decimal("100") / Decimal(headcount)) if headcount else None
-        coverage = _percent(Decimal(len(staffed_stores)) * Decimal("100") / Decimal(selected_store_count)) if selected_store_count else None
-        monthly: dict[str, dict[str, Decimal]] = defaultdict(lambda: {"headcount": Decimal(0), "sales": Decimal(0), "new": Decimal(0)})
+        stability = (
+            _percent(Decimal(max(headcount - movement_count, 0)) * Decimal("100") / Decimal(headcount))
+            if headcount
+            else None
+        )
+        coverage = (
+            _percent(Decimal(len(staffed_stores)) * Decimal("100") / Decimal(selected_store_count))
+            if selected_store_count
+            else None
+        )
+        monthly: dict[str, dict[str, Decimal]] = defaultdict(
+            lambda: {"headcount": Decimal(0), "sales": Decimal(0), "new": Decimal(0)}
+        )
         for row in rows:
             item = monthly[str(row["import_month"])]
             item["headcount"] += 1
@@ -803,18 +947,57 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                 risk=RiskLevel.HEALTHY,
             )
             for row in rows
-            if f"{row['site_code']}:{row['agent']}" in top_agents and str(row["import_month"]) >= shift_month(scope.period, -5)
+            if f"{row['site_code']}:{row['agent']}" in top_agents
+            and str(row["import_month"]) >= shift_month(scope.period, -5)
         ]
         alerts = list(grile_alerts)
         if not current:
-            alerts.insert(0, self._missing_alert(ModuleId.WORKFORCE, "Nu există agenți activi în scope-ul selectat."))
-        kpis = [
-            KpiMetric(id="workforce.headcount", label="Headcount activ", value=Decimal(headcount), unit=MetricUnit.INTEGER),
-            KpiMetric(id="workforce.productivity", label="Productivitate / agent", value=_money(total_sales / Decimal(headcount)) if headcount else Decimal(0), unit=MetricUnit.CURRENCY),
-            KpiMetric(id="workforce.coverage", label="Acoperire magazine", value=coverage or Decimal(0), unit=MetricUnit.PERCENT, risk=_risk(coverage)),
-            KpiMetric(id="workforce.stability", label="Stabilitate", value=stability or Decimal(0), unit=MetricUnit.PERCENT, risk=_risk(stability)),
-        ] if current else []
-        return self._response(ModuleId.WORKFORCE, meta, kpis=kpis, trend=trend, distribution=shares(list(tenure_bands.items())), breakdown=sorted(breakdown, key=lambda item: item.primary, reverse=True), matrix=matrix, alerts=alerts)
+            alerts.insert(
+                0,
+                self._missing_alert(ModuleId.WORKFORCE, "Nu există agenți activi în scope-ul selectat."),
+            )
+        kpis = (
+            [
+                KpiMetric(
+                    id="workforce.headcount",
+                    label="Headcount activ",
+                    value=Decimal(headcount),
+                    unit=MetricUnit.INTEGER,
+                ),
+                KpiMetric(
+                    id="workforce.productivity",
+                    label="Productivitate / agent",
+                    value=_money(total_sales / Decimal(headcount)) if headcount else Decimal(0),
+                    unit=MetricUnit.CURRENCY,
+                ),
+                KpiMetric(
+                    id="workforce.coverage",
+                    label="Acoperire magazine",
+                    value=coverage or Decimal(0),
+                    unit=MetricUnit.PERCENT,
+                    risk=_risk(coverage),
+                ),
+                KpiMetric(
+                    id="workforce.stability",
+                    label="Stabilitate",
+                    value=stability or Decimal(0),
+                    unit=MetricUnit.PERCENT,
+                    risk=_risk(stability),
+                ),
+            ]
+            if current
+            else []
+        )
+        return self._response(
+            ModuleId.WORKFORCE,
+            meta,
+            kpis=kpis,
+            trend=trend,
+            distribution=shares(list(tenure_bands.items())),
+            breakdown=sorted(breakdown, key=lambda item: item.primary, reverse=True),
+            matrix=matrix,
+            alerts=alerts,
+        )
 
     @staticmethod
     def _salary_scope(scope: AnalyticsScope, params: list[Any], alias: str = "salary") -> list[str]:
@@ -828,13 +1011,19 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                 clauses.append(f"LOWER({alias}.company_name) = LOWER(${len(params)})")
             if scope.regional:
                 params.append(scope.regional)
-                clauses.append(f"EXISTS (SELECT 1 FROM stores org WHERE org.site_code = {alias}.site_code AND org.regional = ${len(params)})")
+                clauses.append(
+                    f"EXISTS (SELECT 1 FROM stores org WHERE org.site_code = {alias}.site_code AND org.regional = ${len(params)})"
+                )
             if scope.asm:
                 params.append(scope.asm)
-                clauses.append(f"EXISTS (SELECT 1 FROM stores org WHERE org.site_code = {alias}.site_code AND org.asm = ${len(params)})")
+                clauses.append(
+                    f"EXISTS (SELECT 1 FROM stores org WHERE org.site_code = {alias}.site_code AND org.asm = ${len(params)})"
+                )
         if scope.agent:
             params.append(scope.agent)
-            clauses.append(f"EXISTS (SELECT 1 FROM agent_salary_links link WHERE link.person_id = {alias}.person_id AND link.agent_code = ${len(params)} AND link.match_status = 'confirmed')")
+            clauses.append(
+                f"EXISTS (SELECT 1 FROM agent_salary_links link WHERE link.person_id = {alias}.person_id AND link.agent_code = ${len(params)} AND link.match_status = 'confirmed')"
+            )
         return clauses
 
     async def _salary_rows(self, scope: AnalyticsScope) -> Sequence[asyncpg.Record]:
@@ -854,7 +1043,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                        MAX(salary.locatie) AS locatie,
                        SUM(salary.total_salary) AS total_salary
                 FROM salary_records salary
-                WHERE {' AND '.join(clauses)}
+                WHERE {" AND ".join(clauses)}
                 GROUP BY salary.year, salary.month, salary.person_id
                 ORDER BY salary.year, salary.month, full_name
                 """,
@@ -868,16 +1057,25 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             self._meta(ModuleId.COMPENSATION, scope, "salary_records/reporting_agent_month"),
         )
         current_year, current_month = (int(part) for part in scope.period.split("-"))
-        current = [row for row in salary_rows if int(row["year"]) == current_year and int(row["month"]) == current_month]
+        current = [
+            row for row in salary_rows if int(row["year"]) == current_year and int(row["month"]) == current_month
+        ]
         payroll = sum((_money(row["total_salary"]) for row in current), Decimal(0))
-        salaries = sorted((_money(row["total_salary"]) for row in current))
+        salaries = sorted(_money(row["total_salary"]) for row in current)
         average = _money(payroll / Decimal(len(salaries))) if salaries else Decimal(0)
         if salaries:
             middle = len(salaries) // 2
-            median = salaries[middle] if len(salaries) % 2 else _money((salaries[middle - 1] + salaries[middle]) / Decimal(2))
+            median = (
+                salaries[middle]
+                if len(salaries) % 2
+                else _money((salaries[middle - 1] + salaries[middle]) / Decimal(2))
+            )
         else:
             median = Decimal(0)
-        sales = sum((_money(row["total_sales"]) for row in sales_rows if str(row["import_month"]) == scope.period), Decimal(0))
+        sales = sum(
+            (_money(row["total_sales"]) for row in sales_rows if str(row["import_month"]) == scope.period),
+            Decimal(0),
+        )
         ratio = _ratio(payroll, sales)
         monthly: dict[str, list[Decimal]] = defaultdict(list)
         companies: dict[str, Decimal] = defaultdict(Decimal)
@@ -889,7 +1087,14 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         trend = []
         for period, values in sorted(monthly.items()):
             total = sum(values, Decimal(0))
-            trend.append(TrendPoint(key=period, label=period, primary=_money(total), secondary=_money(total / Decimal(len(values))) if values else None))
+            trend.append(
+                TrendPoint(
+                    key=period,
+                    label=period,
+                    primary=_money(total),
+                    secondary=_money(total / Decimal(len(values))) if values else None,
+                )
+            )
         breakdown = [
             BreakdownRow(
                 id=str(row["person_id"]),
@@ -904,30 +1109,84 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         ]
         top_people = {row.id for row in sorted(breakdown, key=lambda item: item.primary, reverse=True)[:8]}
         matrix = [
-            MatrixCell(x=f"{int(row['year']):04d}-{int(row['month']):02d}", y=str(row["full_name"]), value=_money(row["total_salary"]), risk=RiskLevel.HEALTHY)
+            MatrixCell(
+                x=f"{int(row['year']):04d}-{int(row['month']):02d}",
+                y=str(row["full_name"]),
+                value=_money(row["total_salary"]),
+                risk=RiskLevel.HEALTHY,
+            )
             for row in salary_rows
-            if str(row["person_id"]) in top_people and f"{int(row['year']):04d}-{int(row['month']):02d}" >= shift_month(scope.period, -5)
+            if str(row["person_id"]) in top_people
+            and f"{int(row['year']):04d}-{int(row['month']):02d}" >= shift_month(scope.period, -5)
         ]
         alerts: list[InsightAlert] = []
         if len(current) < 3 and current:
-            alerts.append(InsightAlert(id="salary-narrow-scope", severity=AlertSeverity.WARNING, title="Scope salarial foarte restrâns", description="Rezultatul conține mai puțin de trei persoane; exportul agregat trebuie suprimat în producție."))
+            alerts.append(
+                InsightAlert(
+                    id="salary-narrow-scope",
+                    severity=AlertSeverity.WARNING,
+                    title="Scope salarial foarte restrâns",
+                    description="Rezultatul conține mai puțin de trei persoane; exportul agregat trebuie suprimat în producție.",
+                )
+            )
         if not current:
-            alerts.append(self._missing_alert(ModuleId.COMPENSATION, "Nu există date salariale pentru perioada selectată."))
-        kpis = [
-            KpiMetric(id="compensation.payroll", label="Cost salarial", value=_money(payroll), unit=MetricUnit.CURRENCY),
-            KpiMetric(id="compensation.average", label="Salariu mediu", value=average, unit=MetricUnit.CURRENCY),
-            KpiMetric(id="compensation.median", label="Salariu median", value=median, unit=MetricUnit.CURRENCY),
-            KpiMetric(id="compensation.sales_ratio", label="Cost / vânzări", value=ratio or Decimal(0), unit=MetricUnit.PERCENT, risk=RiskLevel.WATCH if ratio and ratio > Decimal("25") else RiskLevel.HEALTHY),
-        ] if current else []
-        return self._response(ModuleId.COMPENSATION, meta, kpis=kpis, trend=trend, distribution=shares(list(companies.items())), breakdown=sorted(breakdown, key=lambda item: item.primary, reverse=True), matrix=matrix, alerts=alerts)
+            alerts.append(
+                self._missing_alert(ModuleId.COMPENSATION, "Nu există date salariale pentru perioada selectată.")
+            )
+        kpis = (
+            [
+                KpiMetric(
+                    id="compensation.payroll",
+                    label="Cost salarial",
+                    value=_money(payroll),
+                    unit=MetricUnit.CURRENCY,
+                ),
+                KpiMetric(
+                    id="compensation.average",
+                    label="Salariu mediu",
+                    value=average,
+                    unit=MetricUnit.CURRENCY,
+                ),
+                KpiMetric(
+                    id="compensation.median",
+                    label="Salariu median",
+                    value=median,
+                    unit=MetricUnit.CURRENCY,
+                ),
+                KpiMetric(
+                    id="compensation.sales_ratio",
+                    label="Cost / vânzări",
+                    value=ratio or Decimal(0),
+                    unit=MetricUnit.PERCENT,
+                    risk=RiskLevel.WATCH if ratio and ratio > Decimal("25") else RiskLevel.HEALTHY,
+                ),
+            ]
+            if current
+            else []
+        )
+        return self._response(
+            ModuleId.COMPENSATION,
+            meta,
+            kpis=kpis,
+            trend=trend,
+            distribution=shares(list(companies.items())),
+            breakdown=sorted(breakdown, key=lambda item: item.primary, reverse=True),
+            matrix=matrix,
+            alerts=alerts,
+        )
 
     async def _finance_rows(self, scope: AnalyticsScope) -> Sequence[asyncpg.Record]:
         start = shift_month(scope.period, -11)
-        params: list[Any] = [date.fromisoformat(f"{start}-01"), date.fromisoformat(f"{scope.period}-01")]
+        params: list[Any] = [
+            date.fromisoformat(f"{start}-01"),
+            date.fromisoformat(f"{scope.period}-01"),
+        ]
         filters: list[str] = []
         if scope.stores:
             params.append(list(scope.stores))
-            filters.append(f"(row.linked_site_code = ANY(${len(params)}::text[]) OR (row.linked_site_code IS NULL AND row.source_site_code = ANY(${len(params)}::text[])))")
+            filters.append(
+                f"(row.linked_site_code = ANY(${len(params)}::text[]) OR (row.linked_site_code IS NULL AND row.source_site_code = ANY(${len(params)}::text[])))"
+            )
         else:
             if scope.firm:
                 params.append(scope.firm)
@@ -1008,13 +1267,33 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         trend = []
         for period, amounts in sorted(monthly_amounts.items()):
             values = finance_metrics(amounts)
-            trend.append(TrendPoint(key=period, label=period, primary=values["revenue"], secondary=values["ebit"], target=_ratio(values["ebit"], values["revenue"]), is_estimate=monthly_estimate[period]))
+            trend.append(
+                TrendPoint(
+                    key=period,
+                    label=period,
+                    primary=values["revenue"],
+                    secondary=values["ebit"],
+                    target=_ratio(values["ebit"], values["revenue"]),
+                    is_estimate=monthly_estimate[period],
+                )
+            )
         breakdown: list[BreakdownRow] = []
         for key, amounts in store_amounts.items():
             values = finance_metrics(amounts)
             label, regional = store_labels[key]
             store_margin = _ratio(values["ebit"], values["revenue"])
-            breakdown.append(BreakdownRow(id=f"{key[0]}:{key[1]}", label=label, context=f"{key[0]} · {regional}", primary=values["revenue"], secondary=values["ebit"], tertiary=values["operating_costs"], progress_pct=store_margin, risk=RiskLevel.RISK if values["ebit"] < 0 else RiskLevel.HEALTHY))
+            breakdown.append(
+                BreakdownRow(
+                    id=f"{key[0]}:{key[1]}",
+                    label=label,
+                    context=f"{key[0]} · {regional}",
+                    primary=values["revenue"],
+                    secondary=values["ebit"],
+                    tertiary=values["operating_costs"],
+                    progress_pct=store_margin,
+                    risk=RiskLevel.RISK if values["ebit"] < 0 else RiskLevel.HEALTHY,
+                )
+            )
         top_stores = {item.id for item in sorted(breakdown, key=lambda item: item.primary, reverse=True)[:8]}
         matrix: list[MatrixCell] = []
         by_store_month: dict[tuple[str, str], dict[str, Decimal]] = defaultdict(lambda: defaultdict(Decimal))
@@ -1029,27 +1308,91 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         for (identifier, period), amounts in by_store_month.items():
             values = finance_metrics(amounts)
             store_margin = _ratio(values["ebit"], values["revenue"])
-            matrix.append(MatrixCell(x=period, y=label_by_id[identifier], value=store_margin or Decimal(0), risk=RiskLevel.RISK if values["ebit"] < 0 else RiskLevel.HEALTHY))
-        cost_items = [(CATEGORY_LABELS.get(code, code), amount) for code, amount in category_current.items() if code in COGS_CODES | OPERATING_CODES | {"a1"}]
+            matrix.append(
+                MatrixCell(
+                    x=period,
+                    y=label_by_id[identifier],
+                    value=store_margin or Decimal(0),
+                    risk=RiskLevel.RISK if values["ebit"] < 0 else RiskLevel.HEALTHY,
+                )
+            )
+        cost_items = [
+            (CATEGORY_LABELS.get(code, code), amount)
+            for code, amount in category_current.items()
+            if code in COGS_CODES | OPERATING_CODES | {"a1"}
+        ]
         alerts: list[InsightAlert] = []
         negative = [item for item in breakdown if item.secondary is not None and item.secondary < 0]
         if negative:
-            alerts.append(InsightAlert(id="finance-negative", severity=AlertSeverity.CRITICAL, title="Magazine cu EBIT negativ", description=f"{len(negative)} magazine au EBIT negativ în intervalul analizat."))
+            alerts.append(
+                InsightAlert(
+                    id="finance-negative",
+                    severity=AlertSeverity.CRITICAL,
+                    title="Magazine cu EBIT negativ",
+                    description=f"{len(negative)} magazine au EBIT negativ în intervalul analizat.",
+                )
+            )
         if monthly_estimate.get(scope.period):
-            alerts.append(InsightAlert(id="finance-estimate", severity=AlertSeverity.WARNING, title="Perioadă estimată", description="Cel puțin o componentă P&L este estimată; actualele au prioritate unde există."))
+            alerts.append(
+                InsightAlert(
+                    id="finance-estimate",
+                    severity=AlertSeverity.WARNING,
+                    title="Perioadă estimată",
+                    description="Cel puțin o componentă P&L este estimată; actualele au prioritate unde există.",
+                )
+            )
         if not rows:
             alerts.append(self._missing_alert(ModuleId.FINANCE, "Nu există date P&L pentru scope-ul selectat."))
-        kpis = [
-            KpiMetric(id="finance.revenue", label="Venit net", value=current_metrics["revenue"], unit=MetricUnit.CURRENCY),
-            KpiMetric(id="finance.ebit", label="EBIT", value=current_metrics["ebit"], unit=MetricUnit.CURRENCY, risk=RiskLevel.RISK if current_metrics["ebit"] < 0 else RiskLevel.HEALTHY),
-            KpiMetric(id="finance.ebit_margin", label="Marjă EBIT", value=margin or Decimal(0), unit=MetricUnit.PERCENT, risk=RiskLevel.RISK if current_metrics["ebit"] < 0 else RiskLevel.HEALTHY),
-            KpiMetric(id="finance.operating_costs", label="Cost operațional", value=current_metrics["operating_costs"], unit=MetricUnit.CURRENCY),
-        ] if rows else []
-        return self._response(ModuleId.FINANCE, meta, kpis=kpis, trend=trend, distribution=shares(cost_items), breakdown=sorted(breakdown, key=lambda item: item.secondary or Decimal(0)), matrix=matrix, alerts=alerts)
+        kpis = (
+            [
+                KpiMetric(
+                    id="finance.revenue",
+                    label="Venit net",
+                    value=current_metrics["revenue"],
+                    unit=MetricUnit.CURRENCY,
+                ),
+                KpiMetric(
+                    id="finance.ebit",
+                    label="EBIT",
+                    value=current_metrics["ebit"],
+                    unit=MetricUnit.CURRENCY,
+                    risk=RiskLevel.RISK if current_metrics["ebit"] < 0 else RiskLevel.HEALTHY,
+                ),
+                KpiMetric(
+                    id="finance.ebit_margin",
+                    label="Marjă EBIT",
+                    value=margin or Decimal(0),
+                    unit=MetricUnit.PERCENT,
+                    risk=RiskLevel.RISK if current_metrics["ebit"] < 0 else RiskLevel.HEALTHY,
+                ),
+                KpiMetric(
+                    id="finance.operating_costs",
+                    label="Cost operațional",
+                    value=current_metrics["operating_costs"],
+                    unit=MetricUnit.CURRENCY,
+                ),
+            ]
+            if rows
+            else []
+        )
+        return self._response(
+            ModuleId.FINANCE,
+            meta,
+            kpis=kpis,
+            trend=trend,
+            distribution=shares(cost_items),
+            breakdown=sorted(breakdown, key=lambda item: item.secondary or Decimal(0)),
+            matrix=matrix,
+            alerts=alerts,
+        )
 
     async def _planning_rows(self, scope: AnalyticsScope) -> Sequence[asyncpg.Record]:
         params: list[Any] = [shift_month(scope.period, -11), scope.period]
-        clauses: list[str] = ["run.forecast_month BETWEEN $1 AND $2", "run.status = 'completed'", "run.metric = 'sales_value'"]
+        clauses: list[str] = [
+            "run.forecast_month BETWEEN $1 AND $2",
+            "run.status = 'completed'",
+            "run.metric = 'sales_value'",
+        ]
         scope_params: list[Any] = params
         store_clauses = append_reporting_scope(scope, alias="store", params=scope_params, include_agent=False)
         clauses.extend(store_clauses)
@@ -1074,7 +1417,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                     FROM selected_runs selected
                     JOIN ai_forecast_store_month forecast ON forecast.run_id = selected.id
                     JOIN stores store ON store.site_code = forecast.site_code
-                    WHERE {' AND '.join(store_clauses)}
+                    WHERE {" AND ".join(store_clauses)}
                 ), actual AS (
                     SELECT agg.import_month, agg.site_code, SUM(agg.total_sales) AS actual_sales
                     FROM reporting_agent_month agg
@@ -1103,8 +1446,18 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         current = [row for row in rows if str(row["forecast_month"]) == scope.period]
         forecast = sum((_money(row["forecast_sales"]) for row in current), Decimal(0))
         target = sum((_money(row["target_value"]) for row in current), Decimal(0))
-        actual = sum((_money(row["actual_sales"]) for row in current if row["actual_sales"] is not None), Decimal(0))
-        monthly: dict[str, dict[str, Decimal | bool]] = defaultdict(lambda: {"forecast": Decimal(0), "actual": Decimal(0), "target": Decimal(0), "has_actual": False})
+        actual = sum(
+            (_money(row["actual_sales"]) for row in current if row["actual_sales"] is not None),
+            Decimal(0),
+        )
+        monthly: dict[str, dict[str, Decimal | bool]] = defaultdict(
+            lambda: {
+                "forecast": Decimal(0),
+                "actual": Decimal(0),
+                "target": Decimal(0),
+                "has_actual": False,
+            }
+        )
         for row in rows:
             item = monthly[str(row["forecast_month"])]
             item["forecast"] = Decimal(item["forecast"]) + _money(row["forecast_sales"])
@@ -1120,7 +1473,16 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             if actual_value is not None and actual_value > 0:
                 error = abs(forecast_value - actual_value) / actual_value * Decimal("100")
                 accuracies.append(max(Decimal(0), _percent(Decimal("100") - error)))
-            trend.append(TrendPoint(key=period, label=period, primary=forecast_value, comparison=actual_value, target=_money(values["target"]), is_estimate=actual_value is None))
+            trend.append(
+                TrendPoint(
+                    key=period,
+                    label=period,
+                    primary=forecast_value,
+                    comparison=actual_value,
+                    target=_money(values["target"]),
+                    is_estimate=actual_value is None,
+                )
+            )
         accuracy = _percent(sum(accuracies, Decimal(0)) / Decimal(len(accuracies))) if accuracies else None
         breakdown: list[BreakdownRow] = []
         for row in current:
@@ -1128,41 +1490,130 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             target_value = _money(row["target_value"])
             actual_value = _money(row["actual_sales"]) if row["actual_sales"] is not None else None
             progress = _ratio(forecast_value, target_value)
-            breakdown.append(BreakdownRow(id=str(row["site_code"]), label=str(row["locatie"]), context=f"{row['firma']} · {row['regional']}", primary=forecast_value, secondary=actual_value, tertiary=target_value, progress_pct=progress, delta_pct=_delta(forecast_value, actual_value) if actual_value is not None else None, risk=_risk(progress)))
+            breakdown.append(
+                BreakdownRow(
+                    id=str(row["site_code"]),
+                    label=str(row["locatie"]),
+                    context=f"{row['firma']} · {row['regional']}",
+                    primary=forecast_value,
+                    secondary=actual_value,
+                    tertiary=target_value,
+                    progress_pct=progress,
+                    delta_pct=_delta(forecast_value, actual_value) if actual_value is not None else None,
+                    risk=_risk(progress),
+                )
+            )
         distribution_by_regional: dict[str, Decimal] = defaultdict(Decimal)
         for row in current:
             distribution_by_regional[str(row["regional"])] += _money(row["forecast_sales"])
         top_codes = {item.id for item in sorted(breakdown, key=lambda item: item.primary, reverse=True)[:8]}
         matrix = [
-            MatrixCell(x=str(row["forecast_month"]), y=str(row["locatie"]), value=_ratio(_money(row["forecast_sales"]), _money(row["actual_sales"])) or Decimal(0), risk=RiskLevel.HEALTHY)
+            MatrixCell(
+                x=str(row["forecast_month"]),
+                y=str(row["locatie"]),
+                value=_ratio(_money(row["forecast_sales"]), _money(row["actual_sales"])) or Decimal(0),
+                risk=RiskLevel.HEALTHY,
+            )
             for row in rows
-            if str(row["site_code"]) in top_codes and str(row["forecast_month"]) >= shift_month(scope.period, -5) and row["actual_sales"] is not None
+            if str(row["site_code"]) in top_codes
+            and str(row["forecast_month"]) >= shift_month(scope.period, -5)
+            and row["actual_sales"] is not None
         ]
         alerts: list[InsightAlert] = []
         if not current:
-            alerts.append(self._missing_alert(ModuleId.PLANNING, "Nu există un forecast complet pentru perioada și scope-ul selectat."))
+            alerts.append(
+                self._missing_alert(
+                    ModuleId.PLANNING,
+                    "Nu există un forecast complet pentru perioada și scope-ul selectat.",
+                )
+            )
         elif target > 0 and forecast < target:
-            alerts.append(InsightAlert(id="planning-gap", severity=AlertSeverity.WARNING, title="Forecast sub target", description=f"Gap-ul proiectat este {_money(forecast - target)} RON."))
-        kpis = [
-            KpiMetric(id="planning.forecast", label="Forecast", value=_money(forecast), unit=MetricUnit.CURRENCY, supporting_value=_money(target), supporting_label="Target", risk=_risk(_ratio(forecast, target))),
-            KpiMetric(id="planning.target_gap", label="Gap față de target", value=_money(forecast - target), unit=MetricUnit.CURRENCY, risk=_risk(_ratio(forecast, target))),
-            KpiMetric(id="planning.accuracy", label="Acuratețe istorică", value=accuracy or Decimal(0), unit=MetricUnit.PERCENT, risk=_risk(accuracy)),
-            KpiMetric(id="planning.actual", label="Actual disponibil", value=_money(actual), unit=MetricUnit.CURRENCY),
-        ] if current else []
-        return self._response(ModuleId.PLANNING, meta, kpis=kpis, trend=trend, distribution=shares(list(distribution_by_regional.items())), breakdown=sorted(breakdown, key=lambda item: item.progress_pct or Decimal(0)), matrix=matrix, alerts=alerts)
+            alerts.append(
+                InsightAlert(
+                    id="planning-gap",
+                    severity=AlertSeverity.WARNING,
+                    title="Forecast sub target",
+                    description=f"Gap-ul proiectat este {_money(forecast - target)} RON.",
+                )
+            )
+        kpis = (
+            [
+                KpiMetric(
+                    id="planning.forecast",
+                    label="Forecast",
+                    value=_money(forecast),
+                    unit=MetricUnit.CURRENCY,
+                    supporting_value=_money(target),
+                    supporting_label="Target",
+                    risk=_risk(_ratio(forecast, target)),
+                ),
+                KpiMetric(
+                    id="planning.target_gap",
+                    label="Gap față de target",
+                    value=_money(forecast - target),
+                    unit=MetricUnit.CURRENCY,
+                    risk=_risk(_ratio(forecast, target)),
+                ),
+                KpiMetric(
+                    id="planning.accuracy",
+                    label="Acuratețe istorică",
+                    value=accuracy or Decimal(0),
+                    unit=MetricUnit.PERCENT,
+                    risk=_risk(accuracy),
+                ),
+                KpiMetric(
+                    id="planning.actual",
+                    label="Actual disponibil",
+                    value=_money(actual),
+                    unit=MetricUnit.CURRENCY,
+                ),
+            ]
+            if current
+            else []
+        )
+        return self._response(
+            ModuleId.PLANNING,
+            meta,
+            kpis=kpis,
+            trend=trend,
+            distribution=shares(list(distribution_by_regional.items())),
+            breakdown=sorted(breakdown, key=lambda item: item.progress_pct or Decimal(0)),
+            matrix=matrix,
+            alerts=alerts,
+        )
 
     @staticmethod
     def _performance_alerts(rows: Sequence[BreakdownRow]) -> list[InsightAlert]:
         alerts: list[InsightAlert] = []
         for row in rows:
             if row.risk is RiskLevel.RISK:
-                alerts.append(InsightAlert(id=f"risk-{row.id}", severity=AlertSeverity.WARNING, title="Entitate sub ritmul necesar", description=f"Realizarea curentă este {row.progress_pct}%.", entity_label=row.label))
+                alerts.append(
+                    InsightAlert(
+                        id=f"risk-{row.id}",
+                        severity=AlertSeverity.WARNING,
+                        title="Entitate sub ritmul necesar",
+                        description=f"Realizarea curentă este {row.progress_pct}%.",
+                        entity_label=row.label,
+                    )
+                )
             if len(alerts) >= 5:
                 break
         if not alerts and rows:
-            alerts.append(InsightAlert(id="scope-healthy", severity=AlertSeverity.INFO, title="Fără abateri majore", description="Nicio entitate nu a intrat în pragul critic curent."))
+            alerts.append(
+                InsightAlert(
+                    id="scope-healthy",
+                    severity=AlertSeverity.INFO,
+                    title="Fără abateri majore",
+                    description="Nicio entitate nu a intrat în pragul critic curent.",
+                )
+            )
         return alerts
 
     @staticmethod
     def _missing_alert(module: ModuleId, description: str) -> InsightAlert:
-        return InsightAlert(id=f"{module.value}-missing", severity=AlertSeverity.CRITICAL, title="Date indisponibile", description=description)
+        return InsightAlert(
+            id=f"{module.value}-missing",
+            severity=AlertSeverity.CRITICAL,
+            title="Date indisponibile",
+            description=description,
+        )

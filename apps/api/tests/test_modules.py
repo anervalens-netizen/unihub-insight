@@ -1,6 +1,5 @@
 from fastapi.testclient import TestClient
 
-
 MODULES = (
     "sales",
     "performance",

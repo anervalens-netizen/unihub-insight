@@ -7,6 +7,7 @@ from unihub_insight_api.domain import (
     FilterOptionsResponse,
     ModuleAnalyticsResponse,
     ModuleId,
+    MonthlyReviewResponse,
     OverviewResponse,
 )
 
@@ -21,3 +22,9 @@ class AnalyticsRepository(Protocol):
         module: ModuleId,
         scope: AnalyticsScope,
     ) -> ModuleAnalyticsResponse: ...
+
+    async def get_monthly_review(
+        self,
+        scope: AnalyticsScope,
+        recent_months: int,
+    ) -> MonthlyReviewResponse: ...

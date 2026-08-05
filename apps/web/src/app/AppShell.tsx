@@ -12,14 +12,22 @@ import { moduleMetadata } from './navigation';
 import { Sidebar } from './Sidebar';
 
 function usePersistentBoolean(key: string, initial: boolean): [boolean, (value: boolean) => void] {
-  const [value, setValue] = useState(() => { const stored = localStorage.getItem(key); return stored === null ? initial : stored === 'true'; });
-  const update = (next: boolean): void => { setValue(next); localStorage.setItem(key, String(next)); };
+  const [value, setValue] = useState(() => {
+    const stored = localStorage.getItem(key);
+    return stored === null ? initial : stored === 'true';
+  });
+  const update = (next: boolean): void => {
+    setValue(next);
+    localStorage.setItem(key, String(next));
+  };
   return [value, update];
 }
 
 function useTheme() {
   const [dark, setDark] = usePersistentBoolean('unihub-insight:dark', false);
-  useEffect(() => { document.documentElement.dataset.theme = dark ? 'dark' : 'light'; }, [dark]);
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  }, [dark]);
   return { dark, setDark };
 }
 
@@ -31,11 +39,63 @@ export function AppShell() {
   const metadata = moduleMetadata[pathname as keyof typeof moduleMetadata] ?? moduleMetadata['/'];
 
   if (identity.isPending) return <LoadingState label="Se verifică identitatea și permisiunile…" />;
-  if (identity.isError) return <ErrorState title="Autentificarea nu este disponibilă" message={identity.error instanceof Error ? identity.error.message : 'Identitatea nu a putut fi verificată.'} onRetry={() => void identity.refetch()} />;
+  if (identity.isError)
+    return (
+      <ErrorState
+        title="Autentificarea nu este disponibilă"
+        message={
+          identity.error instanceof Error
+            ? identity.error.message
+            : 'Identitatea nu a putut fi verificată.'
+        }
+        onRetry={() => void identity.refetch()}
+      />
+    );
   const user = identity.data;
-  return <IdentityProvider user={user}><div className="app-root">
-    <div className="desktop-warning"><Laptop size={24} /><strong>UniHub Insight este optimizat pentru desktop</strong><span>Folosește o fereastră de minimum 1180 px pentru analiza completă.</span></div>
-    <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} capabilities={user.capabilities} />
-    <div className="workspace"><header className="topbar"><div className="page-identity"><span>Retail Intelligence</span><h1>{metadata.title}</h1><p>{metadata.description}</p></div><div className="topbar-actions"><div className="identity-summary"><strong>{user.name ?? user.email ?? user.subject}</strong><span>{user.is_demo ? 'Demo administrator' : `${user.capabilities.length} capabilități`}</span></div><span className="environment-badge">v0.4</span><button type="button" className="icon-button icon-button--topbar" onClick={() => setDark(!dark)} aria-label={dark ? 'Folosește tema luminoasă' : 'Folosește tema întunecată'}>{dark ? <Sun size={17} /> : <Moon size={17} />}</button></div></header><GlobalFilters /><main className="content-canvas"><Outlet /></main></div>
-  </div></IdentityProvider>;
+  return (
+    <IdentityProvider user={user}>
+      <div className="app-root">
+        <div className="desktop-warning">
+          <Laptop size={24} />
+          <strong>UniHub Insight este optimizat pentru desktop</strong>
+          <span>Folosește o fereastră de minimum 1180 px pentru analiza completă.</span>
+        </div>
+        <Sidebar
+          collapsed={collapsed}
+          onToggle={() => setCollapsed(!collapsed)}
+          capabilities={user.capabilities}
+        />
+        <div className="workspace">
+          <header className="topbar">
+            <div className="page-identity">
+              <span>Retail Intelligence</span>
+              <h1>{metadata.title}</h1>
+              <p>{metadata.description}</p>
+            </div>
+            <div className="topbar-actions">
+              <div className="identity-summary">
+                <strong>{user.name ?? user.email ?? user.subject}</strong>
+                <span>
+                  {user.is_demo ? 'Demo administrator' : `${user.capabilities.length} capabilități`}
+                </span>
+              </div>
+              <span className="environment-badge">v0.4</span>
+              <button
+                type="button"
+                className="icon-button icon-button--topbar"
+                onClick={() => setDark(!dark)}
+                aria-label={dark ? 'Folosește tema luminoasă' : 'Folosește tema întunecată'}
+              >
+                {dark ? <Sun size={17} /> : <Moon size={17} />}
+              </button>
+            </div>
+          </header>
+          <GlobalFilters />
+          <main className="content-canvas">
+            <Outlet />
+          </main>
+        </div>
+      </div>
+    </IdentityProvider>
+  );
 }

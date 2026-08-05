@@ -20,11 +20,7 @@ def previous_period(period: str, comparison: ComparisonMode) -> str | None:
 def scope_label(scope: AnalyticsScope) -> str:
     segments: list[str] = []
     if scope.stores:
-        segments.append(
-            f"Magazin {scope.stores[0]}"
-            if len(scope.stores) == 1
-            else f"{len(scope.stores)} magazine"
-        )
+        segments.append(f"Magazin {scope.stores[0]}" if len(scope.stores) == 1 else f"{len(scope.stores)} magazine")
     else:
         if scope.firm:
             segments.append(scope.firm)

@@ -41,9 +41,7 @@ export function DashboardLibrary({
             type="button"
             key={document.id}
             className={
-              document.id === selectedId
-                ? 'dashboard-list-item is-active'
-                : 'dashboard-list-item'
+              document.id === selectedId ? 'dashboard-list-item is-active' : 'dashboard-list-item'
             }
             onClick={() => onSelect(document.id)}
           >
@@ -62,11 +60,7 @@ export function DashboardLibrary({
       <div className="dashboard-templates">
         <h3>Template-uri</h3>
         {templates.map((template) => (
-          <button
-            type="button"
-            key={template.id}
-            onClick={() => onCreateTemplate(template)}
-          >
+          <button type="button" key={template.id} onClick={() => onCreateTemplate(template)}>
             <CopyPlus size={14} />
             <span>
               <strong>{template.name}</strong>

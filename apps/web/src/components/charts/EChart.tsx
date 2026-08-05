@@ -1,16 +1,16 @@
 import { BarChart, HeatmapChart, LineChart, PieChart, ScatterChart } from 'echarts/charts';
 import {
   AriaComponent,
-  DataZoomComponent,
   DatasetComponent,
+  DataZoomComponent,
   GridComponent,
   LegendComponent,
   TitleComponent,
   TooltipComponent,
   VisualMapComponent,
 } from 'echarts/components';
-import * as echarts from 'echarts/core';
 import type { EChartsCoreOption, EChartsType } from 'echarts/core';
+import * as echarts from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { useEffect, useRef } from 'react';
 

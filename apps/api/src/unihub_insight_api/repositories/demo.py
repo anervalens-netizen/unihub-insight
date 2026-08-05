@@ -5,7 +5,7 @@ import hashlib
 import math
 import random
 from datetime import UTC, date, datetime
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from zoneinfo import ZoneInfo
 
 from unihub_insight_api.domain import (
@@ -26,7 +26,6 @@ from unihub_insight_api.domain import (
     RiskLevel,
 )
 from unihub_insight_api.services import previous_period, scope_label
-
 
 MONEY = Decimal("0.01")
 PERCENT = Decimal("0.01")
@@ -81,18 +80,90 @@ def _seed(*parts: str) -> int:
 
 
 DEMO_STORES: tuple[FilterStore, ...] = (
-    FilterStore(site_code="B001", label="București Plaza", firm="MOBIUP", regional="Andrei Sud", asm="ASM București"),
-    FilterStore(site_code="B002", label="București ParkLake", firm="MOBIUP", regional="Andrei Sud", asm="ASM București"),
-    FilterStore(site_code="B003", label="București Sun Plaza", firm="MOBICELL", regional="Andrei Sud", asm="ASM București"),
-    FilterStore(site_code="C001", label="Constanța City", firm="MOBIUP", regional="Dobrogea", asm="ASM Constanța"),
-    FilterStore(site_code="C002", label="Constanța VIVO", firm="MOBICELL", regional="Dobrogea", asm="ASM Constanța"),
-    FilterStore(site_code="G001", label="Galați Shopping", firm="MOBIUP", regional="Dobrogea", asm="ASM Galați"),
-    FilterStore(site_code="BZR1", label="Buzău Aurora", firm="MOBICELL", regional="Moldova Sud", asm="ASM Buzău"),
-    FilterStore(site_code="BR01", label="Brăila Mall", firm="MOBIUP", regional="Moldova Sud", asm="ASM Brăila"),
-    FilterStore(site_code="P001", label="Ploiești Shopping", firm="MOBIUP", regional="Muntenia", asm="ASM Prahova"),
-    FilterStore(site_code="P002", label="Ploiești AFI", firm="MOBICELL", regional="Muntenia", asm="ASM Prahova"),
-    FilterStore(site_code="T001", label="Târgoviște Dâmbovița", firm="MOBIUP", regional="Muntenia", asm="ASM Dâmbovița"),
-    FilterStore(site_code="F001", label="Focșani Mall", firm="MOBICELL", regional="Moldova Sud", asm="ASM Vrancea"),
+    FilterStore(
+        site_code="B001",
+        label="București Plaza",
+        firm="MOBIUP",
+        regional="Andrei Sud",
+        asm="ASM București",
+    ),
+    FilterStore(
+        site_code="B002",
+        label="București ParkLake",
+        firm="MOBIUP",
+        regional="Andrei Sud",
+        asm="ASM București",
+    ),
+    FilterStore(
+        site_code="B003",
+        label="București Sun Plaza",
+        firm="MOBICELL",
+        regional="Andrei Sud",
+        asm="ASM București",
+    ),
+    FilterStore(
+        site_code="C001",
+        label="Constanța City",
+        firm="MOBIUP",
+        regional="Dobrogea",
+        asm="ASM Constanța",
+    ),
+    FilterStore(
+        site_code="C002",
+        label="Constanța VIVO",
+        firm="MOBICELL",
+        regional="Dobrogea",
+        asm="ASM Constanța",
+    ),
+    FilterStore(
+        site_code="G001",
+        label="Galați Shopping",
+        firm="MOBIUP",
+        regional="Dobrogea",
+        asm="ASM Galați",
+    ),
+    FilterStore(
+        site_code="BZR1",
+        label="Buzău Aurora",
+        firm="MOBICELL",
+        regional="Moldova Sud",
+        asm="ASM Buzău",
+    ),
+    FilterStore(
+        site_code="BR01",
+        label="Brăila Mall",
+        firm="MOBIUP",
+        regional="Moldova Sud",
+        asm="ASM Brăila",
+    ),
+    FilterStore(
+        site_code="P001",
+        label="Ploiești Shopping",
+        firm="MOBIUP",
+        regional="Muntenia",
+        asm="ASM Prahova",
+    ),
+    FilterStore(
+        site_code="P002",
+        label="Ploiești AFI",
+        firm="MOBICELL",
+        regional="Muntenia",
+        asm="ASM Prahova",
+    ),
+    FilterStore(
+        site_code="T001",
+        label="Târgoviște Dâmbovița",
+        firm="MOBIUP",
+        regional="Muntenia",
+        asm="ASM Dâmbovița",
+    ),
+    FilterStore(
+        site_code="F001",
+        label="Focșani Mall",
+        firm="MOBICELL",
+        regional="Moldova Sud",
+        asm="ASM Vrancea",
+    ),
 )
 
 DEMO_AGENTS: tuple[FilterAgent, ...] = tuple(
@@ -149,12 +220,8 @@ class DemoAnalyticsRepository:
             if cutoff_day > 0 and not is_final
             else total_sales
         )
-        target_progress = (
-            _percent(total_sales * Decimal("100") / target_total) if target_total > 0 else None
-        )
-        forecast_progress = (
-            _percent(forecast * Decimal("100") / target_total) if target_total > 0 else None
-        )
+        target_progress = _percent(total_sales * Decimal("100") / target_total) if target_total > 0 else None
+        forecast_progress = _percent(forecast * Decimal("100") / target_total) if target_total > 0 else None
 
         comparison_factor = Decimal(str(rng.uniform(0.89, 1.08)))
         previous_sales = _money(total_sales / comparison_factor) if comparison_factor else Decimal(0)
@@ -223,11 +290,7 @@ class DemoAnalyticsRepository:
                     unit=MetricUnit.CURRENCY,
                     delta_pct=sales_delta if previous_period(scope.period, scope.comparison) else None,
                     delta_label="față de reper",
-                    risk=(
-                        RiskLevel.HEALTHY
-                        if sales_delta is not None and sales_delta >= 0
-                        else RiskLevel.WATCH
-                    ),
+                    risk=(RiskLevel.HEALTHY if sales_delta is not None and sales_delta >= 0 else RiskLevel.WATCH),
                     supporting_value=_money(total_sales / Decimal(max(cutoff_day, 1))),
                     supporting_label="Medie / zi acoperită",
                 ),
@@ -254,11 +317,7 @@ class DemoAnalyticsRepository:
                     label="Bonuri 2+",
                     value=receipt_2plus_pct,
                     unit=MetricUnit.PERCENT,
-                    risk=(
-                        RiskLevel.HEALTHY
-                        if receipt_2plus_pct >= Decimal("32")
-                        else RiskLevel.WATCH
-                    ),
+                    risk=(RiskLevel.HEALTHY if receipt_2plus_pct >= Decimal("32") else RiskLevel.WATCH),
                     supporting_value=Decimal(receipt_count),
                     supporting_label="Bonuri totale",
                 ),
@@ -282,9 +341,7 @@ class DemoAnalyticsRepository:
         if scope.asm:
             stores = [store for store in stores if store.asm == scope.asm]
         if scope.agent:
-            site_codes = {
-                agent.site_code for agent in DEMO_AGENTS if agent.name == scope.agent
-            }
+            site_codes = {agent.site_code for agent in DEMO_AGENTS if agent.name == scope.agent}
             stores = [store for store in stores if store.site_code in site_codes]
         return stores
 
@@ -369,11 +426,7 @@ class DemoAnalyticsRepository:
             alerts.append(
                 InsightAlert(
                     id="forecast-gap",
-                    severity=(
-                        AlertSeverity.CRITICAL
-                        if forecast_progress < Decimal("85")
-                        else AlertSeverity.WARNING
-                    ),
+                    severity=(AlertSeverity.CRITICAL if forecast_progress < Decimal("85") else AlertSeverity.WARNING),
                     title="Forecast sub target",
                     description=(
                         f"Run-rate-ul curent indică {forecast_progress}% din target. "
@@ -388,9 +441,7 @@ class DemoAnalyticsRepository:
                         id=f"store-risk-{row.id}",
                         severity=AlertSeverity.WARNING,
                         title="Magazin sub ritmul necesar",
-                        description=(
-                            f"Realizarea este {row.progress_pct}% pentru perioada acoperită."
-                        ),
+                        description=(f"Realizarea este {row.progress_pct}% pentru perioada acoperită."),
                         entity_label=row.label,
                     )
                 )

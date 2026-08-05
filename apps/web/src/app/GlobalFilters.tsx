@@ -85,9 +85,7 @@ function StoreMultiSelect({
   const selectedSet = useMemo(() => new Set(selected), [selected]);
   const normalizedSearch = search.trim().toLocaleLowerCase('ro-RO');
   const filtered = stores.filter((store) =>
-    `${store.label} ${store.site_code}`
-      .toLocaleLowerCase('ro-RO')
-      .includes(normalizedSearch),
+    `${store.label} ${store.site_code}`.toLocaleLowerCase('ro-RO').includes(normalizedSearch),
   );
 
   return (
@@ -214,7 +212,7 @@ export function GlobalFilters() {
   const count = activeFilterCount(search);
 
   return (
-    <div className="global-filters" aria-label="Filtre globale">
+    <div className="global-filters">
       <div className="filter-heading" title={`${count} filtre business active`}>
         <Filter size={16} />
         {count > 0 ? <span>{count}</span> : null}

@@ -10,14 +10,16 @@ from unihub_insight_api.domain import (
     DashboardListResponse,
     DashboardUpdateRequest,
 )
-from unihub_insight_api.repositories.dashboards import DashboardConflictError, DashboardNotFoundError
+from unihub_insight_api.repositories.dashboards import (
+    DashboardConflictError,
+    DashboardNotFoundError,
+)
 from unihub_insight_api.services.dashboard_validation import (
     DashboardCapabilityError,
     DashboardValidationError,
     user_can_read,
     validate_dashboard,
 )
-
 
 router = APIRouter(prefix="/api/v1/dashboards", tags=["dashboards"])
 
@@ -45,13 +47,17 @@ async def list_dashboards(store: DashboardStoreDependency, user: AnalyticsUserDe
 
 
 @router.post("", response_model=DashboardDocument, status_code=status.HTTP_201_CREATED)
-async def create_dashboard(request: DashboardCreateRequest, store: DashboardStoreDependency, user: AnalyticsUserDependency) -> DashboardDocument:
+async def create_dashboard(
+    request: DashboardCreateRequest, store: DashboardStoreDependency, user: AnalyticsUserDependency
+) -> DashboardDocument:
     _validate(request, user)
     return await store.create(user.subject, request)
 
 
 @router.get("/{dashboard_id}", response_model=DashboardDocument)
-async def get_dashboard(dashboard_id: str, store: DashboardStoreDependency, user: AnalyticsUserDependency) -> DashboardDocument:
+async def get_dashboard(
+    dashboard_id: str, store: DashboardStoreDependency, user: AnalyticsUserDependency
+) -> DashboardDocument:
     document = await store.get(dashboard_id)
     if document is None or not user_can_read(document, user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dashboard not found.")
@@ -59,7 +65,12 @@ async def get_dashboard(dashboard_id: str, store: DashboardStoreDependency, user
 
 
 @router.put("/{dashboard_id}", response_model=DashboardDocument)
-async def update_dashboard(dashboard_id: str, request: DashboardUpdateRequest, store: DashboardStoreDependency, user: AnalyticsUserDependency) -> DashboardDocument:
+async def update_dashboard(
+    dashboard_id: str,
+    request: DashboardUpdateRequest,
+    store: DashboardStoreDependency,
+    user: AnalyticsUserDependency,
+) -> DashboardDocument:
     current = await store.get(dashboard_id)
     if current is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dashboard not found.")
@@ -69,13 +80,18 @@ async def update_dashboard(dashboard_id: str, request: DashboardUpdateRequest, s
     try:
         return await store.update(dashboard_id, request)
     except DashboardConflictError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Dashboard was modified by another request.") from exc
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Dashboard was modified by another request.",
+        ) from exc
     except DashboardNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dashboard not found.") from exc
 
 
 @router.delete("/{dashboard_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_dashboard(dashboard_id: str, store: DashboardStoreDependency, user: AnalyticsUserDependency) -> Response:
+async def delete_dashboard(
+    dashboard_id: str, store: DashboardStoreDependency, user: AnalyticsUserDependency
+) -> Response:
     current = await store.get(dashboard_id)
     if current is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dashboard not found.")

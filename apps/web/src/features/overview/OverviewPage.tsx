@@ -5,7 +5,9 @@ import { useMemo, useState } from 'react';
 import { useGlobalSearch } from '../../app/search-hooks';
 import { DashboardCanvas } from '../../components/dashboard/DashboardCanvas';
 import { ErrorState } from '../../components/ui/ErrorState';
+import { ExcelExportButton } from '../../components/ui/ExcelExportButton';
 import { LoadingState } from '../../components/ui/LoadingState';
+import { analyticsSearchParams } from '../../lib/download';
 import { formatDate, formatMonth } from '../../lib/format';
 import { currentBusinessMonth } from '../../lib/search';
 import { overviewQuery } from './api';
@@ -41,9 +43,16 @@ export function OverviewPage() {
           <span className={`meta-chip data-mode data-mode--${data.meta.data_mode}`}>
             {data.meta.data_mode === 'demo' ? 'Date demo deterministe' : 'PostgreSQL live'}
           </span>
-          {overview.isFetching ? <span className="meta-chip meta-chip--sync">Actualizare…</span> : null}
+          {overview.isFetching ? (
+            <span className="meta-chip meta-chip--sync">Actualizare…</span>
+          ) : null}
         </div>
         <div className="overview-actions">
+          <ExcelExportButton
+            path="/exports/overview.xlsx"
+            params={analyticsSearchParams(queryInput)}
+            filename={`overview-${period}.xlsx`}
+          />
           <button
             type="button"
             className="button button--secondary"
@@ -76,8 +85,8 @@ export function OverviewPage() {
       {editMode ? (
         <div className="edit-notice">
           <LayoutGrid size={16} />
-          Trage cardurile din antet și redimensionează-le din margini. Layoutul se salvează
-          local automat.
+          Trage cardurile din antet și redimensionează-le din margini. Layoutul se salvează local
+          automat.
         </div>
       ) : null}
 

@@ -8,6 +8,7 @@ import { router } from './router';
 import './styles.css';
 import './features.css';
 import './dashboard-editor.css';
+import './monthly-review.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Root element #root is missing.');
