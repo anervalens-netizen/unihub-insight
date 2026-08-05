@@ -20,6 +20,7 @@
     "typecheck": "npm --workspace @unihub-insight/web run typecheck && uv run --project apps/api mypy --config-file apps/api/pyproject.toml apps/api/src",
     "test": "npm --workspace @unihub-insight/web run test && uv run --project apps/api pytest apps/api/tests",
     "build": "npm --workspace @unihub-insight/web run build",
+    "bundle:check": "node scripts/check-bundle.mjs",
     "verify": "bash scripts/verify.sh"
   }
 }

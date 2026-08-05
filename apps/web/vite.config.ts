@@ -16,7 +16,8 @@ export default defineConfig({
     sourcemap: true,
     cssCodeSplit: true,
     reportCompressedSize: true,
-    chunkSizeWarningLimit: 550,
+    // Minified size is not a transfer-cost proxy; scripts/check-bundle.mjs enforces gzip budgets.
+    chunkSizeWarningLimit: 750,
     rollupOptions: {
       output: {
         manualChunks(id) {
