@@ -39,8 +39,15 @@ jobs:
           npm ci --ignore-scripts
           uv sync --project apps/api --frozen --all-groups
 
-      - name: Apply Python lint fixes
-        run: uv run --project apps/api ruff check --fix apps/api/src apps/api/tests
+      - name: Apply Python lint fixes and capture diagnostics
+        shell: bash
+        run: |
+          set +e
+          uv run --project apps/api ruff check --fix apps/api/src apps/api/tests > ruff-output.txt 2>&1
+          status=$?
+          cat ruff-output.txt
+          echo "$status" > /tmp/ruff-status
+          exit 0
 
       - name: Format and verify
         shell: bash
@@ -60,7 +67,7 @@ jobs:
           status="$(cat /tmp/verify-status)"
           rm -f .github/workflows/monthly-review-autofix.yml
           if [[ "$status" == "0" ]]; then
-            rm -f verification-output.txt
+            rm -f verification-output.txt ruff-output.txt
           fi
           git add -A
           git config user.name "github-actions[bot]"
