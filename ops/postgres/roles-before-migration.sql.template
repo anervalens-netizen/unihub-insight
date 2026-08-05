@@ -6,10 +6,11 @@ ALTER ROLE unihub_insight_reader SET default_transaction_read_only = on;
 ALTER ROLE unihub_insight_reader SET statement_timeout = '2500ms';
 ALTER ROLE unihub_insight_reader SET lock_timeout = '1000ms';
 GRANT CONNECT ON DATABASE unihub TO unihub_insight_reader;
-GRANT USAGE ON SCHEMA public TO unihub_insight_reader;
+GRANT USAGE ON SCHEMA public, insight TO unihub_insight_reader;
 GRANT SELECT ON TABLE
     reporting_agent_day,
     reporting_agent_month,
+    reporting_item_month,
     reporting_category_month,
     reporting_focus_item_month,
     reporting_agent_profile,
@@ -31,7 +32,10 @@ CREATE ROLE unihub_insight_migrator LOGIN PASSWORD 'REPLACE_MIGRATOR_PASSWORD';
 ALTER ROLE unihub_insight_migrator SET statement_timeout = '30s';
 ALTER ROLE unihub_insight_migrator SET lock_timeout = '5s';
 GRANT CONNECT, CREATE ON DATABASE unihub TO unihub_insight_migrator;
-GRANT USAGE ON SCHEMA public TO unihub_insight_migrator;
+GRANT USAGE, CREATE ON SCHEMA public TO unihub_insight_migrator;
+-- Required only to define the governed monthly aggregate view. The API reader
+-- never receives direct access to raw transactions.
+GRANT SELECT ON TABLE sales_transactions TO unihub_insight_migrator;
 
 CREATE ROLE unihub_insight_metadata LOGIN PASSWORD 'REPLACE_METADATA_PASSWORD';
 ALTER ROLE unihub_insight_metadata SET statement_timeout = '2500ms';
