@@ -3,6 +3,7 @@ import { ChevronsLeft, ChevronsRight, ExternalLink } from 'lucide-react';
 
 import type { Capability } from '../features/identity/schemas';
 import { environment } from '../lib/environment';
+import { globalSearchSchema } from '../lib/search';
 import { navigationItems } from './navigation';
 
 export function Sidebar({
@@ -33,7 +34,7 @@ export function Sidebar({
             <Link
               key={item.to}
               to={item.to}
-              search={true}
+              search={(previous) => globalSearchSchema.parse(previous)}
               activeOptions={{ exact: item.to === '/' }}
               className="nav-link"
               activeProps={{ className: 'nav-link nav-link--active' }}
