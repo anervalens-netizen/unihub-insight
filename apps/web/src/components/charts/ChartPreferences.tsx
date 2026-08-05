@@ -2,6 +2,7 @@ import { Check, Palette, RotateCcw, SlidersHorizontal, X } from 'lucide-react';
 import {
   createContext,
   type ReactNode,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -85,20 +86,20 @@ export function ChartPreferencesProvider({
   children: ReactNode;
 }) {
   const [preferences, setPreferences] = useState(readPreferences);
-  const update = (patch: Partial<ChartPreferences>): void => {
+  const update = useCallback((patch: Partial<ChartPreferences>): void => {
     setPreferences((current) => {
       const next = { ...current, ...patch };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       return next;
     });
-  };
-  const reset = (): void => {
+  }, []);
+  const reset = useCallback((): void => {
     localStorage.removeItem(STORAGE_KEY);
     setPreferences(DEFAULT_PREFERENCES);
-  };
+  }, []);
   const value = useMemo(
     () => ({ theme, preferences, update, reset }),
-    [preferences, theme],
+    [preferences, reset, theme, update],
   );
   return (
     <ChartPreferencesContext.Provider value={value}>
@@ -190,14 +191,14 @@ export function ChartPreferencesButton() {
     const close = (event: MouseEvent): void => {
       if (!hostRef.current?.contains(event.target as Node)) setOpen(false);
     };
-    const escape = (event: KeyboardEvent): void => {
+    const handleEscape = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') setOpen(false);
     };
     document.addEventListener('mousedown', close);
-    window.addEventListener('keydown', escape);
+    window.addEventListener('keydown', handleEscape);
     return () => {
       document.removeEventListener('mousedown', close);
-      window.removeEventListener('keydown', escape);
+      window.removeEventListener('keydown', handleEscape);
     };
   }, [open]);
 
@@ -260,10 +261,12 @@ export function ChartPreferencesButton() {
 
           <div className="chart-pref-section">
             <h3>Densitate</h3>
-            <div className="chart-pref-segmented" role="group" aria-label="Densitate grafice">
+            <fieldset className="chart-pref-segmented">
+              <legend>Densitate grafice</legend>
               <button
                 type="button"
                 className={preferences.density === 'comfortable' ? 'is-active' : ''}
+                aria-pressed={preferences.density === 'comfortable'}
                 onClick={() => update({ density: 'comfortable' })}
               >
                 Aerisit
@@ -271,11 +274,12 @@ export function ChartPreferencesButton() {
               <button
                 type="button"
                 className={preferences.density === 'compact' ? 'is-active' : ''}
+                aria-pressed={preferences.density === 'compact'}
                 onClick={() => update({ density: 'compact' })}
               >
                 Compact
               </button>
-            </div>
+            </fieldset>
           </div>
 
           <div className="chart-pref-section chart-pref-toggles">
