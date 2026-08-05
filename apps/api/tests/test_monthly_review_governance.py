@@ -83,7 +83,8 @@ def test_review_periods_are_strictly_bounded() -> None:
     )
     with pytest.raises(ValueError, match="bounded"):
         validate_review_periods(
-            [f"2025-{month:02d}" for month in range(1, 13)] + ["2024-01", "2024-02", "2024-03", "2024-04", "2024-05"]
+            [f"2025-{month:02d}" for month in range(1, 13)]
+            + ["2024-01", "2024-02", "2024-03", "2024-04", "2024-05"]
         )
     with pytest.raises(ValueError, match="YYYY-MM"):
         validate_review_periods(["2026-13"])
@@ -105,6 +106,20 @@ def test_active_repository_uses_reporting_models_not_raw_transactions() -> None:
     app_source = inspect.getsource(create_app)
     assert "ReportingMonthlyReviewRepository" in app_source
     assert "PostgresMonthlyReviewRepository(" not in app_source
+
+
+def test_monthly_targets_are_aggregated_before_joining() -> None:
+    store_source = inspect.getsource(ReportingMonthlyReviewRepository._review_store_rows)
+    agent_source = inspect.getsource(ReportingMonthlyReviewRepository._review_agent_rows)
+    combined = f"{store_source}\n{agent_source}"
+
+    assert combined.count("SUM(target.target_value) AS target_value") >= 3
+    assert "GROUP BY target.import_month, target.site_code" in store_source
+    assert "GROUP BY\n                        target.import_month,\n                        target.site_code,\n                        target.agent" in agent_source
+    assert "LEFT JOIN targets USING (import_month, site_code)" in store_source
+    assert "LEFT JOIN targets USING (import_month, site_code, agent)" in agent_source
+    assert "LEFT JOIN agent_targets target USING" not in combined
+    assert "LEFT JOIN store_targets store_target" not in combined
 
 
 def test_governed_supplement_view_is_security_bounded() -> None:
