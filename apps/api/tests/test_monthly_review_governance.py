@@ -42,9 +42,7 @@ def test_scoring_contract_matches_runtime_formula() -> None:
 
     target_component = min(max(target_pct / Decimal("1.2"), 0), 100)
     yoy_component = min(max(Decimal("50") + yoy_pct * Decimal("1.8"), 0), 100)
-    recent_component = min(
-        max(Decimal("50") + recent_pct * Decimal("2.2"), 0), 100
-    )
+    recent_component = min(max(Decimal("50") + recent_pct * Decimal("2.2"), 0), 100)
     expected = (
         target_component * contract.target_weight
         + yoy_component * contract.yoy_weight
@@ -52,12 +50,15 @@ def test_scoring_contract_matches_runtime_formula() -> None:
         + consistency * contract.consistency_weight
     ).quantize(Decimal("0.01"))
 
-    assert score_entity(
-        target_pct=target_pct,
-        yoy_pct=yoy_pct,
-        recent_pct=recent_pct,
-        consistency=consistency,
-    ) == expected
+    assert (
+        score_entity(
+            target_pct=target_pct,
+            yoy_pct=yoy_pct,
+            recent_pct=recent_pct,
+            consistency=consistency,
+        )
+        == expected
+    )
     assert "receipts_effect" in MONTHLY_REVIEW_DRIVER_FORMULA
 
 
@@ -82,8 +83,7 @@ def test_review_periods_are_strictly_bounded() -> None:
     )
     with pytest.raises(ValueError, match="bounded"):
         validate_review_periods(
-            [f"2025-{month:02d}" for month in range(1, 13)]
-            + ["2024-01", "2024-02", "2024-03", "2024-04", "2024-05"]
+            [f"2025-{month:02d}" for month in range(1, 13)] + ["2024-01", "2024-02", "2024-03", "2024-04", "2024-05"]
         )
     with pytest.raises(ValueError, match="YYYY-MM"):
         validate_review_periods(["2026-13"])
@@ -108,9 +108,7 @@ def test_active_repository_uses_reporting_models_not_raw_transactions() -> None:
 
 
 def test_governed_supplement_view_is_security_bounded() -> None:
-    migration = Path("apps/api/migrations/002_monthly_review_item_month.sql").read_text(
-        encoding="utf-8"
-    )
+    migration = Path("apps/api/migrations/002_monthly_review_item_month.sql").read_text(encoding="utf-8")
     assert "security_barrier = true" in migration
     assert "WHERE NOT sale.is_cartela" in migration
     assert "GRANT SELECT ON insight.monthly_review_item_month" in migration

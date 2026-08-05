@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 import asyncpg
 
@@ -10,7 +10,6 @@ from unihub_insight_api.domain import AnalyticsScope, OverviewMeta
 from unihub_insight_api.repositories.monthly_review import (
     PostgresMonthlyReviewRepository,
 )
-
 
 MAX_REVIEW_PERIODS = 16
 MAX_PRODUCT_CANDIDATES = 500
@@ -22,9 +21,7 @@ def validate_review_periods(periods: Sequence[str]) -> tuple[str, ...]:
     if not normalized:
         raise ValueError("At least one review period is required")
     if len(normalized) > MAX_REVIEW_PERIODS:
-        raise ValueError(
-            f"Monthly review is bounded to {MAX_REVIEW_PERIODS} distinct months"
-        )
+        raise ValueError(f"Monthly review is bounded to {MAX_REVIEW_PERIODS} distinct months")
     if any(_PERIOD_PATTERN.fullmatch(period) is None for period in normalized):
         raise ValueError("Monthly review periods must use YYYY-MM")
     return normalized
@@ -43,12 +40,7 @@ class ReportingMonthlyReviewRepository(PostgresMonthlyReviewRepository):
     async def _meta_for_review(self, scope: AnalyticsScope) -> OverviewMeta:
         meta = await super()._meta_for_review(scope)
         return meta.model_copy(
-            update={
-                "source": (
-                    "reporting_agent_month/reporting_item_month/"
-                    "insight.monthly_review_item_month"
-                )
-            }
+            update={"source": ("reporting_agent_month/reporting_item_month/insight.monthly_review_item_month")}
         )
 
     async def _review_store_rows(
@@ -65,9 +57,7 @@ class ReportingMonthlyReviewRepository(PostgresMonthlyReviewRepository):
             params.append(scope.agent)
             agent_parameter = len(params)
             agent_filter_core = f"AND fact.agent = ${agent_parameter}"
-            agent_filter_supplement = (
-                f"AND supplement.agent = ${agent_parameter}"
-            )
+            agent_filter_supplement = f"AND supplement.agent = ${agent_parameter}"
             target_expression = "agent_target.target_value"
             target_join = f"""
                 LEFT JOIN agent_targets agent_target
@@ -85,8 +75,10 @@ class ReportingMonthlyReviewRepository(PostgresMonthlyReviewRepository):
         where_scope = " AND ".join(clauses)
 
         async with self.pool.acquire() as connection:
-            return await connection.fetch(
-                f"""
+            return cast(
+                Sequence[asyncpg.Record],
+                await connection.fetch(
+                    f"""
                 WITH eligible AS MATERIALIZED (
                     SELECT
                         store.site_code,
@@ -151,7 +143,8 @@ class ReportingMonthlyReviewRepository(PostgresMonthlyReviewRepository):
                 {target_join}
                 ORDER BY requested.import_month, eligible.site_code
                 """,
-                *params,
+                    *params,
+                ),
             )
 
     async def _review_agent_rows(
@@ -168,14 +161,14 @@ class ReportingMonthlyReviewRepository(PostgresMonthlyReviewRepository):
             params.append(scope.agent)
             agent_parameter = len(params)
             agent_filter_core = f"AND fact.agent = ${agent_parameter}"
-            agent_filter_supplement = (
-                f"AND supplement.agent = ${agent_parameter}"
-            )
+            agent_filter_supplement = f"AND supplement.agent = ${agent_parameter}"
         where_scope = " AND ".join(clauses)
 
         async with self.pool.acquire() as connection:
-            return await connection.fetch(
-                f"""
+            return cast(
+                Sequence[asyncpg.Record],
+                await connection.fetch(
+                    f"""
                 WITH eligible AS MATERIALIZED (
                     SELECT
                         store.site_code,
@@ -242,7 +235,8 @@ class ReportingMonthlyReviewRepository(PostgresMonthlyReviewRepository):
                 LEFT JOIN agent_targets target USING (import_month, site_code, agent)
                 ORDER BY core.import_month, core.site_code, core.agent
                 """,
-                *params,
+                    *params,
+                ),
             )
 
     async def _review_product_rows(
@@ -259,14 +253,14 @@ class ReportingMonthlyReviewRepository(PostgresMonthlyReviewRepository):
             params.append(scope.agent)
             agent_parameter = len(params)
             agent_filter_core = f"AND fact.agent = ${agent_parameter}"
-            agent_filter_supplement = (
-                f"AND supplement.agent = ${agent_parameter}"
-            )
+            agent_filter_supplement = f"AND supplement.agent = ${agent_parameter}"
         where_scope = " AND ".join(clauses)
 
         async with self.pool.acquire() as connection:
-            return await connection.fetch(
-                f"""
+            return cast(
+                Sequence[asyncpg.Record],
+                await connection.fetch(
+                    f"""
                 WITH eligible AS MATERIALIZED (
                     SELECT
                         store.site_code,
@@ -339,5 +333,6 @@ class ReportingMonthlyReviewRepository(PostgresMonthlyReviewRepository):
                 LEFT JOIN supplement USING (import_month, item_code)
                 ORDER BY core.import_month, ABS(core.sales) DESC
                 """,
-                *params,
+                    *params,
+                ),
             )

@@ -22,12 +22,7 @@ class MonthlyReviewScoringContract:
 
     @property
     def total_weight(self) -> Decimal:
-        return (
-            self.target_weight
-            + self.yoy_weight
-            + self.recent_weight
-            + self.consistency_weight
-        )
+        return self.target_weight + self.yoy_weight + self.recent_weight + self.consistency_weight
 
 
 MONTHLY_REVIEW_SCORING = MonthlyReviewScoringContract(
@@ -45,8 +40,7 @@ MONTHLY_REVIEW_SCORING = MonthlyReviewScoringContract(
 )
 
 MONTHLY_REVIEW_DRIVER_FORMULA = (
-    "sales_difference = receipts_effect + units_per_receipt_effect "
-    "+ value_per_unit_and_mix_effect"
+    "sales_difference = receipts_effect + units_per_receipt_effect + value_per_unit_and_mix_effect"
 )
 
 

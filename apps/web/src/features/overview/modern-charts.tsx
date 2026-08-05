@@ -1,12 +1,11 @@
 import type { EChartsCoreOption } from 'echarts/core';
 import { useMemo, useState } from 'react';
-
-import { EChart } from '../../components/charts/EChart';
 import {
   ChartTypeSelector,
   type ProfessionalChartType,
 } from '../../components/charts/ChartTypeSelector';
 import { useChartDesign } from '../../components/charts/chart-design';
+import { EChart } from '../../components/charts/EChart';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { formatCurrency } from '../../lib/format';
 import { useOverviewData } from './context';

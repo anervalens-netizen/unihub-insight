@@ -30,10 +30,7 @@ export interface ChartDesign {
 
 type PlainRecord = Record<string, unknown>;
 
-const paletteDefinitions: Record<
-  ChartPalette,
-  { light: string[]; dark: string[] }
-> = {
+const paletteDefinitions: Record<ChartPalette, { light: string[]; dark: string[] }> = {
   executive: {
     light: ['#4f46e5', '#0f766e', '#d97706', '#be123c', '#2563eb', '#7c3aed', '#0891b2'],
     dark: ['#818cf8', '#5eead4', '#fbbf24', '#fb7185', '#60a5fa', '#c4b5fd', '#67e8f9'],
@@ -65,10 +62,7 @@ function withAlpha(hex: string, alpha: number): string {
   return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 }
 
-export function createChartDesign(
-  theme: AppTheme,
-  preferences: ChartPreferences,
-): ChartDesign {
+export function createChartDesign(theme: AppTheme, preferences: ChartPreferences): ChartDesign {
   const palette = paletteDefinitions[preferences.palette][theme];
   const dark = theme === 'dark';
   return {

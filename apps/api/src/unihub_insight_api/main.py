@@ -47,9 +47,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.metadata_pool = None
         if resolved_settings.data_mode == "postgres":
             app.state.pool = await create_pool(resolved_settings)
-            app.state.analytics_repository = ReportingMonthlyReviewRepository(
-                app.state.pool
-            )
+            app.state.analytics_repository = ReportingMonthlyReviewRepository(app.state.pool)
         else:
             app.state.analytics_repository = DemoMonthlyReviewRepository()
         if resolved_settings.metadata_database_url:

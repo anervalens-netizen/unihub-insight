@@ -47,26 +47,16 @@ function readPreferences(): ChartPreferences {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_PREFERENCES;
     const value = JSON.parse(raw) as Partial<ChartPreferences>;
-    const palettes: ChartPalette[] = [
-      'executive',
-      'ocean',
-      'vibrant',
-      'accessible',
-      'monochrome',
-    ];
+    const palettes: ChartPalette[] = ['executive', 'ocean', 'vibrant', 'accessible', 'monochrome'];
     return {
       palette: palettes.includes(value.palette as ChartPalette)
         ? (value.palette as ChartPalette)
         : DEFAULT_PREFERENCES.palette,
       density: value.density === 'compact' ? 'compact' : 'comfortable',
       showLegend:
-        typeof value.showLegend === 'boolean'
-          ? value.showLegend
-          : DEFAULT_PREFERENCES.showLegend,
+        typeof value.showLegend === 'boolean' ? value.showLegend : DEFAULT_PREFERENCES.showLegend,
       showLabels:
-        typeof value.showLabels === 'boolean'
-          ? value.showLabels
-          : DEFAULT_PREFERENCES.showLabels,
+        typeof value.showLabels === 'boolean' ? value.showLabels : DEFAULT_PREFERENCES.showLabels,
       animate: typeof value.animate === 'boolean' ? value.animate : DEFAULT_PREFERENCES.animate,
       smoothLines:
         typeof value.smoothLines === 'boolean'
@@ -102,9 +92,7 @@ export function ChartPreferencesProvider({
     [preferences, reset, theme, update],
   );
   return (
-    <ChartPreferencesContext.Provider value={value}>
-      {children}
-    </ChartPreferencesContext.Provider>
+    <ChartPreferencesContext.Provider value={value}>{children}</ChartPreferencesContext.Provider>
   );
 }
 
