@@ -43,8 +43,10 @@ jobs:
       - name: Install API dependencies
         run: uv sync --project apps/api --all-groups
 
-      - name: Normalize formatting
-        run: npm run format
+      - name: Normalize source
+        run: |
+          npm run format
+          uv run --project apps/api ruff check --fix apps/api/src apps/api/tests
 
       - name: Verify source
         run: npm run verify
