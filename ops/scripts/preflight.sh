@@ -56,6 +56,12 @@ done
 
 psql "$UNIHUB_INSIGHT_DATABASE_URL" -Atqc \
   "SELECT current_setting('transaction_read_only')" | grep -qx on
+psql "$UNIHUB_INSIGHT_DATABASE_URL" -Atqc \
+  "SELECT has_table_privilege(current_user, 'insight.monthly_review_item_month', 'SELECT')" \
+  | grep -qx t
+psql "$UNIHUB_INSIGHT_DATABASE_URL" -Atqc \
+  "SELECT has_table_privilege(current_user, 'public.sales_transactions', 'SELECT')" \
+  | grep -qx f
 psql "$UNIHUB_INSIGHT_METADATA_DATABASE_URL" -Atqc \
   "SELECT has_database_privilege(current_user, current_database(), 'CONNECT')" | grep -qx t
 
