@@ -1,15 +1,15 @@
 name: Fix Monthly Review Mypy
 
 on:
-  pull_request:
-    branches: [main]
-    types: [synchronize]
+  push:
+    branches:
+      - feat/monthly-performance-review
 
 permissions:
   contents: write
 
 concurrency:
-  group: monthly-review-mypy-${{ github.event.pull_request.number }}
+  group: monthly-review-mypy
   cancel-in-progress: false
 
 jobs:
@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ github.head_ref }}
+          ref: feat/monthly-performance-review
           fetch-depth: 0
 
       - uses: actions/setup-node@v5
@@ -87,4 +87,4 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "fix: complete monthly review type verification"
-          git push origin "HEAD:${{ github.head_ref }}"
+          git push origin HEAD:feat/monthly-performance-review
