@@ -18,14 +18,22 @@ export default defineConfig({
     reportCompressedSize: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom'],
-          'vendor-tanstack': [
-            '@tanstack/react-query',
-            '@tanstack/react-router',
-            '@tanstack/react-table',
-          ],
-          'vendor-grid': ['gridstack'],
+        manualChunks(id) {
+          const normalized = id.replaceAll('\\', '/');
+          if (!normalized.includes('/node_modules/')) return undefined;
+          if (
+            normalized.includes('/react/') ||
+            normalized.includes('/react-dom/') ||
+            normalized.includes('/scheduler/')
+          ) {
+            return 'vendor-react';
+          }
+          if (normalized.includes('/@tanstack/')) return 'vendor-tanstack';
+          if (normalized.includes('/gridstack/')) return 'vendor-grid';
+          if (normalized.includes('/echarts/') || normalized.includes('/zrender/')) {
+            return 'vendor-charts';
+          }
+          return 'vendor';
         },
       },
     },
