@@ -3,6 +3,10 @@ import { Outlet, useLocation } from '@tanstack/react-router';
 import { Laptop, Moon, Sun } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+import {
+  ChartPreferencesButton,
+  ChartPreferencesProvider,
+} from '../components/charts/ChartPreferences';
 import { ErrorState } from '../components/ui/ErrorState';
 import { LoadingState } from '../components/ui/LoadingState';
 import { identityQuery } from '../features/identity/api';
@@ -52,50 +56,56 @@ export function AppShell() {
       />
     );
   const user = identity.data;
+  const theme = dark ? 'dark' : 'light';
   return (
     <IdentityProvider user={user}>
-      <div className="app-root">
-        <div className="desktop-warning">
-          <Laptop size={24} />
-          <strong>UniHub Insight este optimizat pentru desktop</strong>
-          <span>Folosește o fereastră de minimum 1180 px pentru analiza completă.</span>
-        </div>
-        <Sidebar
-          collapsed={collapsed}
-          onToggle={() => setCollapsed(!collapsed)}
-          capabilities={user.capabilities}
-        />
-        <div className="workspace">
-          <header className="topbar">
-            <div className="page-identity">
-              <span>Retail Intelligence</span>
-              <h1>{metadata.title}</h1>
-              <p>{metadata.description}</p>
-            </div>
-            <div className="topbar-actions">
-              <div className="identity-summary">
-                <strong>{user.name ?? user.email ?? user.subject}</strong>
-                <span>
-                  {user.is_demo ? 'Demo administrator' : `${user.capabilities.length} capabilități`}
-                </span>
+      <ChartPreferencesProvider theme={theme}>
+        <div className="app-root">
+          <div className="desktop-warning">
+            <Laptop size={24} />
+            <strong>UniHub Insight este optimizat pentru desktop</strong>
+            <span>Folosește o fereastră de minimum 1180 px pentru analiza completă.</span>
+          </div>
+          <Sidebar
+            collapsed={collapsed}
+            onToggle={() => setCollapsed(!collapsed)}
+            capabilities={user.capabilities}
+          />
+          <div className="workspace">
+            <header className="topbar">
+              <div className="page-identity">
+                <span>Retail Intelligence</span>
+                <h1>{metadata.title}</h1>
+                <p>{metadata.description}</p>
               </div>
-              <span className="environment-badge">v0.4</span>
-              <button
-                type="button"
-                className="icon-button icon-button--topbar"
-                onClick={() => setDark(!dark)}
-                aria-label={dark ? 'Folosește tema luminoasă' : 'Folosește tema întunecată'}
-              >
-                {dark ? <Sun size={17} /> : <Moon size={17} />}
-              </button>
-            </div>
-          </header>
-          <GlobalFilters />
-          <main className="content-canvas">
-            <Outlet />
-          </main>
+              <div className="topbar-actions">
+                <div className="identity-summary">
+                  <strong>{user.name ?? user.email ?? user.subject}</strong>
+                  <span>
+                    {user.is_demo
+                      ? 'Demo administrator'
+                      : `${user.capabilities.length} capabilități`}
+                  </span>
+                </div>
+                <span className="environment-badge">v0.5</span>
+                <ChartPreferencesButton />
+                <button
+                  type="button"
+                  className="icon-button icon-button--topbar"
+                  onClick={() => setDark(!dark)}
+                  aria-label={dark ? 'Folosește tema luminoasă' : 'Folosește tema întunecată'}
+                >
+                  {dark ? <Sun size={17} /> : <Moon size={17} />}
+                </button>
+              </div>
+            </header>
+            <GlobalFilters />
+            <main className="content-canvas">
+              <Outlet />
+            </main>
+          </div>
         </div>
-      </div>
+      </ChartPreferencesProvider>
     </IdentityProvider>
   );
 }
