@@ -44,9 +44,11 @@ def test_metadata_backup_and_restore_enter_only_the_insight_schema_owner() -> No
 def test_readiness_is_private_and_rollback_checks_migration_compatibility_first() -> None:
     caddy = (ROOT / "ops/caddy/unihub-insight.caddy.template").read_text(encoding="utf-8")
     rollback = (ROOT / "ops/scripts/rollback.sh").read_text(encoding="utf-8")
+    compatibility = (ROOT / "ops/scripts/check-release-migrations.sh").read_text(encoding="utf-8")
     deploy = (ROOT / "ops/scripts/deploy-release.sh").read_text(encoding="utf-8")
 
     assert "@insight_diagnostics path /livez /readyz /metrics /ready-metrics" in caddy
     assert "handle /ready-metrics {\n\t\treverse_proxy unix//run/unihub-insight/api.sock" in caddy
     assert rollback.index("check-release-migrations.sh") < rollback.index('ln -sfn "$RELEASE"')
+    assert "SET ROLE unihub_insight_schema_owner" in compatibility
     assert "previous release is incompatible with applied metadata migrations" in deploy

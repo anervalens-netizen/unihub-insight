@@ -21,7 +21,7 @@ set +a
 applied="$({
   printf '%s\n' "$UNIHUB_INSIGHT_MIGRATION_DATABASE_URL" \
     | docker exec -i unihub_postgres sh -eu -c \
-      'IFS= read -r INSIGHT_DSN; export INSIGHT_DSN; exec psql "$INSIGHT_DSN" --no-psqlrc --tuples-only --no-align --command "SELECT version || '\''|'\'' || checksum FROM insight.schema_migrations ORDER BY version"'
+      'IFS= read -r INSIGHT_DSN; export INSIGHT_DSN; exec psql "$INSIGHT_DSN" --no-psqlrc --tuples-only --no-align --command "SET ROLE unihub_insight_schema_owner; SELECT version || '\''|'\'' || checksum FROM insight.schema_migrations ORDER BY version"'
 })"
 
 while IFS='|' read -r version expected_checksum; do
