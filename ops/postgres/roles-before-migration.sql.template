@@ -6,7 +6,7 @@ ALTER ROLE unihub_insight_reader SET default_transaction_read_only = on;
 ALTER ROLE unihub_insight_reader SET statement_timeout = '2500ms';
 ALTER ROLE unihub_insight_reader SET lock_timeout = '1000ms';
 GRANT CONNECT ON DATABASE unihub TO unihub_insight_reader;
-GRANT USAGE ON SCHEMA public, insight TO unihub_insight_reader;
+GRANT USAGE ON SCHEMA public TO unihub_insight_reader;
 GRANT SELECT ON TABLE
     reporting_agent_day,
     reporting_agent_month,
