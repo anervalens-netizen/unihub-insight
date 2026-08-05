@@ -1,4 +1,4 @@
-- job_name: unihub-insight
+- job_name: unihub_insight
   metrics_path: /metrics
   scheme: http
   static_configs:
