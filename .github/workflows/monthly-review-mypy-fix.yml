@@ -1,0 +1,90 @@
+name: Fix Monthly Review Mypy
+
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: monthly-review-mypy-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  fix-verify-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Fix product entity inference
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/api/src/unihub_insight_api/repositories/monthly_review.py')
+          text = path.read_text(encoding='utf-8')
+          old = '''            entity = ProductEntity(product_id, label, brand, category)
+            products.append(
+                product_row(
+                    entity,
+'''
+          new = '''            product_entity = ProductEntity(product_id, label, brand, category)
+            products.append(
+                product_row(
+                    product_entity,
+'''
+          if old not in text:
+              raise RuntimeError('Expected ProductEntity fragment was not found')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+
+      - name: Install dependencies
+        run: |
+          npm ci --ignore-scripts
+          uv sync --project apps/api --frozen --all-groups
+
+      - name: Format and capture verification
+        shell: bash
+        run: |
+          npm run format
+          set +e
+          npm run verify > verification-output.txt 2>&1
+          status=$?
+          cat verification-output.txt
+          echo "$status" > verification-status.txt
+          exit 0
+
+      - name: Publish correction and evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          status="$(cat verification-status.txt)"
+          rm -f .github/workflows/monthly-review-mypy-fix.yml
+          rm -f ruff-output.txt
+          if [[ "$status" == "0" ]]; then
+            rm -f verification-output.txt verification-status.txt
+          fi
+          git add -A
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fix: complete monthly review type verification"
+          git push origin "HEAD:${{ github.head_ref }}"
