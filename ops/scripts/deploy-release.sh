@@ -10,7 +10,17 @@ SOURCE_SHA="${2:?source SHA required}"
 BASE="${UNIHUB_INSIGHT_BASE:-/opt/unihub-insight}"
 RELEASE="$BASE/releases/$SOURCE_SHA"
 CURRENT="$BASE/current"
-PREVIOUS="$(readlink -f "$CURRENT" 2>/dev/null || true)"
+PREVIOUS=""
+if [[ -L "$CURRENT" ]]; then
+  PREVIOUS="$(readlink -f "$CURRENT" 2>/dev/null || true)"
+  [[ -n "$PREVIOUS" && -d "$PREVIOUS" && "$PREVIOUS" != "$CURRENT" ]] || {
+    echo "active release symlink is invalid: $CURRENT" >&2
+    exit 1
+  }
+elif [[ -e "$CURRENT" ]]; then
+  echo "active release path is not a symlink: $CURRENT" >&2
+  exit 1
+fi
 
 SOURCE="$(cd "$SOURCE" && pwd)"
 [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || {

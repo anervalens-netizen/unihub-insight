@@ -30,9 +30,11 @@ restart_api_on_exit() {
 }
 trap restart_api_on_exit EXIT
 
-pg_restore "$UNIHUB_INSIGHT_MIGRATION_DATABASE_URL" \
-  --role=unihub_insight_schema_owner \
-  --clean --if-exists --no-owner --schema=insight "$BACKUP"
+{
+  printf '%s\n' "$UNIHUB_INSIGHT_MIGRATION_DATABASE_URL"
+  command cat "$BACKUP"
+} | docker exec -i unihub_postgres sh -eu -c \
+  'IFS= read -r INSIGHT_DSN; export INSIGHT_DSN; exec pg_restore --dbname="$INSIGHT_DSN" --role=unihub_insight_schema_owner --clean --if-exists --no-owner --schema=insight'
 
 if [[ $api_was_active -eq 1 ]]; then
   systemctl start unihub-insight-api.service

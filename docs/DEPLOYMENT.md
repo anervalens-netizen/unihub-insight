@@ -34,6 +34,8 @@ Install the units from `ops/systemd/` and configure the root-owned `0600` files
 The API unit loads only the first; migrations and backups use only the second.
 The API listens only on Docker's host bridge `172.23.0.1:8100`; PostgreSQL is
 the Docker container `unihub_postgres` published to host `127.0.0.1:5432`.
+Metadata backup/restore runs PostgreSQL 18's `pg_dump`/`pg_restore` inside that
+container, avoiding host-client version drift.
 
 Add `ops/caddy/unihub-insight.caddy.template` to the existing
 `/opt/Mobiup/infra/caddy/Caddyfile`. Add this read-only mount to the existing
