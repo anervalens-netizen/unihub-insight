@@ -44,6 +44,7 @@ This directory contains the complete pre-deploy package. No script executes agai
 6. Run `postgres/metadata-grants-after-migration.sql` only as a compatibility
    check: migration `001` grants metadata CRUD explicitly on `dashboards`.
 7. Run `scripts/preflight.sh` and `scripts/smoke.sh`.
+8. Run `scripts/load-gate.py` through the active release Python environment for the bounded synthetic concurrency gate; keep the seven-day real-traffic SLI verdict separate.
 
 ## Release guarantees
 

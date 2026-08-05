@@ -48,6 +48,19 @@ Chart POC also measures ECharts bundle/chunk, first render, resize, frame time a
 
 Reproducible functional browser coverage runs with `npm run browser:qa`. It does not replace the production RUM/load gate or owner visual acceptance.
 
+Run the bounded synthetic API/concurrency probe on the primary against the private UDS, after loading the root-only runtime environment without printing it:
+
+```bash
+set -a
+source /etc/unihub-insight/insight.env
+set +a
+/opt/unihub-insight/current/apps/api/.venv/bin/python \
+  /opt/unihub-insight/current/ops/scripts/load-gate.py \
+  --period 2026-08 --iterations 20 --concurrency 5
+```
+
+The probe covers Overview, every native module, one 10-widget mixed batch and concurrent inspect/CSV/XLSX traffic. Its JSON is explicitly marked `synthetic`; passing it closes only the bounded concurrency check, never the seven-day/100-real-request RUM and API SLI gate.
+
 ## Failure criteria
 
 - any ordinary request exceeds the hard deadline;
