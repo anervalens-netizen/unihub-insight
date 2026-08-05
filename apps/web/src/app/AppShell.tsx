@@ -28,7 +28,8 @@ function usePersistentBoolean(key: string, initial: boolean): [boolean, (value: 
 }
 
 function useTheme() {
-  const [dark, setDark] = usePersistentBoolean('unihub-insight:dark', false);
+  const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const [dark, setDark] = usePersistentBoolean('unihub-insight:dark', systemDark);
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
   }, [dark]);
