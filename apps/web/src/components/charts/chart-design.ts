@@ -1,3 +1,4 @@
+// biome-ignore-all lint/complexity/useLiteralKeys: ECharts options are traversed as dynamic records under strict TypeScript.
 import type { EChartsCoreOption } from 'echarts/core';
 
 import {
