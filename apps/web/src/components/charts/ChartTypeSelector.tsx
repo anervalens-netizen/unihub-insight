@@ -30,7 +30,8 @@ export function ChartTypeSelector<Type extends ProfessionalChartType>({
 }) {
   if (options.length < 2) return null;
   return (
-    <div className="chart-type-selector" role="group" aria-label={label}>
+    <fieldset className="chart-type-selector">
+      <legend>{label}</legend>
       {options.map((option) => (
         <button
           key={option}
@@ -42,6 +43,6 @@ export function ChartTypeSelector<Type extends ProfessionalChartType>({
           {labels[option]}
         </button>
       ))}
-    </div>
+    </fieldset>
   );
 }
