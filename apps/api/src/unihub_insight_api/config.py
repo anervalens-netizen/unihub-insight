@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "UniHub Insight API"
-    version: str = "0.4.0"
+    version: str = "1.0.0-rc.1"
     environment: Literal["development", "test", "production"] = "development"
     data_mode: Literal["demo", "postgres"] = "demo"
     auth_mode: Literal["demo", "proxy"] = "demo"
@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     db_pool_max_size: int = Field(default=6, ge=2, le=20)
     metadata_pool_max_size: int = Field(default=3, ge=1, le=10)
     statement_timeout_ms: int = Field(default=2500, ge=250, le=5000)
+    batch_deadline_ms: int = Field(default=8000, ge=1000, le=10000)
 
     @model_validator(mode="after")
     def validate_runtime(self) -> Settings:

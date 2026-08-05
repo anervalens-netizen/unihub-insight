@@ -25,6 +25,7 @@ from unihub_insight_api.domain import (
     ModuleId,
     OverviewMeta,
     RiskLevel,
+    SourceDomain,
     TrendPoint,
     ValueAxis,
 )
@@ -342,10 +343,10 @@ def _kpis(module: ModuleId, scope: AnalyticsScope, entity_count: int) -> list[Kp
                 unit=MetricUnit.INTEGER,
             ),
             KpiMetric(
-                id="campaigns.reward_value",
-                label="Discount & recompense",
-                value=_number(focus_sales * Decimal(str(rng.uniform(0.04, 0.09)))),
-                unit=MetricUnit.CURRENCY,
+                id="campaigns.active_products",
+                label="Produse active",
+                value=_number(max(3, round(entity_count * rng.uniform(1.2, 2.1)))),
+                unit=MetricUnit.INTEGER,
             ),
         ]
     if module is ModuleId.WORKFORCE:
@@ -469,9 +470,9 @@ def _kpis(module: ModuleId, scope: AnalyticsScope, entity_count: int) -> list[Kp
             risk=RiskLevel.HEALTHY,
         ),
         KpiMetric(
-            id="planning.upside",
-            label="Scenariu upside",
-            value=_number(forecast * Decimal(str(rng.uniform(1.06, 1.13)))),
+            id="planning.actual",
+            label="Actual disponibil",
+            value=_number(forecast * Decimal(str(rng.uniform(0.86, 1.02)))),
             unit=MetricUnit.CURRENCY,
         ),
     ]
@@ -612,8 +613,29 @@ class DemoInsightRepository(DemoAnalyticsRepository):
     ) -> ModuleAnalyticsResponse:
         profile = PROFILES[module]
         rows = _breakdown(module, scope)
+        snapshot = await self.resolve_snapshot(scope)
+        domain = {
+            ModuleId.SALES: SourceDomain.SALES,
+            ModuleId.PERFORMANCE: SourceDomain.SALES,
+            ModuleId.CAMPAIGNS: SourceDomain.CAMPAIGNS,
+            ModuleId.WORKFORCE: SourceDomain.WORKFORCE,
+            ModuleId.COMPENSATION: SourceDomain.COMPENSATION,
+            ModuleId.FINANCE: SourceDomain.FINANCE,
+            ModuleId.PLANNING: SourceDomain.PLANNING,
+        }[module]
+        source_meta = snapshot.sources[domain.value]
+        meta = _meta(module, scope).model_copy(
+            update={
+                "analytical_snapshot_id": snapshot.id,
+                "snapshot_contract_version": snapshot.contract_version,
+                "sources": {domain: source_meta},
+                "source": source_meta.source,
+                "as_of": source_meta.as_of,
+                "is_final": source_meta.is_final,
+            }
+        )
         return ModuleAnalyticsResponse(
-            meta=_meta(module, scope),
+            meta=meta,
             module=module,
             title=profile.title,
             description=profile.description,

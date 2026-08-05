@@ -1,185 +1,279 @@
-import type { EChartsCoreOption } from 'echarts/core';
 import { useMemo } from 'react';
-
+import type { ChartUrlStateEvent } from '../../components/charts/chart-spec';
+import {
+  buildSafePngExport,
+  chartEventToUrlState,
+  resolveChartSpec,
+} from '../../components/charts/chart-spec';
 import { EChart } from '../../components/charts/EChart';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { ErrorState } from '../../components/ui/ErrorState';
+import { LoadingState } from '../../components/ui/LoadingState';
 import { formatCurrency, formatInteger, formatPercent } from '../../lib/format';
-import type { ModuleAnalytics } from '../modules/schemas';
+import type {
+  DatasetDimension,
+  DatasetValue,
+  MetricDefinition,
+  QueryDataset,
+  WidgetQueryResult,
+} from '../query/schemas';
 import { widgetFilterLabel } from './filter-resolution';
 import type { DashboardWidget } from './schemas';
 
-function format(value: number, unit: string): string {
+function formatNumber(value: number, unit: MetricDefinition['unit']): string {
   if (unit === 'currency') return formatCurrency(value, true);
   if (unit === 'percent') return formatPercent(value);
   if (unit === 'integer') return formatInteger(value);
   return value.toLocaleString('ro-RO', { maximumFractionDigits: 2 });
 }
 
-function ConfiguredChart({ widget, data }: { widget: DashboardWidget; data: ModuleAnalytics }) {
-  const option = useMemo<EChartsCoreOption>(() => {
-    if (widget.visualization === 'donut')
-      return {
-        tooltip: { trigger: 'item' },
-        legend: { bottom: 0, textStyle: { color: '#64748b', fontSize: 10 } },
-        series: [
-          {
-            type: 'pie',
-            radius: ['48%', '72%'],
-            center: ['50%', '43%'],
-            label: { show: false },
-            data: data.distribution.map((row) => ({ name: row.label, value: row.value })),
-          },
-        ],
-      };
-    if (widget.visualization === 'waterfall')
-      return {
-        grid: { top: 12, right: 12, bottom: 40, left: 55 },
-        tooltip: { trigger: 'axis' },
-        xAxis: {
-          type: 'category',
-          data: data.distribution.map((row) => row.label),
-          axisLabel: { rotate: 25, fontSize: 9 },
-        },
-        yAxis: { type: 'value' },
-        series: [
-          {
-            type: 'bar',
-            data: data.distribution.map((row) => row.value),
-            itemStyle: { color: '#4f46e5' },
-          },
-        ],
-      };
-    if (widget.visualization === 'heatmap') {
-      const x = [...new Set(data.matrix.map((cell) => cell.x))];
-      const y = [...new Set(data.matrix.map((cell) => cell.y))];
-      const values = data.matrix.map((cell) => cell.value);
-      return {
-        tooltip: { position: 'top' },
-        grid: { top: 12, right: 12, bottom: 44, left: 95 },
-        xAxis: { type: 'category', data: x },
-        yAxis: { type: 'category', data: y, axisLabel: { width: 86, overflow: 'truncate' } },
-        visualMap: {
-          min: values.length ? Math.min(...values) : 0,
-          max: values.length ? Math.max(...values) : 100,
-          orient: 'horizontal',
-          left: 'center',
-          bottom: 0,
-          inRange: { color: ['#fff1f2', '#fef3c7', '#ccfbf1', '#c7d2fe'] },
-        },
-        series: [
-          {
-            type: 'heatmap',
-            data: data.matrix.map((cell) => [x.indexOf(cell.x), y.indexOf(cell.y), cell.value]),
-          },
-        ],
-      };
-    }
-    if (widget.visualization === 'scatter')
-      return {
-        grid: { top: 16, right: 18, bottom: 36, left: 58 },
-        tooltip: { trigger: 'item' },
-        xAxis: { type: 'value', name: data.axes[0]?.label },
-        yAxis: { type: 'value', name: data.axes[1]?.label },
-        series: [
-          {
-            type: 'scatter',
-            symbolSize: 10,
-            data: data.breakdown
-              .filter((row) => row.secondary !== null && row.secondary !== undefined)
-              .map((row) => [row.primary, row.secondary, row.label]),
-          },
-        ],
-      };
-    const chartType = widget.visualization === 'bar' ? 'bar' : 'line';
-    return {
-      grid: { top: 18, right: 16, bottom: 36, left: 58 },
-      tooltip: { trigger: 'axis' },
-      xAxis: { type: 'category', data: data.trend.map((row) => row.label) },
-      yAxis: { type: 'value' },
-      series: [
-        {
-          type: chartType,
-          data: data.trend.map((row) => row.primary),
-          showSymbol: false,
-          smooth: 0.15,
-          itemStyle: { color: '#4f46e5' },
-          lineStyle: { color: '#4f46e5', width: 2 },
-          ...(widget.visualization === 'area'
-            ? { areaStyle: { color: 'rgba(79,70,229,.12)' } }
-            : {}),
-        },
-        {
-          type: 'line',
-          data: data.trend.map((row) => row.target),
-          showSymbol: false,
-          lineStyle: { color: '#0f766e', type: 'dashed' },
-        },
-      ],
-    };
-  }, [data, widget.visualization]);
+function formatValue(
+  value: DatasetValue | undefined,
+  dimension: DatasetDimension | undefined,
+  metric: MetricDefinition,
+): string {
+  if (value === null || value === undefined) return '—';
+  if (dimension?.role === 'value' || dimension?.id === 'value') {
+    const numericValue = typeof value === 'number' ? value : Number(value);
+    if (Number.isFinite(numericValue)) return formatNumber(numericValue, metric.unit);
+  }
+  if (typeof value === 'number') return value.toLocaleString('ro-RO', { maximumFractionDigits: 2 });
+  if (typeof value === 'boolean') return value ? 'Da' : 'Nu';
+  return value;
+}
+
+function sourceLabel(result: WidgetQueryResult): string {
+  if (!result.meta) return '';
+  return `${result.meta.source.source} · ${result.meta.source.status}`;
+}
+
+function sourceRisk(result: WidgetQueryResult): 'healthy' | 'watch' | 'risk' {
+  const status = result.meta?.source.status;
+  if (status === 'official') return 'healthy';
+  if (status === 'partial' || status === 'stale') return 'watch';
+  return 'risk';
+}
+
+function QueryMetadata({
+  result,
+  metric,
+}: {
+  result: WidgetQueryResult;
+  metric: MetricDefinition;
+}) {
+  const source = result.meta?.source;
+  return (
+    <details className="query-metadata">
+      <summary>
+        <span>{source?.status ?? 'missing'}</span>
+        <span>{source?.source ?? metric.source_authority}</span>
+      </summary>
+      <div>
+        <span>Definiție: {metric.description}</span>
+        <span>Formulă: {metric.formula_reference}</span>
+        <span>Missing: {metric.missing_policy}</span>
+        <span>
+          Metric v{metric.version} · query v{metric.query_contract_version}
+        </span>
+        <span>
+          Cutoff: {source?.cutoff ?? '—'} · authority: {source?.authority ?? '—'}
+        </span>
+        {source?.warnings.length ? <span>Warnings: {source.warnings.join(' · ')}</span> : null}
+      </div>
+    </details>
+  );
+}
+
+function DatasetTable({
+  dataset,
+  metric,
+  fallbackReason,
+}: {
+  dataset: QueryDataset;
+  metric: MetricDefinition;
+  fallbackReason?: string;
+}) {
+  return (
+    <div className="table-scroll">
+      {fallbackReason ? <span className="widget-filter-mode">Tabelă: {fallbackReason}</span> : null}
+      <table className="data-table">
+        <thead>
+          <tr>
+            {dataset.dimensions.map((dimension) => (
+              <th key={dimension.id}>{dimension.label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {dataset.rows.map((row) => (
+            <tr
+              key={dataset.dimensions.map((dimension) => String(row[dimension.id] ?? '')).join('|')}
+            >
+              {dataset.dimensions.map((dimension) => (
+                <td key={dimension.id}>{formatValue(row[dimension.id], dimension, metric)}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ConfiguredChart({
+  widget,
+  dataset,
+  metric,
+  result,
+  onUrlStateChange,
+}: {
+  widget: DashboardWidget;
+  dataset: QueryDataset;
+  metric: MetricDefinition;
+  result: WidgetQueryResult;
+  onUrlStateChange?: (event: ChartUrlStateEvent) => void;
+}) {
+  const resolved = useMemo(
+    () => resolveChartSpec(metric, widget.visualization, dataset),
+    [dataset, metric, widget.visualization],
+  );
+  if (resolved.kind === 'table') {
+    return (
+      <div className="configured-table">
+        <DatasetTable dataset={dataset} metric={metric} fallbackReason={resolved.reason} />
+        <QueryMetadata result={result} metric={metric} />
+      </div>
+    );
+  }
   return (
     <div className="configured-chart">
       <span className="widget-filter-mode">{widgetFilterLabel(widget)}</span>
-      <EChart option={option} className="chart--fill" ariaLabel={widget.title} />
+      <EChart
+        option={resolved.option}
+        className="chart--fill"
+        ariaLabel={widget.title}
+        pngExport={buildSafePngExport(resolved, widget.title)}
+        onEvent={(event) => {
+          const interaction = chartEventToUrlState(dataset, event);
+          if (interaction) onUrlStateChange?.(interaction);
+        }}
+      />
+      <details className="chart-backing-table">
+        <summary>Date sursă accesibile</summary>
+        <DatasetTable dataset={dataset} metric={metric} />
+      </details>
+      <QueryMetadata result={result} metric={metric} />
     </div>
   );
 }
 
 export function ConfiguredWidget({
   widget,
-  data,
+  result,
+  metric,
+  loading = false,
+  requestError,
+  onRetry,
+  onUrlStateChange,
 }: {
   widget: DashboardWidget;
-  data: ModuleAnalytics | undefined;
+  result: WidgetQueryResult | undefined;
+  metric: MetricDefinition | undefined;
+  loading?: boolean;
+  requestError?: unknown;
+  onRetry?: () => void;
+  onUrlStateChange?: (event: ChartUrlStateEvent) => void;
 }) {
-  if (!data)
+  if (loading) return <LoadingState label={`Se încarcă ${widget.title}…`} />;
+  if (requestError) {
     return (
-      <EmptyState message="Modulul nu este disponibil pentru permisiunile sau scope-ul curent." />
+      <ErrorState
+        message={
+          requestError instanceof Error ? requestError.message : 'Batch-ul nu a putut fi încărcat.'
+        }
+        {...(onRetry ? { onRetry } : {})}
+      />
     );
-  const metric = data.kpis.find((item) => item.id === widget.metric_id) ?? data.kpis[0];
-  if (widget.visualization === 'kpi') {
-    if (!metric) return <EmptyState message="Metrica configurată nu este disponibilă." />;
+  }
+  if (!result) return <EmptyState message="Widgetul nu este disponibil în batch-ul curent." />;
+  if (result.error) {
     return (
-      <div className="configured-kpi">
-        <strong>{format(metric.value, metric.unit)}</strong>
-        <span>{metric.label}</span>
-        <small className={`risk-badge risk-badge--${metric.risk}`}>
-          {metric.supporting_label ?? data.meta.scope_label}
-        </small>
-        <em>{widgetFilterLabel(widget)}</em>
+      <ErrorState
+        message={result.error.message}
+        {...(result.error.retryable && onRetry ? { onRetry } : {})}
+      />
+    );
+  }
+  if (!result.dataset) return <EmptyState message="Datasetul metricii nu este disponibil." />;
+  if (!metric) return <EmptyState message="Metrica nu mai există în catalogul activ." />;
+
+  const { dataset } = result;
+  if (result.meta?.source.status === 'unavailable') {
+    return (
+      <div className="configured-empty">
+        <EmptyState
+          message={`Sursa este unavailable: ${result.meta.source.source}. Contractul nu a livrat date.`}
+        />
+        <QueryMetadata result={result} metric={metric} />
       </div>
     );
   }
-  if (widget.visualization === 'table')
+  if (dataset.rows.length === 0) {
     return (
-      <div className="table-scroll">
-        <span className="widget-filter-mode">{widgetFilterLabel(widget)}</span>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Entitate</th>
-              <th>{data.axes[0]?.label ?? 'Principal'}</th>
-              <th>Progres</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.breakdown.map((row) => (
-              <tr key={row.id}>
-                <td>
-                  {row.label}
-                  <small className="table-context">{row.context}</small>
-                </td>
-                <td>{format(row.primary, data.axes[0]?.unit ?? 'decimal')}</td>
-                <td>{formatPercent(row.progress_pct)}</td>
-                <td>
-                  <span className={`risk-badge risk-badge--${row.risk}`}>{row.risk}</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="configured-empty">
+        <EmptyState
+          message={
+            metric.suppressible
+              ? 'Date lipsă sau suprimate conform contractului; nu se afișează zero inventat.'
+              : 'Dataset fără rânduri pentru snapshotul și scope-ul curent.'
+          }
+        />
+        <QueryMetadata result={result} metric={metric} />
       </div>
     );
-  return <ConfiguredChart widget={widget} data={data} />;
+  }
+  if (widget.visualization === 'kpi') {
+    const valueDimension =
+      dataset.dimensions.find((dimension) => dimension.role === 'value') ??
+      dataset.dimensions.find((dimension) => dimension.id === 'value');
+    const value = dataset.rows[0]?.[valueDimension?.id ?? 'value'];
+    if (value === null || value === undefined) {
+      return (
+        <div className="configured-empty">
+          <EmptyState message="Valoarea este missing în snapshot; nu se înlocuiește cu zero." />
+          <QueryMetadata result={result} metric={metric} />
+        </div>
+      );
+    }
+    return (
+      <div className="configured-kpi">
+        <strong>{formatValue(value, valueDimension, metric)}</strong>
+        <small
+          className={`risk-badge risk-badge--${sourceRisk(result)}`}
+          title={`Snapshot ${result.meta?.snapshot_id ?? 'indisponibil'}`}
+        >
+          {sourceLabel(result)}
+        </small>
+        <em>{widgetFilterLabel(widget)}</em>
+        <QueryMetadata result={result} metric={metric} />
+      </div>
+    );
+  }
+  if (widget.visualization === 'table') {
+    return (
+      <div className="configured-table">
+        <DatasetTable dataset={dataset} metric={metric} />
+        <QueryMetadata result={result} metric={metric} />
+      </div>
+    );
+  }
+  return (
+    <ConfiguredChart
+      widget={widget}
+      dataset={dataset}
+      metric={metric}
+      result={result}
+      {...(onUrlStateChange ? { onUrlStateChange } : {})}
+    />
+  );
 }

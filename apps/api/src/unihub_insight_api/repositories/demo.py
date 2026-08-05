@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 
 from unihub_insight_api.domain import (
     AlertSeverity,
+    AnalyticalSnapshot,
     AnalyticsScope,
     DailyPoint,
     DataMode,
@@ -24,6 +25,9 @@ from unihub_insight_api.domain import (
     OverviewResponse,
     PerformanceRow,
     RiskLevel,
+    SourceDomain,
+    SourceMetadata,
+    SourceStatus,
 )
 from unihub_insight_api.services import previous_period, scope_label
 
@@ -179,6 +183,47 @@ DEMO_AGENTS: tuple[FilterAgent, ...] = tuple(
 
 
 class DemoAnalyticsRepository:
+    async def resolve_snapshot(self, scope: AnalyticsScope) -> AnalyticalSnapshot:
+        year, month = (int(part) for part in scope.period.split("-"))
+        days_in_month = calendar.monthrange(year, month)[1]
+        today = _business_today()
+        if scope.period < _current_period():
+            cutoff = date(year, month, days_in_month)
+            is_final = True
+        elif scope.period == _current_period():
+            cutoff = date(year, month, min(today.day, days_in_month))
+            is_final = False
+        else:
+            cutoff = None
+            is_final = False
+        domains = tuple(SourceDomain)
+        sources = {
+            domain.value: SourceMetadata(
+                domain=domain,
+                source=f"deterministic-demo-{domain.value}",
+                period=scope.period,
+                cutoff=cutoff,
+                as_of=cutoff,
+                is_final=is_final,
+                coverage_numerator=cutoff.day if cutoff else 0,
+                coverage_denominator=days_in_month,
+                source_generation=f"demo:{scope.period}:{domain.value}:v1",
+                authority="deterministic-demo",
+                authority_head="demo-v1",
+                status=SourceStatus.OFFICIAL if cutoff else SourceStatus.UNAVAILABLE,
+                produced_at=datetime.now(UTC),
+            )
+            for domain in domains
+        }
+        digest = hashlib.sha256(
+            "|".join(source.source_generation or "" for source in sources.values()).encode()
+        ).hexdigest()[:32]
+        return AnalyticalSnapshot(
+            id=f"demo-{scope.period}-{digest}",
+            period=scope.period,
+            sources=sources,
+        )
+
     async def get_filter_options(self, period: str) -> FilterOptionsResponse:
         current = _current_period()
         periods = [_shift_month(current, -offset) for offset in range(0, 24)]
@@ -195,6 +240,8 @@ class DemoAnalyticsRepository:
         )
 
     async def get_overview(self, scope: AnalyticsScope) -> OverviewResponse:
+        snapshot = await self.resolve_snapshot(scope)
+        sales_source = snapshot.sources[SourceDomain.SALES.value]
         selected_stores = self._selected_stores(scope)
         store_count = max(len(selected_stores), 1)
         rng = random.Random(_seed(scope.period, scope.model_dump_json()))
@@ -280,7 +327,10 @@ class DemoAnalyticsRepository:
                 data_mode=DataMode.DEMO,
                 scope_label=scope_label(scope),
                 generated_at=datetime.now(UTC),
-                source="deterministic-demo",
+                source=sales_source.source,
+                analytical_snapshot_id=snapshot.id,
+                snapshot_contract_version=snapshot.contract_version,
+                sources={SourceDomain.SALES: sales_source},
             ),
             kpis=[
                 KpiMetric(

@@ -92,6 +92,14 @@ async def export_module(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Capability {required.value} is required.",
         )
+    compensation_differentiating_scope = module is ModuleId.COMPENSATION and (
+        scope.regional or scope.asm or scope.stores or scope.agent
+    )
+    if compensation_differentiating_scope:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Compensation acceptă numai scope agregat de firmă.",
+        )
     if module in {ModuleId.FINANCE, ModuleId.PLANNING} and scope.agent:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,

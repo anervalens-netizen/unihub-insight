@@ -88,7 +88,7 @@ export function AppShell() {
                       : `${user.capabilities.length} capabilități`}
                   </span>
                 </div>
-                <span className="environment-badge">v0.5</span>
+                <span className="environment-badge">v1.0.0-rc.1</span>
                 <ChartPreferencesButton />
                 <button
                   type="button"

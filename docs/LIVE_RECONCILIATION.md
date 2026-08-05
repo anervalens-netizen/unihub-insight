@@ -40,11 +40,11 @@ Compare active headcount, days worked, entries/exits and eligible-store coverage
 
 ### Compensation
 
-- Total payroll includes all canonical salary rows.
-- Average includes only salaries of at least 2,000 RON.
-- Median does not apply the 2,000 RON threshold.
-- Any scope with one or two people exposes no values, rows, charts or exports.
-- Public contracts use `person_id`, never CNP.
+- Compare only approved aggregate cohorts from `reporting_compensation_month_v1`; Insight never reads salary/person rows.
+- Total payroll includes all canonical salary rows in the Retail-owned aggregation.
+- Average includes only salaries of at least 2,000 RON; median does not apply pragul.
+- Any cohort with one or two people exposes no values, rows, charts or exports.
+- Public contracts contain no `person_id`, name, CNP or filter that can differentiate a person.
 
 ### Finance
 

@@ -2,6 +2,7 @@
 title: UniHub Insight roadmap integrat
 status: active
 baseline_date: 2026-08-05
+candidate: 1.0.0-rc.1
 ---
 
 # Roadmap integrat UniHub Insight
@@ -40,22 +41,24 @@ Dependențele se implementează vertical: o suprafață ajunge `LIVE` numai cân
 
 ## Registru de workstream-uri
 
-- [ ] Read-model-uri canonice Retail pentru Campaigns, Workforce, Compensation, Visits, Finance și Planning; fără formule copiate în Insight.
-- [ ] Catalog versionat metrică/dimensiune/grain/comparison/capability și metadata de snapshot/generație proprie fiecărui domeniu.
-- [ ] Contract finit de query cu batch planner, deadline comun și izolare per widget; aceeași valoare în modul, dashboard, inspect și export.
-- [ ] Scope complet: lună/YTD/3–12 luni/an/interval, comparații multiple, URL state, drill-down, cross-filter, breadcrumb și preseturi.
-- [ ] `ChartSpec` ECharts 6.1, chart matrix documentată, Canvas/SVG POC, ARIA/decals, backing table și export PNG sigur.
-- [ ] Sales specializat: Pace, Trend, Mix, Drivers, Transactions și Calendar.
-- [ ] Performance specializat: rețea→RM→ASM→magazin→agent, ranking, distribuție, heatmap, scatter, consistență, productivitate și visits.
-- [ ] Campaigns specializat: Overview, Promo, Incentive, Concurs, Focus și Folii, cu coverage și fără cauzalitate inventată.
-- [ ] Workforce specializat: People, Mișcări, Stabilitate, Acoperire, Productivitate, Vizite și Grile.
-- [ ] Compensation specializat: numai read-model agregat aprobat, fără acces direct la `salary_records`/nume private și cu suprimare fail-closed.
-- [ ] Finance specializat: actual/estimate, autoritate generație, cost structure, profitability, reconciliation, waterfall și break-even.
-- [ ] Planning specializat: forecast 12 luni, accuracy, scenarii versionate și sensitivity.
-- [ ] Custom dashboards: blank/template/clone, editor complet, layout/versionare DB, ACL per subject, partajare țintită și batch execution.
-- [ ] XLSX/CSV/PNG, metric dictionary, audit/version history și aceeași autorizare ca API-ul.
+- [x] Read-model-uri canonice Retail v1 pentru Campaigns, Workforce, Compensation, Visits, Finance și Planning, publicate aditiv prin migrarea Retail 047.
+- [x] Catalog versionat metrică/dimensiune/grain/comparison/capability și metadata de snapshot/generație per domeniu.
+- [x] Query batch finit, snapshot fail-closed, deadline comun, izolare per widget, inspect și CSV server-side.
+- [x] Lună/YTD/3–12 luni/an/interval, comparații multiple, URL state, drill și preseturi.
+- [x] `ChartSpec` ECharts 6.1 Canvas, dataset/encode, evenimente URL, backing table, accesibilitate și PNG sigur; SVG rămâne respins până la motiv măsurat.
+- [x] Sales, Performance, Campaigns, Workforce, Compensation, Finance și Planning au sub-view-uri și rețete distincte; contractele absente sunt afișate `UNAVAILABLE`, nu simulate.
+- [x] Compensation folosește exclusiv agregatul aprobat, fără persoană/nume/filtre diferențiatoare.
+- [x] Custom dashboards: blank/template/clone, duplicate, editor, layout/versionare, preseturi, ACL per subject, scope ceiling și batch execution.
+- [x] XLSX/CSV/PNG, metric dictionary, audit/version history și autorizare comună.
 - [ ] Matrice negativă rol/capabilitate/export; performanță, accessibility, backup/restore, rollback și exact-SHA.
 - [ ] Browser QA toate modulele și view-urile, comparație cu Retail, viewport/temă/densitate și acceptare vizuală owner.
+
+## Porți deschise după RC1
+
+- Finance și Compensation sunt corect `UNAVAILABLE` în producție: tabelele de generații/head nu publică încă o generație eligibilă. Datele legacy nu sunt promovate implicit.
+- Migrarea Retail 047 este aditivă pentru compatibilitatea N/N-1. Granturile raw Finance/Planning se revocă numai după două release-uri Insight compatibile și rollback B→A verificat.
+- RC1 trebuie promovat prin artifact immutable, reconciliat live, trecut prin backup/restore și rollback, apoi acceptat vizual de owner.
+- Versiunea `1.0.0` cere șapte zile curate conform [Performance Acceptance](docs/PERFORMANCE_ACCEPTANCE.md).
 
 ## Reguli de execuție
 

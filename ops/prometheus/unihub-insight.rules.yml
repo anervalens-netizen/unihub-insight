@@ -1,6 +1,22 @@
 groups:
   - name: unihub-insight
     rules:
+      - alert: UniHubInsightDown
+        expr: up{job="unihub_insight"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: UniHub Insight metrics endpoint is down
+
+      - alert: UniHubInsightNotReady
+        expr: unihub_insight_ready{job="unihub_insight_ready"} == 0 or absent(unihub_insight_ready{job="unihub_insight_ready"})
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: UniHub Insight or a required PostgreSQL dependency is not ready
+
       - alert: UniHubInsightHighErrorRate
         expr: |
           sum(rate(unihub_insight_http_requests_total{status_class="5xx"}[5m]))

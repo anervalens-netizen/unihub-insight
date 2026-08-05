@@ -27,12 +27,22 @@ export function resolveWidgetSearch(
     resolved = {
       period: global.period,
       comparison: global.comparison,
+      ...(global.comparisons ? { comparisons: global.comparisons } : {}),
+      ...(global.range ? { range: global.range } : {}),
+      ...(global.start ? { start: global.start } : {}),
+      ...(global.end ? { end: global.end } : {}),
+      ...(global.drill ? { drill: global.drill } : {}),
       ...local,
     };
   } else {
     resolved = {
       period: global.period,
       comparison: global.comparison,
+      ...(global.comparisons ? { comparisons: global.comparisons } : {}),
+      ...(global.range ? { range: global.range } : {}),
+      ...(global.start ? { start: global.start } : {}),
+      ...(global.end ? { end: global.end } : {}),
+      ...(global.drill ? { drill: global.drill } : {}),
     };
   }
   if (widget.module === 'finance' || widget.module === 'planning') {

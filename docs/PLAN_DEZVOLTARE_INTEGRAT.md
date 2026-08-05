@@ -3,7 +3,8 @@ title: Plan integrat de dezvoltare UniHub Insight
 status: active
 baseline_date: 2026-08-05
 baseline_sha: 9fecf15b938954bb93567fa4b51e4b8f73cda76e
-retail_contract_sha: da38d93707edf8d5ba66f6154d66103a89efd0cc
+retail_contract_sha: a335348c7a2c1bfd27ab587c2ddfb5242c515e51
+candidate: 1.0.0-rc.1
 ---
 
 # Plan integrat de dezvoltare UniHub Insight
@@ -15,6 +16,10 @@ Transformarea aplicației live actuale într-un cockpit managerial desktop compl
 Viziunea funcțională de referință este [conversația inițială](https://chatgpt.com/share/6a738353-58f0-83ed-92a3-aaf2aa8488a8); realitatea implementării și contractele live au prioritate când conversația descrie ceva ca fiind deja gata, dar repository-ul sau producția arată că este parțial.
 
 Acesta este un singur plan persistent. Nu este împărțit în luni, proiecte succesive sau handoff-uri artificiale. Ordinea menționată mai jos exprimă numai dependențe tehnice: un grafic nu poate fi declarat complet înaintea contractului metricii și a reconcilierii sursei sale.
+
+## Stare candidat RC1
+
+La 2026-08-05, Retail SHA `a335348c7a2c1bfd27ab587c2ddfb5242c515e51` a publicat aditiv read-model-urile v1 și resolverul de snapshot. Candidatul Insight `1.0.0-rc.1` implementează catalogul/query batch/inspect/export, `ChartSpec`, sub-view-urile specializate și dashboard ACL/preset/versionare. Finance și Compensation rămân explicit `UNAVAILABLE` până când Retail promovează generații eligibile; datele legacy nu sunt declarate oficiale. Închiderea `1.0.0` rămâne condiționată de deploy exact-SHA, reconciliere și matrice negativă live, backup/restore + rollback, acceptarea vizuală owner și șapte zile de performanță.
 
 ## Adevărul de pornire
 

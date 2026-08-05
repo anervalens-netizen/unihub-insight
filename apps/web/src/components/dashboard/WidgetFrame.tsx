@@ -1,4 +1,4 @@
-import { Expand, GripHorizontal, TableProperties, X } from 'lucide-react';
+import { Download, Expand, GripHorizontal, TableProperties, X } from 'lucide-react';
 import { type ReactNode, useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -7,12 +7,14 @@ export function WidgetFrame({
   subtitle,
   editMode,
   onInspect,
+  onExport,
   children,
 }: {
   title: string;
   subtitle?: string;
   editMode: boolean;
   onInspect?: () => void;
+  onExport?: () => void;
   children: ReactNode;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -49,6 +51,16 @@ export function WidgetFrame({
             onClick={onInspect}
           >
             <TableProperties size={15} />
+          </button>
+        ) : null}
+        {onExport ? (
+          <button
+            type="button"
+            className="icon-button"
+            aria-label={`Exportă datele ${title}`}
+            onClick={onExport}
+          >
+            <Download size={15} />
           </button>
         ) : null}
         <button

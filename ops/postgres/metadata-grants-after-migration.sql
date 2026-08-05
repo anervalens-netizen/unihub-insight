@@ -3,5 +3,9 @@
 -- migration registry or catch-all/default privileges for future tables.
 SELECT has_schema_privilege('unihub_insight_metadata', 'insight', 'USAGE')
    AND has_table_privilege('unihub_insight_metadata', 'insight.dashboards', 'SELECT,INSERT,UPDATE,DELETE')
+   AND has_table_privilege('unihub_insight_metadata', 'insight.dashboard_acl', 'SELECT,INSERT,UPDATE,DELETE')
+   AND has_table_privilege('unihub_insight_metadata', 'insight.dashboard_versions', 'SELECT,INSERT')
+   AND has_table_privilege('unihub_insight_metadata', 'insight.query_audit', 'INSERT')
+   AND NOT has_table_privilege('unihub_insight_metadata', 'insight.query_audit', 'UPDATE,DELETE')
    AND NOT has_table_privilege('unihub_insight_metadata', 'insight.schema_migrations', 'UPDATE')
    AS metadata_authority_is_exact;

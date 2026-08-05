@@ -24,7 +24,7 @@ import { useMemo, useState } from 'react';
 import { EChart } from '../../components/charts/EChart';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { formatCurrency, formatInteger, formatPercent } from '../../lib/format';
-import { useModuleData } from './context';
+import { useModuleData, useModuleUrlStateChange } from './context';
 import type { BreakdownRow, ChartKind, ModuleKpi } from './schemas';
 
 function formatValue(value: number | null | undefined, unit: string, compact = false): string {
@@ -87,6 +87,22 @@ function ModuleKpiWidget({ index }: { index: number }) {
   );
 }
 
+export function ModuleKpiByMetric({ metricId }: { metricId: string }) {
+  const { kpis, module } = useModuleData();
+  const index = kpis.findIndex((metric) => metric.id === metricId);
+  return index < 0 ? (
+    <EmptyState
+      message={
+        module === 'compensation'
+          ? 'Agregatul Compensation este lipsă sau suprimat conform pragului; nu se afișează cifre inventate.'
+          : 'Metrica nu este disponibilă în contractul curent.'
+      }
+    />
+  ) : (
+    <ModuleKpiWidget index={index} />
+  );
+}
+
 export function ModuleKpiOne() {
   return <ModuleKpiWidget index={0} />;
 }
@@ -133,6 +149,7 @@ function ChartToggle<Kind extends ChartKind>({
 
 export function ModuleTrendWidget() {
   const data = useModuleData();
+  const onUrlStateChange = useModuleUrlStateChange();
   const supported = data.supported_charts.filter(
     (kind): kind is 'line' | 'area' | 'bar' => kind === 'line' || kind === 'area' || kind === 'bar',
   );
@@ -205,13 +222,24 @@ export function ModuleTrendWidget() {
   return (
     <div className="chart-widget">
       <ChartToggle options={choices} value={kind} onChange={setKind} />
-      <EChart option={option} className="chart--fill" ariaLabel={`Evoluție ${data.title}`} />
+      <EChart
+        option={option}
+        className="chart--fill"
+        ariaLabel={`Evoluție ${data.title}`}
+        onEvent={(event) => {
+          const point = event.dataIndex === undefined ? undefined : data.trend[event.dataIndex];
+          if (point) {
+            onUrlStateChange?.({ dimensionId: 'period', value: point.key, label: point.label });
+          }
+        }}
+      />
     </div>
   );
 }
 
 export function ModuleDistributionWidget() {
   const data = useModuleData();
+  const onUrlStateChange = useModuleUrlStateChange();
   const choices: Array<'donut' | 'bar'> = data.supported_charts.includes('donut')
     ? ['donut', 'bar']
     : ['bar'];
@@ -258,13 +286,29 @@ export function ModuleDistributionWidget() {
   return (
     <div className="chart-widget">
       <ChartToggle options={choices} value={kind} onChange={setKind} />
-      <EChart option={option} className="chart--fill" ariaLabel={`Distribuție ${data.title}`} />
+      <EChart
+        option={option}
+        className="chart--fill"
+        ariaLabel={`Distribuție ${data.title}`}
+        onEvent={(event) => {
+          const item =
+            event.dataIndex === undefined ? undefined : data.distribution[event.dataIndex];
+          if (item) {
+            onUrlStateChange?.({
+              dimensionId: `${data.module}.distribution`,
+              value: item.id,
+              label: item.label,
+            });
+          }
+        }}
+      />
     </div>
   );
 }
 
 export function ModuleMatrixWidget() {
   const data = useModuleData();
+  const onUrlStateChange = useModuleUrlStateChange();
   const xValues = useMemo(() => [...new Set(data.matrix.map((cell) => cell.x))], [data.matrix]);
   const yValues = useMemo(() => [...new Set(data.matrix.map((cell) => cell.y))], [data.matrix]);
   const values = data.matrix.map((cell) => cell.value);
@@ -315,7 +359,21 @@ export function ModuleMatrixWidget() {
   if (data.matrix.length === 0)
     return <EmptyState message="Matricea nu este disponibilă pentru scope-ul curent." />;
   return (
-    <EChart option={option} className="chart--fill" ariaLabel={`Matrice temporală ${data.title}`} />
+    <EChart
+      option={option}
+      className="chart--fill"
+      ariaLabel={`Matrice temporală ${data.title}`}
+      onEvent={(event) => {
+        const cell = event.dataIndex === undefined ? undefined : data.matrix[event.dataIndex];
+        if (cell) {
+          onUrlStateChange?.({
+            dimensionId: `${data.module}.matrix`,
+            value: `${cell.x}|${cell.y}`,
+            label: cell.label ?? `${cell.y} · ${cell.x}`,
+          });
+        }
+      }}
+    />
   );
 }
 
@@ -326,6 +384,7 @@ function RiskBadge({ risk }: { risk: BreakdownRow['risk'] }) {
 
 export function ModuleBreakdownWidget() {
   const data = useModuleData();
+  const onUrlStateChange = useModuleUrlStateChange();
   const [sorting, setSorting] = useState<SortingState>([{ id: 'primary', desc: true }]);
   const axes = data.axes;
   const columns = useMemo<ColumnDef<BreakdownRow>[]>(
@@ -336,7 +395,19 @@ export function ModuleBreakdownWidget() {
         cell: ({ row }) => (
           <div className="entity-cell">
             <div>
-              <strong>{row.original.label}</strong>
+              <button
+                type="button"
+                className="table-sort"
+                onClick={() =>
+                  onUrlStateChange?.({
+                    dimensionId: `${data.module}.entity`,
+                    value: row.original.id,
+                    label: row.original.label,
+                  })
+                }
+              >
+                <strong>{row.original.label}</strong>
+              </button>
               <span>{row.original.context}</span>
             </div>
           </div>
@@ -370,7 +441,7 @@ export function ModuleBreakdownWidget() {
         cell: ({ getValue }) => <RiskBadge risk={getValue<BreakdownRow['risk']>()} />,
       },
     ],
-    [axes],
+    [axes, data.module, onUrlStateChange],
   );
   const table = useReactTable({
     data: data.breakdown,

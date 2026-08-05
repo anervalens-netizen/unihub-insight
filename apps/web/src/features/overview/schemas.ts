@@ -1,7 +1,9 @@
 import { z } from 'zod';
 
+import { sourceMetadataSchema } from '../../lib/analytics-contracts';
+
 const number = z.coerce.number();
-const nullableNumber = z.union([number, z.null()]);
+export const nullableNumber = z.union([z.null(), number]);
 
 export const filterStoreSchema = z.object({
   site_code: z.string(),
@@ -92,6 +94,9 @@ export const overviewSchema = z.object({
     scope_label: z.string(),
     generated_at: z.string(),
     source: z.string(),
+    analytical_snapshot_id: z.string().nullable().optional(),
+    snapshot_contract_version: z.number().int().optional(),
+    sources: z.record(z.string(), sourceMetadataSchema).optional(),
   }),
   kpis: z.array(kpiSchema),
   daily: z.array(dailyPointSchema),

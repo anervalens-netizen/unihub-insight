@@ -30,4 +30,4 @@ no-session redirect, forged-header 401, capability 403, sensitive-module
 omission and public 404 responses for `/livez`, `/readyz`, `/metrics`, `/docs`,
 `/redoc` and `/openapi.json`.
 
-Dashboard sharing does not replace authorization. Current `shared` metadata is audience-wide; the target `dashboard_acl` must enforce subject permission, capability and scope ceiling at read/query/inspect/export before targeted sharing is declared complete.
+Dashboard sharing does not replace authorization. `dashboard_acl` enforces subject permission, capability and scope ceiling at read/query/inspect/export; a share cannot grant a data capability or scope the recipient did not already have. Revocation is server-side and versioned. Production acceptance still requires the real three-user negative matrix after RC1 deploy.

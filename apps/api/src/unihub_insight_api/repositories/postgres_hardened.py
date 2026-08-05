@@ -143,53 +143,31 @@ class PostgresHardenedInsightRepository(PostgresInsightRepository):
 
     async def _compensation(self, scope: AnalyticsScope) -> ModuleAnalyticsResponse:
         response = await super()._compensation(scope)
-        rows = await self._salary_rows(scope)
-        year, month = (int(part) for part in scope.period.split("-"))
-        current = [row for row in rows if int(row["year"]) == year and int(row["month"]) == month]
-        values = [_money(row["total_salary"]) for row in current]
-        stats = salary_statistics(values)
-
-        if compensation_is_suppressed(len(values)):
-            return response.model_copy(
+        rows = await self._compensation_rows(scope)
+        selected_company = scope.firm or "__ALL__"
+        current = next(
+            (
+                row
+                for row in rows
+                if str(row["period"]) == scope.period
+                and str(row["company_name"]).casefold() == selected_company.casefold()
+            ),
+            None,
+        )
+        if current is None:
+            return response
+        eligible_count = Decimal(int(current["eligible_person_count"]))
+        kpis = [
+            kpi.model_copy(
                 update={
-                    "kpis": [],
-                    "trend": [],
-                    "distribution": [],
-                    "breakdown": [],
-                    "matrix": [],
-                    "alerts": [
-                        InsightAlert(
-                            id="compensation-population-suppressed",
-                            severity=AlertSeverity.CRITICAL,
-                            title="Rezultat salarial suprimat",
-                            description=(
-                                "Scope-ul curent conține mai puțin de trei persoane. "
-                                "Valorile și exporturile sunt ascunse pentru a evita "
-                                "dezvăluirea indirectă a remunerației individuale."
-                            ),
-                        )
-                    ],
+                    "supporting_value": eligible_count,
+                    "supporting_label": "Persoane în agregatul aprobat",
                 }
             )
-
-        kpis: list[KpiMetric] = []
-        for kpi in response.kpis:
-            if kpi.id == "compensation.payroll":
-                kpis.append(kpi.model_copy(update={"value": stats.total}))
-            elif kpi.id == "compensation.average":
-                kpis.append(
-                    kpi.model_copy(
-                        update={
-                            "value": stats.average,
-                            "supporting_value": Decimal(stats.eligible_average_count),
-                            "supporting_label": "Persoane cu minimum 2.000 RON",
-                        }
-                    )
-                )
-            elif kpi.id == "compensation.median":
-                kpis.append(kpi.model_copy(update={"value": stats.median}))
-            else:
-                kpis.append(kpi)
+            if kpi.id == "compensation.average"
+            else kpi
+            for kpi in response.kpis
+        ]
         return response.model_copy(update={"kpis": kpis})
 
     async def _finance(self, scope: AnalyticsScope) -> ModuleAnalyticsResponse:

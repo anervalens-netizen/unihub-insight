@@ -1,6 +1,7 @@
 import { queryOptions } from '@tanstack/react-query';
 
 import { getJson } from '../../lib/api';
+import { analyticsSearchParams } from '../../lib/download';
 import type { GlobalSearch } from '../../lib/search';
 import { filterOptionsSchema, overviewSchema } from './schemas';
 
@@ -17,15 +18,7 @@ export function filterOptionsQuery(period: string) {
 }
 
 export function overviewQuery(search: GlobalSearch & { period: string }) {
-  const params = new URLSearchParams({
-    period: search.period,
-    comparison: search.comparison,
-  });
-  if (search.firm) params.set('firm', search.firm);
-  if (search.regional) params.set('regional', search.regional);
-  if (search.asm) params.set('asm', search.asm);
-  if (search.stores) params.set('stores', search.stores);
-  if (search.agent) params.set('agent', search.agent);
+  const params = analyticsSearchParams(search);
 
   return queryOptions({
     queryKey: ['overview', Object.fromEntries(params)] as const,

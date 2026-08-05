@@ -6,6 +6,11 @@ export function analyticsSearchParams(search: GlobalSearch & { period: string })
     period: search.period,
     comparison: search.comparison,
   });
+  if (search.comparisons) params.set('comparisons', search.comparisons);
+  if (search.range) params.set('range', search.range);
+  if (search.start) params.set('start', search.start);
+  if (search.end) params.set('end', search.end);
+  if (search.drill) params.set('drill', search.drill);
   if (search.firm) params.set('firm', search.firm);
   if (search.regional) params.set('regional', search.regional);
   if (search.asm) params.set('asm', search.asm);

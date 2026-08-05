@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from unihub_insight_api.api.dependencies import RepositoryDependency, ScopeDependency
 from unihub_insight_api.auth import require_capability
 from unihub_insight_api.domain import (
+    AnalyticsCatalogResponse,
     Capability,
     FilterOptionsResponse,
     MetricDefinition,
@@ -15,7 +16,7 @@ from unihub_insight_api.domain import (
     OverviewResponse,
     UserContext,
 )
-from unihub_insight_api.services import METRIC_CATALOG
+from unihub_insight_api.services import ANALYTICS_CATALOG, METRIC_CATALOG
 
 router = APIRouter(prefix="/api/v1", tags=["analytics"])
 
@@ -61,6 +62,14 @@ async def module_analytics(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Capability {required.value} is required.",
         )
+    compensation_differentiating_scope = module is ModuleId.COMPENSATION and (
+        scope.regional or scope.asm or scope.stores or scope.agent
+    )
+    if compensation_differentiating_scope:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Compensation acceptă numai scope agregat de firmă.",
+        )
     if module in {ModuleId.FINANCE, ModuleId.PLANNING} and scope.agent:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -74,3 +83,10 @@ async def metric_catalog(
     _user: Annotated[UserContext, Depends(require_capability(Capability.ANALYTICS))],
 ) -> list[MetricDefinition]:
     return list(METRIC_CATALOG)
+
+
+@router.get("/catalog", response_model=AnalyticsCatalogResponse)
+async def analytics_catalog(
+    _user: Annotated[UserContext, Depends(require_capability(Capability.ANALYTICS))],
+) -> AnalyticsCatalogResponse:
+    return ANALYTICS_CATALOG

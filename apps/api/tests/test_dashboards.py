@@ -1,5 +1,8 @@
 from fastapi.testclient import TestClient
 
+from unihub_insight_api.config import Settings
+from unihub_insight_api.main import create_app
+
 PAYLOAD = {
     "name": "Director",
     "description": "Dashboard executiv",
@@ -38,6 +41,10 @@ def test_dashboard_crud_and_optimistic_conflict(client: TestClient) -> None:
     assert updated_response.status_code == 200
     assert updated_response.json()["version"] == 2
 
+    versions = client.get(f"/api/v1/dashboards/{created['id']}/versions")
+    assert versions.status_code == 200
+    assert [item["version"] for item in versions.json()] == [2, 1]
+
     conflict = client.put(
         f"/api/v1/dashboards/{created['id']}",
         json=update_payload,
@@ -47,3 +54,76 @@ def test_dashboard_crud_and_optimistic_conflict(client: TestClient) -> None:
     deleted = client.delete(f"/api/v1/dashboards/{created['id']}")
     assert deleted.status_code == 204
     assert client.get(f"/api/v1/dashboards/{created['id']}").status_code == 404
+
+
+def test_editor_cannot_reshare_or_delete_dashboard() -> None:
+    settings = Settings(
+        environment="test",
+        data_mode="demo",
+        auth_mode="proxy",
+        trusted_proxy_secret="secret",
+    )
+    owner = {
+        "X-UniHub-Proxy-Secret": "secret",
+        "X-Authentik-Uid": "owner",
+        "X-Authentik-Groups": "unihub-manager",
+    }
+    editor = {
+        "X-UniHub-Proxy-Secret": "secret",
+        "X-Authentik-Uid": "editor",
+        "X-Authentik-Groups": "unihub-manager",
+    }
+    body = {**PAYLOAD, "acl": [{"subject": "editor", "permission": "edit"}]}
+    with TestClient(create_app(settings)) as client:
+        created = client.post("/api/v1/dashboards", json=body, headers=owner).json()
+
+        edited = client.put(
+            f"/api/v1/dashboards/{created['id']}",
+            json={**body, "name": "Editor update", "version": 1},
+            headers=editor,
+        )
+        assert edited.status_code == 200
+
+        reshared_body = {
+            **body,
+            "name": "Editor update",
+            "version": 2,
+            "acl": [
+                {"subject": "editor", "permission": "edit"},
+                {"subject": "third", "permission": "read"},
+            ],
+        }
+        assert (
+            client.put(
+                f"/api/v1/dashboards/{created['id']}",
+                json=reshared_body,
+                headers=editor,
+            ).status_code
+            == 403
+        )
+        assert client.delete(f"/api/v1/dashboards/{created['id']}", headers=editor).status_code == 403
+        assert client.delete(f"/api/v1/dashboards/{created['id']}", headers=owner).status_code == 204
+
+
+def test_filter_preset_crud_and_optimistic_conflict(client: TestClient) -> None:
+    created_response = client.post(
+        "/api/v1/dashboards/presets",
+        json={"name": "Brașov", "filters": {"regional": "Brașov"}, "shared": True},
+    )
+    assert created_response.status_code == 201
+    created = created_response.json()
+
+    listed = client.get("/api/v1/dashboards/presets")
+    assert [item["id"] for item in listed.json()] == [created["id"]]
+
+    update = {
+        "name": "Brașov RM",
+        "filters": {"regional": "Brașov"},
+        "shared": False,
+        "version": 1,
+    }
+    updated = client.put(f"/api/v1/dashboards/presets/{created['id']}", json=update)
+    assert updated.status_code == 200
+    assert updated.json()["version"] == 2
+    assert client.put(f"/api/v1/dashboards/presets/{created['id']}", json=update).status_code == 409
+    assert client.delete(f"/api/v1/dashboards/presets/{created['id']}").status_code == 204

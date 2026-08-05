@@ -18,14 +18,14 @@ Finance and Planning do not accept agent scope. Compensation is visible only wit
 - **Planning** — actual, forecast, target gap and forecast accuracy.
 - **Custom** — personal and shared dashboards assembled from governed metrics.
 
-Current reality: Overview and Monthly Review are the differentiated mature views. Sales through Planning currently render mostly the same generic KPI/trend/distribution/matrix/table canvas; the specialized sub-tabs and deeper drill/cross-filter behavior above are target behavior from the [integrated plan](PLAN_DEZVOLTARE_INTEGRAT.md), not completed functionality.
+În RC1, Sales–Planning au sub-view-uri și rețete distincte. Fiecare tab afișează `LIVE`, `PARTIAL` sau `UNAVAILABLE` din metadata sursei; un mecanism fără contract nu este înlocuit cu altă metrică. Click-ul pe entități actualizează drill-ul din URL și reload-ul reproduce selecția.
 
 ## Dashboard interaction
 
 - Use **Edit layout** to drag a card by its header and resize it from its edges.
 - Use **Layout implicit** to restore the versioned default.
 - Expand any card to fullscreen.
-- In current generic modules, use the table icon to inspect the response rows and export CSV. The target inspector will rerun the exact widget query server-side in the same snapshot.
+- Folosește iconul tabel pentru inspect. Inspectorul rerulează server-side exact query-ul și snapshotul widgetului și oferă CSV bounded.
 - Chart toggles offer only visualizations compatible with the analytical contract.
 
 ## Custom dashboards
@@ -37,7 +37,7 @@ Start blank or clone Director, Regional Manager, Finance or Risk templates. A ca
 - **Override** — ignores global business filters and uses only specified local values; period/comparison remain global.
 - **Ignore** — analyzes network scope for the selected period/comparison.
 
-Every non-inherited state is shown on the card. Current `shared` visibility is global inside the authorized Insight audience; targeted per-user ACL, revocation and scope ceilings are planned and must replace it before sharing is considered complete.
+Orice stare non-inherited este vizibilă pe card. Share-ul este țintit per subject cu `read/edit/admin`; capability și scope ceiling sunt reverificate server-side la read/query/inspect/export. Versiunile anterioare rămân selectabile, iar preset-urile pot fi personale sau partajate.
 
 ## Data-state interpretation
 
@@ -46,7 +46,8 @@ Every non-inherited state is shown on the card. Current `shared` visibility is g
 - Cutoff is the last covered business date, not page-load time.
 - Forecast run-rate is labeled separately from persisted AI forecast.
 - Missing data is not silently converted to zero.
-- Salary views with fewer than three people are suppressed. The current direct salary/person read path is transitional; the target contract removes it and permits only an aggregate Retail read-model protected against identification and filter differencing.
+- Compensation citește numai read-model-ul agregat Retail; nu există persoană/nume/CNP în contract. Cohortele sub trei persoane sunt suprimate inclusiv în inspect și export.
+- `UNAVAILABLE` înseamnă că nu există o generație autoritativă eligibilă; UI nu transformă date legacy sau lipsa în zero.
 
 ## Operational actions
 

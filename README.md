@@ -6,16 +6,19 @@
 
 ## Starea curentă
 
-Aplicația este live pe serverul principal și are o fundație operațională solidă. Nu este încă viziunea completă de produs: Overview și Raportul lunar sunt suprafețele mature, iar cele șapte module de domeniu folosesc încă predominant același șablon analitic generic.
+Producția existentă rămâne operațională, iar `1.0.0-rc.1` este candidatul integrat pentru promovare. RC1 adaugă coloana vertebrală analitică versionată și înlocuiește șablonul unic cu sub-view-uri de domeniu. Nu este încă `1.0`: sursele live Compensation și Finance nu au generații oficiale eligibile, iar pilotul vizual owner și poarta de șapte zile trebuie închise după deploy.
 
 | Suprafață | Stare |
 | --- | --- |
 | Deploy, Authentik, acces limitat la Andrei/Alexandra/Bogdan, PostgreSQL read-only, monitorizare | `LIVE` |
 | Shell desktop, filtre în URL, Overview | `LIVE` |
 | Raport lunar cu istoric/comparații și XLSX numeric | `LIVE` |
-| Sales, Performance, Campaigns, Workforce, Compensation, Finance, Planning | `PARȚIAL` — date live, dar UI încă generic |
-| Custom Dashboards, inspect și export | `PARȚIAL` |
-| Drill/cross-filter, toate read-model-urile, chart catalog și reconcilierea completă | `ÎN PLAN` |
+| Snapshot comun, catalog metrici/dimensiuni, query batch/inspect/CSV | `RC1` |
+| Sales, Performance, Campaigns, Workforce, Compensation, Finance, Planning | `RC1` — sub-view-uri specializate; starea sursei este `LIVE/PARTIAL/UNAVAILABLE` |
+| Custom Dashboards, preseturi, clone, versiuni, ACL/scope ceiling | `RC1` |
+| `ChartSpec` ECharts Canvas, URL drill, backing table și PNG sigur | `RC1` |
+| Compensation și Finance live | `UNAVAILABLE` până la promovarea unei generații autoritative Retail |
+| Reconciliere completă, pilot owner, șapte zile de performanță | `POARTĂ 1.0` |
 
 Ținta completă, research-ul ECharts și regulile de execuție Luna/Terra sunt în [Planul integrat](docs/PLAN_DEZVOLTARE_INTEGRAT.md), iar statusul compact este în [Roadmap](ROADMAP.md).
 
@@ -33,7 +36,7 @@ Aplicația este live pe serverul principal și are o fundație operațională so
 | API | FastAPI 0.139, Pydantic v2 |
 | Date | PostgreSQL prin `asyncpg`, rol read-only |
 | Tooling Python | Python 3.13, uv, Ruff, mypy, pytest |
-| Testare web | Vitest + Playwright/browser smoke și fluxuri analitice |
+| Testare web | Vitest + Chrome/CDP smoke și fluxuri analitice |
 
 ## Pornire locală
 

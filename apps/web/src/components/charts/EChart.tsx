@@ -15,8 +15,8 @@ import * as echarts from 'echarts/core';
 import { UniversalTransition } from 'echarts/features';
 import { CanvasRenderer } from 'echarts/renderers';
 import { useEffect, useMemo, useRef } from 'react';
-
 import { applyChartDesign, useChartDesign } from './chart-design';
+import type { ChartPngExportConfig } from './chart-spec';
 
 echarts.use([
   AriaComponent,
@@ -37,14 +37,46 @@ echarts.use([
   VisualMapComponent,
 ]);
 
+export type EChartEvent = {
+  data?: unknown;
+  dataIndex?: number;
+  name?: string;
+};
+
+function safeFilename(value: string): string {
+  const normalized = value
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 96);
+  return `${normalized || 'chart'}.png`;
+}
+
+function downloadChartPng(chart: EChartsType, exportConfig: ChartPngExportConfig): void {
+  const url = chart.getDataURL({
+    type: 'png',
+    pixelRatio: exportConfig.pixelRatio,
+    backgroundColor: 'transparent',
+  });
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = safeFilename(exportConfig.filename);
+  link.click();
+}
+
 export function EChart({
   option,
   className = '',
   ariaLabel,
+  onEvent,
+  pngExport,
 }: {
   option: EChartsCoreOption;
   className?: string;
   ariaLabel: string;
+  onEvent?: (event: EChartEvent) => void;
+  pngExport?: ChartPngExportConfig;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<EChartsType | null>(null);
@@ -73,6 +105,16 @@ export function EChart({
   }, []);
 
   useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || !onEvent) return;
+    const handleClick = (event: EChartEvent) => onEvent(event);
+    chart.on('click', handleClick);
+    return () => {
+      chart.off('click', handleClick);
+    };
+  }, [onEvent]);
+
+  useEffect(() => {
     chartRef.current?.setOption(designedOption, {
       notMerge: true,
       lazyUpdate: true,
@@ -81,13 +123,28 @@ export function EChart({
   }, [designedOption]);
 
   return (
-    <div
-      ref={hostRef}
-      className={`chart ${className}`}
-      role="img"
-      aria-label={ariaLabel}
-      data-chart-palette={design.paletteName}
-      data-chart-theme={design.theme}
-    />
+    <div className="chart-host">
+      <div
+        ref={hostRef}
+        className={`chart ${className}`}
+        role="img"
+        aria-label={ariaLabel}
+        data-chart-palette={design.paletteName}
+        data-chart-theme={design.theme}
+      />
+      {pngExport ? (
+        <button
+          type="button"
+          className="chart-export-button"
+          aria-label={`Descarcă PNG pentru ${ariaLabel}`}
+          title="Descarcă PNG"
+          onClick={() => {
+            if (chartRef.current) downloadChartPng(chartRef.current, pngExport);
+          }}
+        >
+          PNG
+        </button>
+      ) : null}
+    </div>
   );
 }

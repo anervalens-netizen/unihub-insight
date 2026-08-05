@@ -11,12 +11,17 @@ const widget: DashboardWidget = {
   module: 'sales',
   title: 'Sales',
   metric_id: 'sales.total',
+  metric_version: 1,
+  query_contract_version: 1,
   visualization: 'kpi',
   dimension: null,
   time_grain: 'month',
   filter_mode: 'inherit',
   filters: {},
   options: {},
+  comparisons: [],
+  sort: [],
+  limit: 30,
   layout: { x: 0, y: 0, w: 6, h: 4, min_w: 4, min_h: 3 },
 };
 const global = {

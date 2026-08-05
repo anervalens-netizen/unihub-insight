@@ -1,4 +1,11 @@
-from unihub_insight_api.domain import Capability, MetricDefinition, MetricUnit
+from unihub_insight_api.domain import (
+    AnalyticsCatalogResponse,
+    Capability,
+    ChartKind,
+    DimensionDefinition,
+    MetricDefinition,
+    MetricUnit,
+)
 from unihub_insight_api.services.monthly_review_contract import (
     MONTHLY_REVIEW_METRICS,
 )
@@ -16,6 +23,18 @@ def metric(
     grains: tuple[str, ...] = ("day", "month", "year"),
     comparison: str = "previous-period-or-year",
     missing: str = "covered-empty-is-zero",
+    shapes: tuple[ChartKind, ...] = (
+        ChartKind.KPI,
+        ChartKind.LINE,
+        ChartKind.AREA,
+        ChartKind.BAR,
+        ChartKind.DONUT,
+        ChartKind.HEATMAP,
+        ChartKind.SCATTER,
+        ChartKind.TABLE,
+    ),
+    suppressible: bool = False,
+    source_authority: str = "unihub-retail",
 ) -> MetricDefinition:
     return MetricDefinition(
         id=metric_id,
@@ -28,11 +47,20 @@ def metric(
         comparison_policy=comparison,
         missing_policy=missing,
         required_capability=capability,
+        allowed_shapes=shapes,
+        suppressible=suppressible,
+        source_authority=source_authority,
     )
 
 
 METRIC_CATALOG: tuple[MetricDefinition, ...] = (
-    metric("sales.total", "Vânzări", "Suma vânzărilor nete de accesorii.", MetricUnit.CURRENCY),
+    metric(
+        "sales.total",
+        "Vânzări",
+        "Suma vânzărilor nete de accesorii.",
+        MetricUnit.CURRENCY,
+        dimensions=("firm", "regional", "asm", "store", "agent", "category", "time"),
+    ),
     metric(
         "target.progress_pct",
         "Realizare target",
@@ -89,10 +117,18 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         aggregation="derived",
     ),
     metric(
+        "performance.daily_productivity",
+        "Productivitate / zi-agent",
+        "Vânzări împărțite la totalul zilelor-agent acoperite.",
+        MetricUnit.CURRENCY,
+        aggregation="ratio-of-sums",
+    ),
+    metric(
         "campaigns.focus_sales",
         "Vânzări Focus",
         "Vânzările produselor Focus active.",
         MetricUnit.CURRENCY,
+        dimensions=("firm", "regional", "asm", "store", "mechanism", "category", "time"),
     ),
     metric(
         "campaigns.focus_share",
@@ -100,6 +136,7 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         "Cantitatea Focus din cantitatea totală.",
         MetricUnit.PERCENT,
         aggregation="ratio-of-sums",
+        dimensions=("firm", "regional", "asm", "store", "mechanism", "category", "time"),
     ),
     metric(
         "campaigns.active_stores",
@@ -107,6 +144,18 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         "Magazine cu rezultat pozitiv în campanie.",
         MetricUnit.INTEGER,
         aggregation="distinct-count",
+        dimensions=("firm", "regional", "asm", "store", "mechanism", "time"),
+    ),
+    metric(
+        "campaigns.active_products",
+        "Produse Focus active",
+        "Numărul de produse distincte cu rezultat Focus în perioada acoperită.",
+        MetricUnit.INTEGER,
+        aggregation="distinct-count",
+        dimensions=("firm", "regional", "asm", "store", "mechanism", "category", "time"),
+        grains=("month",),
+        shapes=(ChartKind.KPI, ChartKind.TABLE),
+        missing="null-without-focus-contract",
     ),
     metric(
         "workforce.headcount",
@@ -133,11 +182,23 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         capability=Capability.MANAGEMENT,
     ),
     metric(
+        "workforce.stability",
+        "Stabilitate workforce",
+        "Ponderea populației active păstrate conform read-model-ului workforce.",
+        MetricUnit.PERCENT,
+        aggregation="ratio-of-counts",
+        capability=Capability.MANAGEMENT,
+        missing="null-without-effective-dated-roster",
+    ),
+    metric(
         "compensation.payroll",
         "Cost salarial",
         "Cost salarial total, inclusiv bonuri conform contractului Retail.",
         MetricUnit.CURRENCY,
         capability=Capability.HR,
+        dimensions=("firm", "time"),
+        suppressible=True,
+        source_authority="reporting_compensation_month_v1",
     ),
     metric(
         "compensation.average",
@@ -146,6 +207,9 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         MetricUnit.CURRENCY,
         aggregation="average",
         capability=Capability.HR,
+        dimensions=("firm", "time"),
+        suppressible=True,
+        source_authority="reporting_compensation_month_v1",
     ),
     metric(
         "compensation.median",
@@ -154,6 +218,9 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         MetricUnit.CURRENCY,
         aggregation="median",
         capability=Capability.HR,
+        dimensions=("firm", "time"),
+        suppressible=True,
+        source_authority="reporting_compensation_month_v1",
     ),
     metric(
         "compensation.sales_ratio",
@@ -162,6 +229,9 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         MetricUnit.PERCENT,
         aggregation="ratio-of-sums",
         capability=Capability.HR,
+        dimensions=("firm", "time"),
+        suppressible=True,
+        source_authority="reporting_compensation_month_v1",
     ),
     metric(
         "finance.revenue",
@@ -192,6 +262,7 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         "Costuri P&L din categoriile c3–c6.",
         MetricUnit.CURRENCY,
         capability=Capability.PNL,
+        dimensions=("firm", "regional", "asm", "store", "category", "time"),
     ),
     metric(
         "planning.forecast",
@@ -217,5 +288,80 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         aggregation="weighted-derived",
         capability=Capability.MANAGEMENT,
     ),
+    metric(
+        "planning.actual",
+        "Actual disponibil",
+        "Actualul Retail reconciliat pentru perioada și scope-ul scenariului.",
+        MetricUnit.CURRENCY,
+        aggregation="sum",
+        capability=Capability.MANAGEMENT,
+        missing="null-without-covered-actual",
+    ),
     *MONTHLY_REVIEW_METRICS,
+)
+
+
+DIMENSION_CATALOG: tuple[DimensionDefinition, ...] = (
+    DimensionDefinition(
+        id="time",
+        display_name="Perioadă",
+        description="Perioadă calendaristică cu cutoff și coverage explicite.",
+        stable_key="period",
+        allowed_grains=("day", "week", "month", "quarter", "year"),
+    ),
+    DimensionDefinition(
+        id="firm",
+        display_name="Companie",
+        description="Compania Retail din contractul autoritativ.",
+        stable_key="firm_id",
+        allowed_grains=("month", "quarter", "year"),
+    ),
+    DimensionDefinition(
+        id="regional",
+        display_name="Regional Manager",
+        description="Apartenență effective-dated; selecția de magazin domină istoricul.",
+        stable_key="regional_id",
+        allowed_grains=("day", "week", "month", "quarter", "year"),
+    ),
+    DimensionDefinition(
+        id="asm",
+        display_name="ASM",
+        description="Nivel organizațional păstrat în date, fără selector global dedicat.",
+        stable_key="asm_id",
+        allowed_grains=("day", "week", "month", "quarter", "year"),
+    ),
+    DimensionDefinition(
+        id="store",
+        display_name="Magazin",
+        description="Cheia operațională stabilă este site_code.",
+        stable_key="site_code",
+        allowed_grains=("day", "week", "month", "quarter", "year"),
+    ),
+    DimensionDefinition(
+        id="agent",
+        display_name="Agent",
+        description="Identitate effective-dated; nu este disponibilă în Compensation.",
+        stable_key="agent_entity_id",
+        allowed_grains=("day", "week", "month", "quarter", "year"),
+    ),
+    DimensionDefinition(
+        id="mechanism",
+        display_name="Mecanism campanie",
+        description="Promo, Incentive, Concurs, Focus și Folii rămân separate.",
+        stable_key="mechanism_id",
+        allowed_grains=("month",),
+    ),
+    DimensionDefinition(
+        id="category",
+        display_name="Categorie",
+        description="Categorie autoritativă din reporting Retail.",
+        stable_key="category_id",
+        allowed_grains=("day", "week", "month", "quarter", "year"),
+    ),
+)
+
+
+ANALYTICS_CATALOG = AnalyticsCatalogResponse(
+    metrics=list(METRIC_CATALOG),
+    dimensions=list(DIMENSION_CATALOG),
 )

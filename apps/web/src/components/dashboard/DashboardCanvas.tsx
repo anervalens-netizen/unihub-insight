@@ -47,6 +47,7 @@ export function DashboardCanvas({
   resetToken,
   storageKey,
   onInspect,
+  onExport,
   onLayoutChange,
 }: {
   widgets: DashboardWidgetDefinition[];
@@ -54,6 +55,7 @@ export function DashboardCanvas({
   resetToken: number;
   storageKey: string;
   onInspect?: (widgetId: string) => void;
+  onExport?: (widgetId: string) => void;
   onLayoutChange?: (items: DashboardLayoutItem[]) => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -146,6 +148,7 @@ export function DashboardCanvas({
         const position = layoutById.get(widget.id) ?? widget;
         const Widget = widget.component;
         const inspectProps = onInspect ? { onInspect: () => onInspect(widget.id) } : {};
+        const exportProps = onExport ? { onExport: () => onExport(widget.id) } : {};
         return (
           <div
             key={widget.id}
@@ -164,6 +167,7 @@ export function DashboardCanvas({
                 editMode={editMode}
                 {...(widget.subtitle === undefined ? {} : { subtitle: widget.subtitle })}
                 {...inspectProps}
+                {...exportProps}
               >
                 <Widget />
               </WidgetFrame>

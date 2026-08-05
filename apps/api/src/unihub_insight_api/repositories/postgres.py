@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import calendar
+import hashlib
 from collections.abc import Sequence
 from datetime import UTC, date, datetime
 from decimal import ROUND_HALF_UP, Decimal
@@ -11,6 +12,7 @@ import asyncpg
 
 from unihub_insight_api.domain import (
     AlertSeverity,
+    AnalyticalSnapshot,
     AnalyticsScope,
     DailyPoint,
     DataMode,
@@ -25,6 +27,9 @@ from unihub_insight_api.domain import (
     OverviewResponse,
     PerformanceRow,
     RiskLevel,
+    SourceDomain,
+    SourceMetadata,
+    SourceStatus,
 )
 from unihub_insight_api.services import previous_period, scope_label
 
@@ -72,6 +77,55 @@ class PostgresAnalyticsRepository:
     def __init__(self, pool: asyncpg.Pool):
         self.pool = pool
 
+    async def resolve_snapshot(self, scope: AnalyticsScope) -> AnalyticalSnapshot:
+        async with self.pool.acquire() as connection:
+            rows = await connection.fetch(
+                """
+                SELECT domain, period, source, source_generation, authority,
+                       authority_head, contract_version, rule_version, status,
+                       as_of, cutoff, is_final, coverage_numerator,
+                       coverage_denominator, produced_at, warnings
+                FROM reporting_source_snapshot_v1
+                WHERE period = $1
+                ORDER BY domain
+                """,
+                scope.period,
+            )
+        sources: dict[str, SourceMetadata] = {}
+        for row in rows:
+            domain = SourceDomain(str(row["domain"]))
+            status_value = str(row["status"])
+            sources[domain.value] = SourceMetadata(
+                domain=domain,
+                source=str(row["source"]),
+                period=str(row["period"]),
+                cutoff=row["cutoff"] if isinstance(row["cutoff"], date) else None,
+                as_of=row["as_of"] if isinstance(row["as_of"], date) else None,
+                is_final=bool(row["is_final"]),
+                coverage_numerator=(int(row["coverage_numerator"]) if row["coverage_numerator"] is not None else None),
+                coverage_denominator=(
+                    int(row["coverage_denominator"]) if row["coverage_denominator"] is not None else None
+                ),
+                source_generation=str(row["source_generation"]) if row["source_generation"] else None,
+                authority=str(row["authority"]),
+                authority_head=str(row["authority_head"]) if row["authority_head"] else None,
+                contract_version=int(row["contract_version"]),
+                rule_version=str(row["rule_version"]) if row["rule_version"] else None,
+                status=SourceStatus(status_value),
+                produced_at=row["produced_at"],
+                warnings=tuple(str(item) for item in (row["warnings"] or ())),
+            )
+        generation_material = "|".join(
+            f"{key}:{value.source_generation}:{value.authority_head}:{value.status.value}"
+            for key, value in sorted(sources.items())
+        )
+        digest = hashlib.sha256(f"{scope.period}|{generation_material}".encode()).hexdigest()
+        return AnalyticalSnapshot(
+            id=f"retail-v1-{scope.period}-{digest[:32]}",
+            period=scope.period,
+            sources=sources,
+        )
+
     async def get_filter_options(self, period: str) -> FilterOptionsResponse:
         option_rows, period_rows = await asyncio.gather(
             self._fetch_options(period),
@@ -115,6 +169,8 @@ class PostgresAnalyticsRepository:
         )
 
     async def get_overview(self, scope: AnalyticsScope) -> OverviewResponse:
+        snapshot = await self.resolve_snapshot(scope)
+        sales_source = snapshot.sources.get(SourceDomain.SALES.value)
         comparison_period = previous_period(scope.period, scope.comparison)
         current_tasks = (
             self._fetch_summary(scope, scope.period),
@@ -207,7 +263,10 @@ class PostgresAnalyticsRepository:
                 data_mode=DataMode.POSTGRES,
                 scope_label=scope_label(scope),
                 generated_at=datetime.now(UTC),
-                source="unihub-reporting",
+                source=sales_source.source if sales_source else "unihub-reporting",
+                analytical_snapshot_id=snapshot.id,
+                snapshot_contract_version=snapshot.contract_version,
+                sources={SourceDomain.SALES: sales_source} if sales_source else {},
             ),
             kpis=[
                 KpiMetric(

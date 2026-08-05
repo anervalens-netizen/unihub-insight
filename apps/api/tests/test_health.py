@@ -16,6 +16,10 @@ def test_demo_readiness(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json() == {"status": "ready", "data_mode": "demo"}
 
+    metric = client.get("/ready-metrics")
+    assert metric.status_code == 200
+    assert "unihub_insight_ready 1" in metric.text
+
 
 def test_metrics_exposes_bounded_http_telemetry(client: TestClient) -> None:
     client.get("/livez")

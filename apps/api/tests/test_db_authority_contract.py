@@ -19,8 +19,10 @@ def test_role_bootstrap_uses_isolated_authorities_and_owner() -> None:
     assert "GRANT CONNECT ON DATABASE unihub TO unihub_insight_migration_runner" in sql
     assert "REVOKE TEMPORARY ON DATABASE unihub FROM" not in sql
     assert "GRANT SELECT ON TABLE sales_transactions TO unihub_insight_reader" not in sql
-    assert "GRANT SELECT (\n    year, month, person_id" in sql
-    assert "GRANT SELECT (\n    person_id, agent_code, match_status" in sql
+    assert "reporting_compensation_month_v1" in sql
+    assert "salary_records" not in sql
+    assert "agent_salary_links" not in sql
+    assert "person_id" not in sql
 
 
 def test_metadata_authority_is_limited_to_dashboards() -> None:

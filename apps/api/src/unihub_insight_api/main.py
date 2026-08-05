@@ -16,6 +16,7 @@ from unihub_insight_api.api.routes import (
     exports_router,
     health_router,
     monthly_review_router,
+    query_router,
     telemetry_router,
 )
 from unihub_insight_api.config import Settings, get_settings
@@ -122,6 +123,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth_router)
     app.include_router(analytics_router)
     app.include_router(monthly_review_router)
+    app.include_router(query_router)
     app.include_router(exports_router)
     app.include_router(dashboards_router)
     app.include_router(telemetry_router)

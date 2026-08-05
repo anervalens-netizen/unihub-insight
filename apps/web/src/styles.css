@@ -367,7 +367,7 @@ button {
   position: relative;
   z-index: 35;
   display: grid;
-  grid-template-columns: 34px minmax(105px, 0.85fr) minmax(116px, 0.95fr) minmax(100px, 0.9fr) minmax(100px, 0.9fr) minmax(100px, 0.9fr) minmax(126px, 1.1fr) minmax(118px, 1fr) auto;
+  grid-template-columns: 34px minmax(92px, 0.8fr) minmax(92px, 0.8fr) minmax(100px, 0.9fr) repeat(4, minmax(72px, 0.75fr)) minmax(100px, 1fr) minmax(92px, 0.8fr) auto;
   align-items: end;
   gap: 7px;
   min-width: 0;
@@ -640,6 +640,67 @@ button {
   gap: 12px;
   margin: 0 0 3px;
   padding: 0 7px;
+}
+
+.filter-field input[type='month'] {
+  min-height: 31px;
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 10px;
+}
+
+.comparison-option {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 0;
+  color: var(--text);
+  font-size: 9px;
+}
+
+.filter-preset-panel {
+  display: grid;
+  gap: 7px;
+}
+
+.filter-preset-panel > select,
+.filter-preset-panel > input {
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--text);
+  font-size: 9px;
+}
+
+.filter-preset-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.filter-preset-actions button {
+  display: inline-flex;
+  min-height: 29px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-soft);
+  color: var(--text-soft);
+  font-size: 8px;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.filter-preset-actions button:disabled {
+  cursor: default;
+  opacity: 0.45;
 }
 
 .overview-meta,
@@ -1396,7 +1457,7 @@ button {
 
 @media (max-width: 1380px) {
   .global-filters {
-    grid-template-columns: 31px 92px 108px 86px 86px 86px 112px 106px auto;
+    grid-template-columns: 31px repeat(3, minmax(76px, 0.85fr)) repeat(4, minmax(66px, 0.72fr)) minmax(88px, 1fr) minmax(78px, 0.82fr) auto;
     padding-inline: 12px;
   }
 

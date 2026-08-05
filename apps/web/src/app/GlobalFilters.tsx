@@ -1,13 +1,24 @@
-import { useQuery } from '@tanstack/react-query';
-import { Check, Filter, RotateCcw, Search, X } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { BookmarkPlus, Check, Filter, RotateCcw, Save, Search, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-
+import {
+  createFilterPreset,
+  deleteFilterPreset,
+  filterPresetsQuery,
+  updateFilterPreset,
+} from '../features/dashboards/api';
+import { useIdentity } from '../features/identity/context';
 import { filterOptionsQuery } from '../features/overview/api';
 import type { FilterAgent, FilterStore } from '../features/overview/schemas';
 import {
   activeFilterCount,
+  analyticalComparisons,
   currentBusinessMonth,
+  globalSearchSchema,
+  parseComparisons,
   parseStoreSelection,
+  type rangePresets,
+  serializeComparisons,
   serializeStoreSelection,
 } from '../lib/search';
 import { useGlobalSearch, useUpdateGlobalSearch } from './search-hooks';
@@ -142,13 +153,137 @@ function StoreMultiSelect({
   );
 }
 
+const comparisonLabels: Record<(typeof analyticalComparisons)[number], string> = {
+  target: 'Target',
+  forecast: 'Forecast',
+  'previous-period': 'Perioada precedentă',
+  'previous-year': 'Anul trecut',
+  'recent-average': 'Media recentă',
+};
+
+function ComparisonMultiSelect({
+  selected,
+  onChange,
+}: {
+  selected: readonly (typeof analyticalComparisons)[number][];
+  onChange: (values: (typeof analyticalComparisons)[number][]) => void;
+}) {
+  return (
+    <details className="filter-popover filter-popover--comparisons">
+      <summary>
+        <span className="filter-summary-label">Comparații</span>
+        <strong>{selected.length === 0 ? 'Fără reper' : `${selected.length} active`}</strong>
+      </summary>
+      <div className="filter-popover-panel">
+        {analyticalComparisons.map((comparison) => (
+          <label key={comparison} className="comparison-option">
+            <input
+              type="checkbox"
+              checked={selected.includes(comparison)}
+              onChange={() =>
+                onChange(
+                  selected.includes(comparison)
+                    ? selected.filter((value) => value !== comparison)
+                    : [...selected, comparison],
+                )
+              }
+            />
+            <span>{comparisonLabels[comparison]}</span>
+          </label>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+const presetFilterKeys = [
+  'period',
+  'comparison',
+  'comparisons',
+  'range',
+  'start',
+  'end',
+  'firm',
+  'regional',
+  'asm',
+  'stores',
+  'agent',
+] as const;
+
+function presetFilters(search: ReturnType<typeof useGlobalSearch>): Record<string, string> {
+  return Object.fromEntries(
+    presetFilterKeys.flatMap((key) => {
+      const value = search[key];
+      return typeof value === 'string' && value ? [[key, value]] : [];
+    }),
+  );
+}
+
+const clearPresetFilters = Object.fromEntries(
+  presetFilterKeys.map((key) => [key, undefined]),
+) as Record<(typeof presetFilterKeys)[number], undefined>;
+
 export function GlobalFilters() {
   const search = useGlobalSearch();
   const updateSearch = useUpdateGlobalSearch();
+  const identity = useIdentity();
+  const queryClient = useQueryClient();
   const requestedPeriod = search.period ?? currentBusinessMonth();
   const optionsQuery = useQuery(filterOptionsQuery(requestedPeriod));
+  const presetsQuery = useQuery(filterPresetsQuery);
+  const [presetId, setPresetId] = useState('');
+  const [presetName, setPresetName] = useState('');
+  const [presetShared, setPresetShared] = useState(false);
+  const [presetMessage, setPresetMessage] = useState<string | null>(null);
   const options = optionsQuery.data;
   const selectedStores = parseStoreSelection(search.stores);
+  const selectedComparisons = parseComparisons(search);
+  const selectedPreset = presetsQuery.data?.find((preset) => preset.id === presetId);
+  const refreshPresets = async (): Promise<void> => {
+    await queryClient.invalidateQueries({ queryKey: ['filter-presets'] });
+  };
+  const createPresetMutation = useMutation({
+    mutationFn: createFilterPreset,
+    onSuccess: async (preset) => {
+      setPresetId(preset.id);
+      setPresetName(preset.name);
+      setPresetShared(preset.shared);
+      setPresetMessage('Preset salvat.');
+      await refreshPresets();
+    },
+    onError: (error) =>
+      setPresetMessage(error instanceof Error ? error.message : 'Presetul nu a putut fi salvat.'),
+  });
+  const updatePresetMutation = useMutation({
+    mutationFn: ({ id, version }: { id: string; version: number }) =>
+      updateFilterPreset(id, {
+        name: presetName.trim(),
+        shared: presetShared,
+        filters: presetFilters(search),
+        version,
+      }),
+    onSuccess: async (preset) => {
+      setPresetMessage('Preset actualizat.');
+      setPresetShared(preset.shared);
+      await refreshPresets();
+    },
+    onError: (error) =>
+      setPresetMessage(
+        error instanceof Error ? error.message : 'Presetul nu a putut fi actualizat.',
+      ),
+  });
+  const deletePresetMutation = useMutation({
+    mutationFn: deleteFilterPreset,
+    onSuccess: async () => {
+      setPresetId('');
+      setPresetName('');
+      setPresetShared(false);
+      setPresetMessage('Preset șters.');
+      await refreshPresets();
+    },
+    onError: (error) =>
+      setPresetMessage(error instanceof Error ? error.message : 'Presetul nu a putut fi șters.'),
+  });
 
   useEffect(() => {
     if (!options || options.periods.length === 0) return;
@@ -218,6 +353,95 @@ export function GlobalFilters() {
         {count > 0 ? <span>{count}</span> : null}
       </div>
 
+      <details className="filter-popover filter-popover--presets">
+        <summary>
+          <span className="filter-summary-label">Preset</span>
+          <strong>{selectedPreset?.name ?? 'Alege'}</strong>
+        </summary>
+        <div className="filter-popover-panel filter-preset-panel">
+          <select
+            value={presetId}
+            disabled={presetsQuery.isPending}
+            onChange={(event) => {
+              const id = event.target.value;
+              setPresetId(id);
+              const preset = presetsQuery.data?.find((item) => item.id === id);
+              if (!preset) return;
+              setPresetName(preset.name);
+              setPresetShared(preset.shared);
+              const parsed = globalSearchSchema.safeParse(preset.filters);
+              if (parsed.success) {
+                updateSearch({ ...clearPresetFilters, ...parsed.data }, true);
+                setPresetMessage('Preset aplicat.');
+              } else {
+                setPresetMessage('Preset incompatibil cu contractul curent.');
+              }
+            }}
+          >
+            <option value="">Alege un preset…</option>
+            {(presetsQuery.data ?? []).map((preset) => (
+              <option key={preset.id} value={preset.id}>
+                {preset.name}
+                {preset.shared ? ' · shared' : ''}
+              </option>
+            ))}
+          </select>
+          <input
+            value={presetName}
+            maxLength={160}
+            placeholder="Nume preset"
+            onChange={(event) => setPresetName(event.target.value)}
+          />
+          <label className="comparison-option">
+            <input
+              type="checkbox"
+              checked={presetShared}
+              onChange={(event) => setPresetShared(event.target.checked)}
+            />
+            <span>Partajat</span>
+          </label>
+          <div className="filter-preset-actions">
+            <button
+              type="button"
+              disabled={!presetName.trim() || createPresetMutation.isPending}
+              onClick={() =>
+                createPresetMutation.mutate({
+                  name: presetName.trim(),
+                  shared: presetShared,
+                  filters: presetFilters(search),
+                })
+              }
+            >
+              <BookmarkPlus size={13} /> Nou
+            </button>
+            {selectedPreset?.owner_subject === identity.subject ? (
+              <>
+                <button
+                  type="button"
+                  disabled={!presetName.trim() || updatePresetMutation.isPending}
+                  onClick={() =>
+                    updatePresetMutation.mutate({
+                      id: selectedPreset.id,
+                      version: selectedPreset.version,
+                    })
+                  }
+                >
+                  <Save size={13} /> Actualizează
+                </button>
+                <button
+                  type="button"
+                  disabled={deletePresetMutation.isPending}
+                  onClick={() => deletePresetMutation.mutate(selectedPreset.id)}
+                >
+                  <Trash2 size={13} /> Șterge
+                </button>
+              </>
+            ) : null}
+          </div>
+          {presetMessage ? <small>{presetMessage}</small> : null}
+        </div>
+      </details>
+
       <label className="filter-field filter-field--period">
         <span>Perioadă</span>
         <select
@@ -233,21 +457,64 @@ export function GlobalFilters() {
         </select>
       </label>
 
-      <label className="filter-field">
-        <span>Comparație</span>
+      <label className="filter-field filter-field--range">
+        <span>Interval</span>
         <select
-          value={search.comparison}
-          onChange={(event) =>
+          value={search.range ?? 'month'}
+          onChange={(event) => {
+            const range = event.target.value as (typeof rangePresets)[number];
             updateSearch({
-              comparison: event.target.value as 'previous-month' | 'previous-year' | 'none',
-            })
-          }
+              range,
+              ...(range === 'custom'
+                ? { start: search.start ?? requestedPeriod, end: search.end ?? requestedPeriod }
+                : { start: undefined, end: undefined }),
+            });
+          }}
         >
-          <option value="previous-year">Anul trecut</option>
-          <option value="previous-month">Luna precedentă</option>
-          <option value="none">Fără reper</option>
+          <option value="month">Luna selectată</option>
+          <option value="ytd">YTD</option>
+          <option value="3">Ultimele 3 luni</option>
+          <option value="6">Ultimele 6 luni</option>
+          <option value="12">Ultimele 12 luni</option>
+          <option value="year">An</option>
+          <option value="custom">Custom</option>
         </select>
       </label>
+
+      {search.range === 'custom' ? (
+        <>
+          <label className="filter-field filter-field--period">
+            <span>De la</span>
+            <input
+              type="month"
+              value={search.start ?? requestedPeriod}
+              onChange={(event) => updateSearch({ start: event.target.value || undefined })}
+            />
+          </label>
+          <label className="filter-field filter-field--period">
+            <span>Până la</span>
+            <input
+              type="month"
+              value={search.end ?? requestedPeriod}
+              onChange={(event) => updateSearch({ end: event.target.value || undefined })}
+            />
+          </label>
+        </>
+      ) : null}
+
+      <ComparisonMultiSelect
+        selected={selectedComparisons}
+        onChange={(values) =>
+          updateSearch({
+            comparisons: serializeComparisons(values),
+            comparison: values.includes('previous-year')
+              ? 'previous-year'
+              : values.includes('previous-period')
+                ? 'previous-month'
+                : 'none',
+          })
+        }
+      />
 
       <SelectFilter
         label="Firmă"

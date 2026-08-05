@@ -8,7 +8,7 @@ One dashboard render resolves one eligible snapshot from `completed/promoted` ge
 
 ## Bounded query contract
 
-The target request is finite: metric IDs + versions, dimensions, time range/grain, filters by stable entity IDs, simultaneous comparisons, sort and limit. A server-side batch contains at most 8–12 widgets, deduplicates compatible work, has one deadline/cancellation context and returns data/error independently per widget. SQL, arbitrary formulas and client-provided functions are invalid.
+The request is finite: metric IDs + versions, dimensions, time range/grain, filters by stable entity IDs, simultaneous comparisons, sort and limit. A server-side batch contains at most 12 widgets, resolves and rechecks one eligible snapshot under one deadline/cancellation context, and returns data/error independently per widget. SQL, arbitrary formulas and client-provided functions are invalid.
 
 Saved widgets persist `metric_id`, `metric_version` and `query_contract_version`. Inspector and exports execute the same query and snapshot server-side; they do not reconstruct analytical rows from UI payloads.
 
@@ -62,6 +62,8 @@ Initial alerts are deterministic rules, not machine-learning scores. They expose
 - Compensation reads an aggregate Retail view only. No direct `salary_records`, `agent_salary_links`, names or private IDs remain granted. Total uses all rows, average uses values at least 2,000 RON, median uses all values; cohorts of one or two are suppressed across KPI, series, inspect and export, including differencing attacks through filters.
 - Finance explicitly marks `actual`/`estimated` and authority. `__FINANCE_UNALLOCATED__` belongs in company totals and never in store/RM detail. Shadow or unpromoted generations are unavailable, not actual.
 - Planning forecast identifies run, horizon, method/model, input cutoff and coverage. Target scenarios identify scenario, revision, status, rule-set hash and snapshot; drafts are not implicitly shared truth.
+
+Retail migration 047 is intentionally additive for consumer N/N-1. Insight RC1 reads only the approved v1 views, while legacy Finance/Planning raw grants are revoked only after two compatible Insight releases and a verified B→A rollback. This temporary publisher compatibility does not authorize new Insight code to query raw tables.
 
 ## Export contract
 

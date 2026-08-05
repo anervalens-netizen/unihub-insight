@@ -1,9 +1,10 @@
 import { z } from 'zod';
 
+import { sourceMetadataSchema } from '../../lib/analytics-contracts';
 import { capabilities } from '../identity/schemas';
 
 const numeric = z.coerce.number();
-const nullableNumeric = z.union([numeric, z.null()]);
+export const nullableNumeric = z.union([z.null(), numeric]);
 export const moduleIds = [
   'sales',
   'performance',
@@ -53,6 +54,9 @@ export const moduleAnalyticsSchema = z.object({
     scope_label: z.string(),
     generated_at: z.string(),
     source: z.string(),
+    analytical_snapshot_id: z.string().nullable().optional(),
+    snapshot_contract_version: z.number().int().optional(),
+    sources: z.record(z.string(), sourceMetadataSchema).optional(),
   }),
   module: z.enum(moduleIds),
   title: z.string(),

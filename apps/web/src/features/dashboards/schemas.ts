@@ -4,6 +4,13 @@ import { chartKinds, moduleIds } from '../modules/schemas';
 
 export const filterModes = ['inherit', 'augment', 'override', 'ignore'] as const;
 export const visibilityModes = ['private', 'shared'] as const;
+export const dashboardPermissions = ['read', 'edit', 'admin'] as const;
+export type DashboardPermission = (typeof dashboardPermissions)[number];
+
+const dashboardAclEntrySchema = z.object({
+  subject: z.string(),
+  permission: z.enum(dashboardPermissions),
+});
 
 const optionValue = z.union([z.string(), z.number(), z.boolean()]);
 export const dashboardWidgetSchema = z.object({
@@ -11,12 +18,17 @@ export const dashboardWidgetSchema = z.object({
   module: z.enum(moduleIds),
   title: z.string(),
   metric_id: z.string(),
+  metric_version: z.number().int().default(1),
+  query_contract_version: z.number().int().default(1),
   visualization: z.enum(chartKinds),
   dimension: z.string().nullable().optional(),
-  time_grain: z.string(),
-  filter_mode: z.enum(filterModes),
-  filters: z.record(z.string(), z.string()),
-  options: z.record(z.string(), optionValue),
+  time_grain: z.string().default('month'),
+  comparisons: z.array(z.string()).default([]),
+  sort: z.array(z.string()).default([]),
+  limit: z.number().int().default(30),
+  filter_mode: z.enum(filterModes).default('inherit'),
+  filters: z.record(z.string(), z.string()).default({}),
+  options: z.record(z.string(), optionValue).default({}),
   layout: z.object({
     x: z.number().int(),
     y: z.number().int(),
@@ -35,15 +47,50 @@ export const dashboardDocumentSchema = z.object({
   visibility: z.enum(visibilityModes),
   version: z.number().int(),
   widgets: z.array(dashboardWidgetSchema),
+  acl: z.array(dashboardAclEntrySchema).default([]),
+  scope_ceiling: z
+    .object({
+      firms: z.array(z.string()).default([]),
+      regionals: z.array(z.string()).default([]),
+      asms: z.array(z.string()).default([]),
+      stores: z.array(z.string()).default([]),
+      allow_agent: z.boolean().default(true),
+    })
+    .default({ firms: [], regionals: [], asms: [], stores: [], allow_agent: true }),
+  query_contract_version: z.number().int().default(1),
   created_at: z.string(),
   updated_at: z.string(),
 });
 
 export const dashboardListSchema = z.object({ items: z.array(dashboardDocumentSchema) });
+export const dashboardSubjectSchema = z.object({
+  subject: z.string(),
+  email: z.string().nullable().optional(),
+  display_name: z.string().nullable().optional(),
+  last_seen_at: z.string(),
+});
+export const dashboardSubjectsSchema = z.array(dashboardSubjectSchema);
+export const filterPresetSchema = z.object({
+  id: z.string(),
+  owner_subject: z.string(),
+  name: z.string(),
+  filters: z.record(z.string(), z.string()),
+  shared: z.boolean(),
+  version: z.number().int(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export const filterPresetsSchema = z.array(filterPresetSchema);
 export type DashboardWidget = z.infer<typeof dashboardWidgetSchema>;
 export type DashboardDocument = z.infer<typeof dashboardDocumentSchema>;
+export type DashboardSubject = z.infer<typeof dashboardSubjectSchema>;
+export type DashboardAclEntry = z.infer<typeof dashboardAclEntrySchema>;
+export type FilterPreset = z.infer<typeof filterPresetSchema>;
+export type FilterPresetInput = Pick<FilterPreset, 'name' | 'filters' | 'shared'>;
+export type FilterPresetUpdateInput = FilterPresetInput & { version: number };
 export type DashboardCreateInput = Pick<
   DashboardDocument,
   'name' | 'description' | 'visibility' | 'widgets'
->;
+> &
+  Partial<Pick<DashboardDocument, 'acl' | 'scope_ceiling' | 'query_contract_version'>>;
 export type DashboardUpdateInput = DashboardCreateInput & { version: number };

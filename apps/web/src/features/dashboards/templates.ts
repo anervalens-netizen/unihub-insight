@@ -12,17 +12,32 @@ function widget(
   w: number,
   h: number,
 ): DashboardWidget {
+  const dimension =
+    visualization === 'kpi'
+      ? null
+      : visualization === 'line' || visualization === 'area'
+        ? 'time'
+        : visualization === 'donut'
+          ? 'category'
+          : visualization === 'heatmap'
+            ? 'time'
+            : 'store';
   return {
     id,
     module,
     title,
     metric_id: metricId,
+    metric_version: 1,
+    query_contract_version: 1,
     visualization,
-    dimension: null,
+    dimension,
     time_grain: 'month',
     filter_mode: 'inherit',
     filters: {},
     options: {},
+    comparisons: [],
+    sort: [],
+    limit: 30,
     layout: { x, y, w, h, min_w: Math.min(w, 4), min_h: Math.min(h, 4) },
   };
 }
@@ -258,17 +273,4 @@ export const moduleMetrics: Record<
     { id: 'planning.accuracy', label: 'Acuratețe' },
     { id: 'planning.actual', label: 'Actual' },
   ],
-};
-
-export const moduleVisualizations: Record<
-  DashboardWidget['module'],
-  DashboardWidget['visualization'][]
-> = {
-  sales: ['kpi', 'line', 'area', 'bar', 'donut', 'heatmap', 'scatter', 'table'],
-  performance: ['kpi', 'line', 'bar', 'heatmap', 'scatter', 'table'],
-  campaigns: ['kpi', 'line', 'area', 'bar', 'donut', 'heatmap', 'table'],
-  workforce: ['kpi', 'line', 'bar', 'donut', 'heatmap', 'table'],
-  compensation: ['kpi', 'line', 'bar', 'donut', 'heatmap', 'scatter', 'table'],
-  finance: ['kpi', 'line', 'area', 'bar', 'donut', 'heatmap', 'waterfall', 'table'],
-  planning: ['kpi', 'line', 'area', 'bar', 'heatmap', 'scatter', 'table'],
 };

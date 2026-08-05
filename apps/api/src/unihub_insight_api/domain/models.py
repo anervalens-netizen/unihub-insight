@@ -80,6 +80,30 @@ class DashboardVisibility(StrEnum):
     SHARED = "shared"
 
 
+class SourceStatus(StrEnum):
+    OFFICIAL = "official"
+    PARTIAL = "partial"
+    STALE = "stale"
+    UNAVAILABLE = "unavailable"
+
+
+class SourceDomain(StrEnum):
+    SALES = "sales"
+    CAMPAIGNS = "campaigns"
+    WORKFORCE = "workforce"
+    COMPENSATION = "compensation"
+    VISITS = "visits"
+    FINANCE = "finance"
+    PLANNING = "planning"
+    GRILE = "grile"
+
+
+class DashboardPermission(StrEnum):
+    READ = "read"
+    EDIT = "edit"
+    ADMIN = "admin"
+
+
 class AnalyticsScope(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -139,6 +163,28 @@ class OverviewMeta(BaseModel):
     scope_label: str
     generated_at: datetime
     source: str
+    analytical_snapshot_id: str | None = None
+    snapshot_contract_version: int = 1
+    sources: dict[SourceDomain, SourceMetadata] = Field(default_factory=dict)
+
+
+class SourceMetadata(BaseModel):
+    domain: SourceDomain
+    source: str
+    period: str
+    cutoff: date | None = None
+    as_of: date | None = None
+    is_final: bool = False
+    coverage_numerator: int | None = Field(default=None, ge=0)
+    coverage_denominator: int | None = Field(default=None, ge=0)
+    source_generation: str | None = None
+    authority: str
+    authority_head: str | None = None
+    contract_version: int = Field(default=1, ge=1)
+    rule_version: str | None = None
+    status: SourceStatus = SourceStatus.UNAVAILABLE
+    produced_at: datetime | None = None
+    warnings: tuple[str, ...] = ()
 
 
 class KpiMetric(BaseModel):
@@ -208,6 +254,40 @@ class MetricDefinition(BaseModel):
     comparison_policy: str
     missing_policy: str
     required_capability: Capability = Capability.ANALYTICS
+    formula_reference: str = "retail-reporting-contract"
+    allowed_shapes: tuple[ChartKind, ...] = (ChartKind.KPI, ChartKind.TABLE)
+    suppressible: bool = False
+    source_authority: str = "unihub-retail"
+    query_contract_version: int = 1
+    effective_from: date | None = None
+    effective_to: date | None = None
+
+
+class DimensionDefinition(BaseModel):
+    id: str
+    version: int = 1
+    display_name: str
+    description: str
+    stable_key: str
+    allowed_grains: tuple[str, ...]
+    required_capability: Capability = Capability.ANALYTICS
+    source_authority: str = "unihub-retail"
+
+
+class QueryContractDefinition(BaseModel):
+    version: int = 1
+    max_widgets: int = 12
+    max_dimensions: int = 2
+    max_rows: int = 5000
+    default_deadline_ms: int = 8000
+    supported_grains: tuple[str, ...] = ("day", "week", "month", "quarter", "year")
+
+
+class AnalyticsCatalogResponse(BaseModel):
+    version: int = 1
+    metrics: list[MetricDefinition]
+    dimensions: list[DimensionDefinition]
+    query_contract: QueryContractDefinition = Field(default_factory=QueryContractDefinition)
 
 
 class ValueAxis(BaseModel):
@@ -276,13 +356,31 @@ class DashboardWidget(BaseModel):
     module: ModuleId
     title: str = Field(min_length=1, max_length=160)
     metric_id: str = Field(min_length=1, max_length=160)
+    metric_version: int = Field(default=1, ge=1)
+    query_contract_version: int = Field(default=1, ge=1)
     visualization: ChartKind
     dimension: str | None = Field(default=None, max_length=100)
     time_grain: str = Field(default="month", max_length=40)
+    comparisons: tuple[str, ...] = ()
+    sort: tuple[str, ...] = ()
+    limit: int = Field(default=30, ge=1, le=5000)
     filter_mode: FilterMode = FilterMode.INHERIT
     filters: dict[str, str] = Field(default_factory=dict)
     options: dict[str, str | int | float | bool] = Field(default_factory=dict)
     layout: DashboardLayout
+
+
+class DashboardAclEntry(BaseModel):
+    subject: str = Field(min_length=1, max_length=256)
+    permission: DashboardPermission = DashboardPermission.READ
+
+
+class DashboardScopeCeiling(BaseModel):
+    firms: tuple[str, ...] = ()
+    regionals: tuple[str, ...] = ()
+    asms: tuple[str, ...] = ()
+    stores: tuple[str, ...] = ()
+    allow_agent: bool = True
 
 
 class DashboardCreateRequest(BaseModel):
@@ -290,6 +388,9 @@ class DashboardCreateRequest(BaseModel):
     description: str = Field(default="", max_length=600)
     visibility: DashboardVisibility = DashboardVisibility.PRIVATE
     widgets: list[DashboardWidget] = Field(default_factory=list, max_length=80)
+    acl: list[DashboardAclEntry] = Field(default_factory=list, max_length=16)
+    scope_ceiling: DashboardScopeCeiling = Field(default_factory=DashboardScopeCeiling)
+    query_contract_version: int = Field(default=1, ge=1)
 
 
 class DashboardUpdateRequest(DashboardCreateRequest):
@@ -304,9 +405,40 @@ class DashboardDocument(BaseModel):
     visibility: DashboardVisibility
     version: int
     widgets: list[DashboardWidget]
+    acl: list[DashboardAclEntry] = Field(default_factory=list)
+    scope_ceiling: DashboardScopeCeiling = Field(default_factory=DashboardScopeCeiling)
+    query_contract_version: int = 1
     created_at: datetime
     updated_at: datetime
 
 
 class DashboardListResponse(BaseModel):
     items: list[DashboardDocument]
+
+
+class DashboardSubject(BaseModel):
+    subject: str
+    email: str | None = None
+    display_name: str | None = None
+    last_seen_at: datetime
+
+
+class FilterPreset(BaseModel):
+    id: str
+    owner_subject: str
+    name: str
+    filters: dict[str, str]
+    shared: bool = False
+    version: int = 1
+    created_at: datetime
+    updated_at: datetime
+
+
+class FilterPresetCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    filters: dict[str, str] = Field(default_factory=dict)
+    shared: bool = False
+
+
+class FilterPresetUpdateRequest(FilterPresetCreateRequest):
+    version: int = Field(ge=1)

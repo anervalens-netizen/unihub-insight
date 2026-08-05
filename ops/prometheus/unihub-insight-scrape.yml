@@ -6,3 +6,12 @@
       labels:
         service: unihub-insight
         environment: production
+
+- job_name: unihub_insight_ready
+  metrics_path: /ready-metrics
+  scheme: http
+  static_configs:
+    - targets: ['unihub-caddy:8100']
+      labels:
+        service: unihub-insight
+        environment: production

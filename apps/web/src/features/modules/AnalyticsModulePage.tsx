@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Lock, RefreshCw, RotateCcw, Unlock } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { useGlobalSearch, useUpdateGlobalSearch } from '../../app/search-hooks';
 import { DashboardCanvas } from '../../components/dashboard/DashboardCanvas';
@@ -9,13 +9,86 @@ import { ExcelExportButton } from '../../components/ui/ExcelExportButton';
 import { LoadingState } from '../../components/ui/LoadingState';
 import { analyticsSearchParams } from '../../lib/download';
 import { formatDate, formatMonth } from '../../lib/format';
-import { currentBusinessMonth } from '../../lib/search';
+import { currentBusinessMonth, updateDrillPath } from '../../lib/search';
 import { useIdentity } from '../identity/context';
 import { moduleAnalyticsQuery } from './api';
 import { ModuleProvider } from './context';
 import { DataInspector } from './DataInspector';
-import type { ModuleId } from './schemas';
+import type { ModuleAnalytics, ModuleId } from './schemas';
+import { type ModuleSubview, moduleSubviewConfig, subviewForId, subviewStatus } from './subviews';
 import { moduleWidgets } from './widget-catalog';
+
+function SubviewNavigation({
+  views,
+  selected,
+  statuses,
+  onSelect,
+}: {
+  views: readonly ModuleSubview[];
+  selected: ModuleSubview;
+  statuses: ReadonlyMap<string, ReturnType<typeof subviewStatus>>;
+  onSelect: (id: ModuleSubview['id']) => void;
+}) {
+  return (
+    <nav className="module-subview-nav" aria-label="Sub-view analiză">
+      {views.map((view) => {
+        const status = statuses.get(view.id);
+        return (
+          <button
+            type="button"
+            key={view.id}
+            className={view.id === selected.id ? 'module-subview is-active' : 'module-subview'}
+            onClick={() => onSelect(view.id)}
+          >
+            <span>{view.label}</span>
+            <small
+              className={`availability-dot availability-dot--${status?.availability ?? 'unavailable'}`}
+            >
+              {status?.availability === 'available'
+                ? 'LIVE'
+                : status?.availability === 'partial'
+                  ? 'PARTIAL'
+                  : 'UNAVAILABLE'}
+            </small>
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+function SourceMetadataStrip({ data }: { data: ModuleAnalytics }) {
+  const sources = Object.values(data.meta.sources ?? {});
+  return (
+    <section className="module-source-strip" aria-labelledby="module-source-metadata-title">
+      <h3 id="module-source-metadata-title" className="sr-only">
+        Metadata surse
+      </h3>
+      {sources.length === 0 ? (
+        <span className="meta-chip meta-chip--warning">Metadata sursă indisponibilă</span>
+      ) : (
+        sources.map((source) => (
+          <details className="source-meta" key={source.domain}>
+            <summary>
+              <span>{source.domain}</span>
+              <strong className={`source-status source-status--${source.status}`}>
+                {source.status}
+              </strong>
+            </summary>
+            <div>
+              <span>{source.source}</span>
+              <span>Cutoff: {source.cutoff ?? '—'}</span>
+              <span>Autoritate: {source.authority}</span>
+              {source.warnings.length > 0 ? (
+                <span>Warnings: {source.warnings.join(' · ')}</span>
+              ) : null}
+            </div>
+          </details>
+        ))
+      )}
+    </section>
+  );
+}
 
 export function AnalyticsModulePage({ module }: { module: ModuleId }) {
   const search = useGlobalSearch();
@@ -23,6 +96,11 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
   const identity = useIdentity();
   const period = search.period ?? currentBusinessMonth();
   const input = useMemo(() => ({ ...search, period }), [period, search]);
+  const views = moduleSubviewConfig[module];
+  const selectedSubview = subviewForId(module, search.subview);
+  useEffect(() => {
+    if (search.subview !== selectedSubview.id) updateSearch({ subview: selectedSubview.id }, true);
+  }, [search.subview, selectedSubview.id, updateSearch]);
   const incompatibleAgent = Boolean(
     search.agent && (module === 'finance' || module === 'planning'),
   );
@@ -62,9 +140,49 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
       />
     );
   }
-  const widgets = moduleWidgets(data);
+  const statuses = new Map(views.map((view) => [view.id, subviewStatus(data, view)]));
+  const status = statuses.get(selectedSubview.id);
+  const widgets =
+    status?.availability === 'unavailable' ? [] : moduleWidgets(data, selectedSubview.id);
+  const handleUrlState = (event: { dimensionId: string; value: string; label: string | null }) => {
+    updateSearch({
+      drill: updateDrillPath(search.drill, {
+        dimension: event.dimensionId,
+        value: event.value,
+        label: event.label,
+      }),
+      ...(event.dimensionId === 'store' || event.dimensionId === 'site_code'
+        ? { stores: event.value }
+        : {}),
+    });
+  };
   return (
-    <ModuleProvider data={data}>
+    <ModuleProvider data={data} onUrlStateChange={handleUrlState}>
+      <SubviewNavigation
+        views={views}
+        selected={selectedSubview}
+        statuses={statuses}
+        onSelect={(id) => updateSearch({ subview: id })}
+      />
+      <section className="module-view-heading">
+        <div>
+          <span>Sub-view specializat</span>
+          <h2>{selectedSubview.label}</h2>
+          <p>{selectedSubview.description}</p>
+        </div>
+        {status ? (
+          <div className={`module-contract-state module-contract-state--${status.availability}`}>
+            <strong>
+              {status.availability === 'available'
+                ? 'Contract disponibil'
+                : status.availability === 'partial'
+                  ? 'Contract parțial'
+                  : 'Contract lipsă'}
+            </strong>
+            <span>{status.reason}</span>
+          </div>
+        ) : null}
+      </section>
       <section className="overview-toolbar" aria-label="Starea analizei">
         <div className="overview-meta">
           <span className="meta-chip meta-chip--strong">{formatMonth(data.meta.period)}</span>
@@ -109,19 +227,30 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
           </button>
         </div>
       </section>
+      <SourceMetadataStrip data={data} />
       {editMode ? (
         <div className="edit-notice">
           Trage cardurile din antet și redimensionează-le. Layoutul local este versionat separat
           pentru fiecare modul.
         </div>
       ) : null}
-      <DashboardCanvas
-        widgets={widgets}
-        editMode={editMode}
-        resetToken={resetToken}
-        storageKey={`unihub-insight:${module}-layout:v2`}
-        onInspect={setInspectWidget}
-      />
+      {status?.availability === 'unavailable' ? (
+        <div className="module-unavailable" role="status">
+          <strong>{selectedSubview.label} nu este disponibil</strong>
+          <span>{status.reason}</span>
+          <small>
+            Contractul lipsă nu este înlocuit cu cifre din alt mecanism sau din altă generație.
+          </small>
+        </div>
+      ) : (
+        <DashboardCanvas
+          widgets={widgets}
+          editMode={editMode}
+          resetToken={resetToken}
+          storageKey={`unihub-insight:${module}-${selectedSubview.id}-layout:v2`}
+          onInspect={setInspectWidget}
+        />
+      )}
       {inspectWidget ? (
         <DataInspector
           widgetId={inspectWidget}

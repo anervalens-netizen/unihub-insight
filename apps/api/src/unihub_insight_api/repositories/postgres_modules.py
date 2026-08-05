@@ -4,7 +4,7 @@ import asyncio
 import math
 from collections import defaultdict
 from collections.abc import Sequence
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -26,6 +26,7 @@ from unihub_insight_api.domain import (
     ModuleId,
     OverviewMeta,
     RiskLevel,
+    SourceDomain,
     TrendPoint,
     ValueAxis,
 )
@@ -117,6 +118,16 @@ MODULE_DEFINITIONS: dict[ModuleId, tuple[str, str, Capability, tuple[ValueAxis, 
         ),
         (ChartKind.LINE, ChartKind.AREA, ChartKind.BAR, ChartKind.SCATTER, ChartKind.TABLE),
     ),
+}
+
+MODULE_SOURCE_DOMAINS: dict[ModuleId, SourceDomain] = {
+    ModuleId.SALES: SourceDomain.SALES,
+    ModuleId.PERFORMANCE: SourceDomain.SALES,
+    ModuleId.CAMPAIGNS: SourceDomain.CAMPAIGNS,
+    ModuleId.WORKFORCE: SourceDomain.WORKFORCE,
+    ModuleId.COMPENSATION: SourceDomain.COMPENSATION,
+    ModuleId.FINANCE: SourceDomain.FINANCE,
+    ModuleId.PLANNING: SourceDomain.PLANNING,
 }
 
 
@@ -236,17 +247,21 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         return await dispatch[module](scope)
 
     async def _meta(self, module: ModuleId, scope: AnalyticsScope, source: str) -> OverviewMeta:
-        summary = await self._fetch_summary(scope, scope.period)
-        as_of = summary["last_sale_date"]
+        snapshot = await self.resolve_snapshot(scope)
+        domain = MODULE_SOURCE_DOMAINS[module]
+        source_meta = snapshot.sources.get(domain.value)
         return OverviewMeta(
             period=scope.period,
             comparison=scope.comparison,
-            as_of=as_of if isinstance(as_of, date) else None,
-            is_final=bool(summary["is_month_final"]),
+            as_of=source_meta.as_of if source_meta else None,
+            is_final=source_meta.is_final if source_meta else False,
             data_mode=DataMode.POSTGRES,
             scope_label=scope_label(scope),
             generated_at=datetime.now(UTC),
-            source=source,
+            source=source_meta.source if source_meta else source,
+            analytical_snapshot_id=snapshot.id,
+            snapshot_contract_version=snapshot.contract_version,
+            sources={domain: source_meta} if source_meta else {},
         )
 
     @staticmethod
@@ -999,139 +1014,99 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             alerts=alerts,
         )
 
-    @staticmethod
-    def _salary_scope(scope: AnalyticsScope, params: list[Any], alias: str = "salary") -> list[str]:
-        clauses: list[str] = []
-        if scope.stores:
-            params.append(list(scope.stores))
-            clauses.append(f"{alias}.site_code = ANY(${len(params)}::text[])")
-        else:
-            if scope.firm:
-                params.append(scope.firm)
-                clauses.append(f"LOWER({alias}.company_name) = LOWER(${len(params)})")
-            if scope.regional:
-                params.append(scope.regional)
-                clauses.append(
-                    f"EXISTS (SELECT 1 FROM stores org WHERE org.site_code = {alias}.site_code AND org.regional = ${len(params)})"
-                )
-            if scope.asm:
-                params.append(scope.asm)
-                clauses.append(
-                    f"EXISTS (SELECT 1 FROM stores org WHERE org.site_code = {alias}.site_code AND org.asm = ${len(params)})"
-                )
-        if scope.agent:
-            params.append(scope.agent)
-            clauses.append(
-                f"EXISTS (SELECT 1 FROM agent_salary_links link WHERE link.person_id = {alias}.person_id AND link.agent_code = ${len(params)} AND link.match_status = 'confirmed')"
-            )
-        return clauses
-
-    async def _salary_rows(self, scope: AnalyticsScope) -> Sequence[asyncpg.Record]:
+    async def _compensation_rows(self, scope: AnalyticsScope) -> Sequence[asyncpg.Record]:
         start = shift_month(scope.period, -11)
-        start_year, start_month = (int(part) for part in start.split("-"))
-        end_year, end_month = (int(part) for part in scope.period.split("-"))
-        params: list[Any] = [start_year * 100 + start_month, end_year * 100 + end_month]
-        clauses = ["salary.year * 100 + salary.month BETWEEN $1 AND $2"]
-        clauses.extend(self._salary_scope(scope, params))
+        params: list[Any] = [start, scope.period]
+        firm_filter = ""
+        if scope.firm:
+            params.append(scope.firm)
+            firm_filter = f"AND LOWER(compensation.company_name) = LOWER(${len(params)})"
         async with self.pool.acquire() as connection:
             return await connection.fetch(
                 f"""
-                SELECT salary.year, salary.month, salary.person_id,
-                       MAX(salary.full_name) AS full_name,
-                       MAX(salary.company_name) AS company_name,
-                       MAX(salary.site_code) AS site_code,
-                       MAX(salary.locatie) AS locatie,
-                       SUM(salary.total_salary) AS total_salary
-                FROM salary_records salary
-                WHERE {" AND ".join(clauses)}
-                GROUP BY salary.year, salary.month, salary.person_id
-                ORDER BY salary.year, salary.month, full_name
+                SELECT compensation.period, compensation.company_name,
+                       compensation.eligible_person_count,
+                       compensation.payroll_total,
+                       compensation.average_salary_eligible,
+                       compensation.median_salary
+                FROM reporting_compensation_month_v1 compensation
+                WHERE compensation.period BETWEEN $1 AND $2
+                  {firm_filter}
+                ORDER BY compensation.period, compensation.company_name
                 """,
                 *params,
             )
 
     async def _compensation(self, scope: AnalyticsScope) -> ModuleAnalyticsResponse:
-        salary_rows, sales_rows, meta = await asyncio.gather(
-            self._salary_rows(scope),
+        compensation_rows, sales_rows, meta = await asyncio.gather(
+            self._compensation_rows(scope),
             self._sales_history(scope, start=shift_month(scope.period, -11), end=scope.period),
-            self._meta(ModuleId.COMPENSATION, scope, "salary_records/reporting_agent_month"),
+            self._meta(ModuleId.COMPENSATION, scope, "reporting_compensation_month_v1"),
         )
-        current_year, current_month = (int(part) for part in scope.period.split("-"))
+        selected_company = scope.firm or "__ALL__"
         current = [
-            row for row in salary_rows if int(row["year"]) == current_year and int(row["month"]) == current_month
+            row
+            for row in compensation_rows
+            if str(row["period"]) == scope.period and str(row["company_name"]).casefold() == selected_company.casefold()
         ]
-        payroll = sum((_money(row["total_salary"]) for row in current), Decimal(0))
-        salaries = sorted(_money(row["total_salary"]) for row in current)
-        average = _money(payroll / Decimal(len(salaries))) if salaries else Decimal(0)
-        if salaries:
-            middle = len(salaries) // 2
-            median = (
-                salaries[middle]
-                if len(salaries) % 2
-                else _money((salaries[middle - 1] + salaries[middle]) / Decimal(2))
-            )
-        else:
-            median = Decimal(0)
+        current_row = current[0] if current else None
+        payroll = _money(current_row["payroll_total"]) if current_row else Decimal(0)
+        average = _money(current_row["average_salary_eligible"]) if current_row else Decimal(0)
+        median = _money(current_row["median_salary"]) if current_row else Decimal(0)
         sales = sum(
             (_money(row["total_sales"]) for row in sales_rows if str(row["import_month"]) == scope.period),
             Decimal(0),
         )
         ratio = _ratio(payroll, sales)
-        monthly: dict[str, list[Decimal]] = defaultdict(list)
-        companies: dict[str, Decimal] = defaultdict(Decimal)
-        for row in salary_rows:
-            period = f"{int(row['year']):04d}-{int(row['month']):02d}"
-            monthly[period].append(_money(row["total_salary"]))
-            if period == scope.period:
-                companies[str(row["company_name"])] += _money(row["total_salary"])
-        trend = []
-        for period, values in sorted(monthly.items()):
-            total = sum(values, Decimal(0))
-            trend.append(
-                TrendPoint(
-                    key=period,
-                    label=period,
-                    primary=_money(total),
-                    secondary=_money(total / Decimal(len(values))) if values else None,
-                )
+        selected_rows = [
+            row for row in compensation_rows if str(row["company_name"]).casefold() == selected_company.casefold()
+        ]
+        trend = [
+            TrendPoint(
+                key=str(row["period"]),
+                label=str(row["period"]),
+                primary=_money(row["payroll_total"]),
+                secondary=_money(row["average_salary_eligible"]),
+                comparison=_money(row["median_salary"]),
             )
+            for row in selected_rows
+        ]
+        company_rows = [
+            row
+            for row in compensation_rows
+            if str(row["period"]) == scope.period and str(row["company_name"]) != "__ALL__"
+        ]
         breakdown = [
             BreakdownRow(
-                id=str(row["person_id"]),
-                label=str(row["full_name"]),
-                context=f"{row['company_name']} · {row['locatie'] or row['site_code']}",
-                primary=_money(row["total_salary"]),
-                secondary=None,
-                tertiary=None,
+                id=str(row["company_name"]),
+                label=str(row["company_name"]),
+                context=f"{int(row['eligible_person_count'])} persoane eligibile",
+                primary=_money(row["payroll_total"]),
+                secondary=_money(row["average_salary_eligible"]),
+                tertiary=_money(row["median_salary"]),
                 risk=RiskLevel.HEALTHY,
             )
-            for row in current
+            for row in company_rows
         ]
-        top_people = {row.id for row in sorted(breakdown, key=lambda item: item.primary, reverse=True)[:8]}
         matrix = [
             MatrixCell(
-                x=f"{int(row['year']):04d}-{int(row['month']):02d}",
-                y=str(row["full_name"]),
-                value=_money(row["total_salary"]),
+                x=str(row["period"]),
+                y=str(row["company_name"]),
+                value=_money(row["payroll_total"]),
                 risk=RiskLevel.HEALTHY,
             )
-            for row in salary_rows
-            if str(row["person_id"]) in top_people
-            and f"{int(row['year']):04d}-{int(row['month']):02d}" >= shift_month(scope.period, -5)
+            for row in compensation_rows
+            if str(row["company_name"]) != "__ALL__" and str(row["period"]) >= shift_month(scope.period, -5)
         ]
         alerts: list[InsightAlert] = []
-        if len(current) < 3 and current:
-            alerts.append(
-                InsightAlert(
-                    id="salary-narrow-scope",
-                    severity=AlertSeverity.WARNING,
-                    title="Scope salarial foarte restrâns",
-                    description="Rezultatul conține mai puțin de trei persoane; exportul agregat trebuie suprimat în producție.",
-                )
-            )
         if not current:
             alerts.append(
-                self._missing_alert(ModuleId.COMPENSATION, "Nu există date salariale pentru perioada selectată.")
+                InsightAlert(
+                    id="compensation-suppressed-or-missing",
+                    severity=AlertSeverity.WARNING,
+                    title="Date agregate indisponibile",
+                    description="Luna nu are un batch aprobat sau pragul fail-closed de minimum trei persoane nu este îndeplinit.",
+                )
             )
         kpis = (
             [
@@ -1169,7 +1144,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             meta,
             kpis=kpis,
             trend=trend,
-            distribution=shares(list(companies.items())),
+            distribution=shares([(row.label, row.primary) for row in breakdown]),
             breakdown=sorted(breakdown, key=lambda item: item.primary, reverse=True),
             matrix=matrix,
             alerts=alerts,
@@ -1177,20 +1152,18 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
 
     async def _finance_rows(self, scope: AnalyticsScope) -> Sequence[asyncpg.Record]:
         start = shift_month(scope.period, -11)
-        params: list[Any] = [
-            date.fromisoformat(f"{start}-01"),
-            date.fromisoformat(f"{scope.period}-01"),
-        ]
+        params: list[Any] = [start, scope.period]
         filters: list[str] = []
         if scope.stores:
             params.append(list(scope.stores))
-            filters.append(
-                f"(row.linked_site_code = ANY(${len(params)}::text[]) OR (row.linked_site_code IS NULL AND row.source_site_code = ANY(${len(params)}::text[])))"
-            )
+            filters.append(f"row.site_code = ANY(${len(params)}::text[])")
         else:
             if scope.firm:
                 params.append(scope.firm)
-                filters.append(f"LOWER(row.company_name) = LOWER(${len(params)})")
+                filters.append(
+                    f"(LOWER(row.firma) = LOWER(${len(params)}) "
+                    f"OR (row.is_unallocated AND LOWER(row.company_name) = LOWER(${len(params)})))"
+                )
             if scope.regional:
                 params.append(scope.regional)
                 filters.append(f"row.regional = ${len(params)}")
@@ -1201,40 +1174,16 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         async with self.pool.acquire() as connection:
             return await connection.fetch(
                 f"""
-                WITH normalized AS (
-                    SELECT pnl.company_name, pnl.period, pnl.source_site_code,
-                           pnl.source_location_name, pnl.category_code, pnl.amount,
-                           pnl.data_kind,
-                           CASE WHEN pnl.source_site_code = '__FINANCE_UNALLOCATED__'
-                                THEN pnl.source_site_code
-                                ELSE COALESCE(link.site_code, pnl.source_site_code) END AS canonical_site_code,
-                           CASE WHEN pnl.source_site_code = '__FINANCE_UNALLOCATED__'
-                                THEN NULL ELSE link.site_code END AS linked_site_code,
-                           COALESCE(store.regional, 'Nealocat') AS regional,
-                           COALESCE(store.asm, 'Nealocat') AS asm
-                    FROM store_pnl_monthly pnl
-                    LEFT JOIN store_pnl_site_links link
-                      ON link.company_name = pnl.company_name
-                     AND link.source_site_code = pnl.source_site_code
-                    LEFT JOIN stores store
-                      ON store.site_code = CASE WHEN pnl.source_site_code = '__FINANCE_UNALLOCATED__'
-                          THEN NULL ELSE COALESCE(link.site_code, pnl.source_site_code) END
-                    WHERE pnl.period BETWEEN $1 AND $2
-                ), preferred_kind AS (
-                    SELECT company_name, period, canonical_site_code,
-                           CASE WHEN BOOL_OR(data_kind = 'actual') THEN 'actual' ELSE 'estimated' END AS data_kind
-                    FROM normalized
-                    GROUP BY company_name, period, canonical_site_code
-                )
-                SELECT row.*
-                FROM normalized row
-                JOIN preferred_kind preferred
-                  ON preferred.company_name = row.company_name
-                 AND preferred.period = row.period
-                 AND preferred.canonical_site_code = row.canonical_site_code
-                 AND preferred.data_kind = row.data_kind
-                WHERE {filter_sql}
-                ORDER BY row.period, row.company_name, row.canonical_site_code, row.category_code
+                SELECT row.period, row.company_name, row.source_site_code,
+                       row.source_location_name, row.site_code AS canonical_site_code,
+                       row.category_code, row.amount, row.data_kind,
+                       COALESCE(row.regional, 'Nealocat') AS regional,
+                       COALESCE(row.asm, 'Nealocat') AS asm,
+                       row.is_unallocated
+                FROM reporting_finance_month_v1 row
+                WHERE row.period BETWEEN $1 AND $2
+                  AND {filter_sql}
+                ORDER BY row.period, row.company_name, row.site_code, row.category_code
                 """,
                 *params,
             )
@@ -1242,7 +1191,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
     async def _finance(self, scope: AnalyticsScope) -> ModuleAnalyticsResponse:
         rows, meta = await asyncio.gather(
             self._finance_rows(scope),
-            self._meta(ModuleId.FINANCE, scope, "store_pnl_monthly"),
+            self._meta(ModuleId.FINANCE, scope, "reporting_finance_month_v1"),
         )
         monthly_amounts: dict[str, dict[str, Decimal]] = defaultdict(lambda: defaultdict(Decimal))
         monthly_estimate: dict[str, bool] = defaultdict(bool)
@@ -1250,14 +1199,14 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         store_labels: dict[tuple[str, str], tuple[str, str]] = {}
         category_current: dict[str, Decimal] = defaultdict(Decimal)
         for row in rows:
-            period = row["period"].strftime("%Y-%m")
+            period = str(row["period"])
             category = str(row["category_code"])
             amount = _money(row["amount"])
             monthly_amounts[period][category] += amount
             monthly_estimate[period] |= str(row["data_kind"]) == "estimated"
             if period == scope.period:
                 category_current[category] += amount
-            if str(row["source_site_code"]) == "__FINANCE_UNALLOCATED__":
+            if row["is_unallocated"]:
                 continue
             key = (str(row["company_name"]), str(row["canonical_site_code"]))
             store_amounts[key][category] += amount
@@ -1298,9 +1247,9 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         matrix: list[MatrixCell] = []
         by_store_month: dict[tuple[str, str], dict[str, Decimal]] = defaultdict(lambda: defaultdict(Decimal))
         for row in rows:
-            if str(row["source_site_code"]) == "__FINANCE_UNALLOCATED__":
+            if row["is_unallocated"]:
                 continue
-            period = row["period"].strftime("%Y-%m")
+            period = str(row["period"])
             identifier = f"{row['company_name']}:{row['canonical_site_code']}"
             if identifier in top_stores and period >= shift_month(scope.period, -5):
                 by_store_month[(identifier, period)][str(row["category_code"])] += _money(row["amount"])
@@ -1388,64 +1337,56 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
 
     async def _planning_rows(self, scope: AnalyticsScope) -> Sequence[asyncpg.Record]:
         params: list[Any] = [shift_month(scope.period, -11), scope.period]
-        clauses: list[str] = [
-            "run.forecast_month BETWEEN $1 AND $2",
-            "run.status = 'completed'",
-            "run.metric = 'sales_value'",
-        ]
-        scope_params: list[Any] = params
-        store_clauses = append_reporting_scope(scope, alias="store", params=scope_params, include_agent=False)
-        clauses.extend(store_clauses)
+        store_clauses = append_reporting_scope(scope, alias="scenario", params=params, include_agent=False)
+        scope_sql = " AND ".join(store_clauses) if store_clauses else "TRUE"
         async with self.pool.acquire() as connection:
             return await connection.fetch(
                 f"""
-                WITH selected_runs AS (
-                    SELECT DISTINCT ON (forecast_month)
-                           id, forecast_month
-                    FROM ai_forecast_runs run
-                    WHERE run.forecast_month BETWEEN $1 AND $2
-                      AND run.status = 'completed'
-                      AND run.metric = 'sales_value'
-                      AND run.horizon IN ('current_month', 'rolling_12m')
-                    ORDER BY forecast_month,
-                             CASE WHEN horizon = 'rolling_12m' THEN 0 ELSE 1 END,
-                             generated_at DESC, id DESC
-                ), forecast AS (
-                    SELECT selected.forecast_month, forecast.site_code,
-                           store.locatie, store.firma, store.regional, store.asm,
-                           forecast.forecast_sales
-                    FROM selected_runs selected
-                    JOIN ai_forecast_store_month forecast ON forecast.run_id = selected.id
-                    JOIN stores store ON store.site_code = forecast.site_code
-                    WHERE {" AND ".join(store_clauses)}
+                WITH planning AS (
+                    SELECT scenario.period AS forecast_month,
+                           scenario.site_code,
+                           MAX(scenario.locatie) AS locatie,
+                           MAX(scenario.firma) AS firma,
+                           MAX(scenario.regional) AS regional,
+                           MAX(scenario.asm) AS asm,
+                           SUM(scenario.forecast_value)
+                               FILTER (WHERE scenario.authority_kind = 'forecast') AS forecast_sales,
+                           SUM(scenario.target_value)
+                               FILTER (WHERE scenario.authority_kind = 'target') AS target_value
+                    FROM reporting_planning_scenario_v1 scenario
+                    WHERE scenario.period BETWEEN $1 AND $2
+                      AND {scope_sql}
+                    GROUP BY scenario.period, scenario.site_code
+                    HAVING BOOL_OR(scenario.authority_kind = 'forecast')
                 ), actual AS (
                     SELECT agg.import_month, agg.site_code, SUM(agg.total_sales) AS actual_sales
                     FROM reporting_agent_month agg
                     WHERE agg.import_month BETWEEN $1 AND $2
                     GROUP BY agg.import_month, agg.site_code
                 )
-                SELECT forecast.*, actual.actual_sales,
-                       COALESCE(target.target_value, 0) AS target_value
-                FROM forecast
+                SELECT planning.*, actual.actual_sales
+                FROM planning
                 LEFT JOIN actual
-                  ON actual.import_month = forecast.forecast_month
-                 AND actual.site_code = forecast.site_code
-                LEFT JOIN store_targets target
-                  ON target.import_month = forecast.forecast_month
-                 AND target.site_code = forecast.site_code
-                ORDER BY forecast.forecast_month, forecast.forecast_sales DESC
+                  ON actual.import_month = planning.forecast_month
+                 AND actual.site_code = planning.site_code
+                ORDER BY planning.forecast_month, planning.forecast_sales DESC
                 """,
-                *scope_params,
+                *params,
             )
 
     async def _planning(self, scope: AnalyticsScope) -> ModuleAnalyticsResponse:
         rows, meta = await asyncio.gather(
             self._planning_rows(scope),
-            self._meta(ModuleId.PLANNING, scope, "ai_forecast_runs/ai_forecast_store_month"),
+            self._meta(ModuleId.PLANNING, scope, "reporting_planning_scenario_v1"),
         )
         current = [row for row in rows if str(row["forecast_month"]) == scope.period]
         forecast = sum((_money(row["forecast_sales"]) for row in current), Decimal(0))
-        target = sum((_money(row["target_value"]) for row in current), Decimal(0))
+        has_target = any(row["target_value"] is not None for row in current)
+        target = sum(
+            (_money(row["target_value"]) for row in current if row["target_value"] is not None),
+            Decimal(0),
+        )
+        has_actual = any(row["actual_sales"] is not None for row in current)
         actual = sum(
             (_money(row["actual_sales"]) for row in current if row["actual_sales"] is not None),
             Decimal(0),
@@ -1456,12 +1397,15 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                 "actual": Decimal(0),
                 "target": Decimal(0),
                 "has_actual": False,
+                "has_target": False,
             }
         )
         for row in rows:
             item = monthly[str(row["forecast_month"])]
             item["forecast"] = Decimal(item["forecast"]) + _money(row["forecast_sales"])
-            item["target"] = Decimal(item["target"]) + _money(row["target_value"])
+            if row["target_value"] is not None:
+                item["target"] = Decimal(item["target"]) + _money(row["target_value"])
+                item["has_target"] = True
             if row["actual_sales"] is not None:
                 item["actual"] = Decimal(item["actual"]) + _money(row["actual_sales"])
                 item["has_actual"] = True
@@ -1479,7 +1423,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                     label=period,
                     primary=forecast_value,
                     comparison=actual_value,
-                    target=_money(values["target"]),
+                    target=_money(values["target"]) if bool(values.get("has_target")) else None,
                     is_estimate=actual_value is None,
                 )
             )
@@ -1487,9 +1431,9 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         breakdown: list[BreakdownRow] = []
         for row in current:
             forecast_value = _money(row["forecast_sales"])
-            target_value = _money(row["target_value"])
+            target_value = _money(row["target_value"]) if row["target_value"] is not None else None
             actual_value = _money(row["actual_sales"]) if row["actual_sales"] is not None else None
-            progress = _ratio(forecast_value, target_value)
+            progress = _ratio(forecast_value, target_value) if target_value is not None else None
             breakdown.append(
                 BreakdownRow(
                     id=str(row["site_code"]),
@@ -1536,41 +1480,48 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                     description=f"Gap-ul proiectat este {_money(forecast - target)} RON.",
                 )
             )
-        kpis = (
-            [
+        kpis: list[KpiMetric] = []
+        if current:
+            kpis.append(
                 KpiMetric(
                     id="planning.forecast",
                     label="Forecast",
                     value=_money(forecast),
                     unit=MetricUnit.CURRENCY,
-                    supporting_value=_money(target),
-                    supporting_label="Target",
-                    risk=_risk(_ratio(forecast, target)),
-                ),
-                KpiMetric(
-                    id="planning.target_gap",
-                    label="Gap față de target",
-                    value=_money(forecast - target),
-                    unit=MetricUnit.CURRENCY,
-                    risk=_risk(_ratio(forecast, target)),
-                ),
-                KpiMetric(
-                    id="planning.accuracy",
-                    label="Acuratețe istorică",
-                    value=accuracy or Decimal(0),
-                    unit=MetricUnit.PERCENT,
-                    risk=_risk(accuracy),
-                ),
-                KpiMetric(
-                    id="planning.actual",
-                    label="Actual disponibil",
-                    value=_money(actual),
-                    unit=MetricUnit.CURRENCY,
-                ),
-            ]
-            if current
-            else []
-        )
+                    supporting_value=_money(target) if has_target else None,
+                    supporting_label="Target" if has_target else None,
+                    risk=_risk(_ratio(forecast, target)) if has_target else RiskLevel.HEALTHY,
+                )
+            )
+            if has_target:
+                kpis.append(
+                    KpiMetric(
+                        id="planning.target_gap",
+                        label="Gap față de target",
+                        value=_money(forecast - target),
+                        unit=MetricUnit.CURRENCY,
+                        risk=_risk(_ratio(forecast, target)),
+                    )
+                )
+            if accuracy is not None:
+                kpis.append(
+                    KpiMetric(
+                        id="planning.accuracy",
+                        label="Acuratețe istorică",
+                        value=accuracy,
+                        unit=MetricUnit.PERCENT,
+                        risk=_risk(accuracy),
+                    )
+                )
+            if has_actual:
+                kpis.append(
+                    KpiMetric(
+                        id="planning.actual",
+                        label="Actual disponibil",
+                        value=_money(actual),
+                        unit=MetricUnit.CURRENCY,
+                    )
+                )
         return self._response(
             ModuleId.PLANNING,
             meta,

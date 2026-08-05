@@ -58,25 +58,18 @@ GRANT SELECT ON TABLE
     reporting_focus_item_month,
     reporting_agent_profile,
     reporting_agent_lifecycle_month,
+    reporting_source_snapshot_v1,
+    reporting_campaign_month_v1,
+    reporting_workforce_month_v1,
+    reporting_compensation_month_v1,
+    reporting_visit_month_v1,
+    reporting_finance_month_v1,
+    reporting_planning_scenario_v1,
     store_targets,
     agent_targets,
-    import_snapshots,
     stores,
-    grile_store_current_status,
-    store_pnl_monthly,
-    store_pnl_site_links,
-    ai_forecast_runs,
-    ai_forecast_store_month
+    grile_store_current_status
 TO unihub_insight_reader;
-
--- Compensation queries use only these non-identity columns. Sensitive salary
--- and salary-link identity fields remain outside the Insight reader surface.
-GRANT SELECT (
-    year, month, person_id, full_name, company_name, site_code, locatie, total_salary
-) ON TABLE salary_records TO unihub_insight_reader;
-GRANT SELECT (
-    person_id, agent_code, match_status
-) ON TABLE agent_salary_links TO unihub_insight_reader;
 
 -- The governed product/month view is owned by Insight. Its owner needs only
 -- the source columns used in the view, never access to Retail's public schema

@@ -1,19 +1,28 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Eye, Lock, Save, Settings2, Share2, Unlock } from 'lucide-react';
+import { CopyPlus, Eye, Lock, Save, Settings2, Share2, Unlock } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { useGlobalSearch } from '../../app/search-hooks';
+import { useGlobalSearch, useUpdateGlobalSearch } from '../../app/search-hooks';
 import type { DashboardLayoutItem } from '../../components/dashboard/types';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { LoadingState } from '../../components/ui/LoadingState';
-import { currentBusinessMonth } from '../../lib/search';
+import { currentBusinessMonth, updateDrillPath } from '../../lib/search';
 import { useIdentity } from '../identity/context';
 import type { Capability } from '../identity/schemas';
 import type { ModuleId } from '../modules/schemas';
-import { createDashboard, dashboardsQuery, deleteDashboard, updateDashboard } from './api';
+import { analyticsCatalogQuery } from '../query/api';
+import {
+  createDashboard,
+  dashboardSubjectsQuery,
+  dashboardsQuery,
+  dashboardVersionsQuery,
+  deleteDashboard,
+  updateDashboard,
+} from './api';
 import { CustomDashboardPreview } from './CustomDashboardPreview';
 import { DashboardEditor } from './DashboardEditor';
 import { DashboardLibrary } from './DashboardLibrary';
+import { dashboardCanDelete, dashboardCanEdit, dashboardCanManageSharing } from './permissions';
 import type { DashboardDocument, DashboardWidget } from './schemas';
 import { type DashboardTemplate, dashboardTemplates, moduleMetrics } from './templates';
 
@@ -31,6 +40,21 @@ function cloneDocument(document: DashboardDocument): DashboardDocument {
   return structuredClone(document);
 }
 
+function cloneCreateInput(document: DashboardDocument) {
+  return {
+    name: `${document.name} (copie)`,
+    description: document.description,
+    visibility: 'private' as const,
+    widgets: document.widgets.map((widget) => ({
+      ...structuredClone(widget),
+      id: crypto.randomUUID(),
+    })),
+    scope_ceiling: structuredClone(document.scope_ceiling),
+    acl: [],
+    query_contract_version: document.query_contract_version,
+  };
+}
+
 function nextWidget(module: ModuleId, existing: DashboardWidget[]): DashboardWidget {
   const metric = moduleMetrics[module][0];
   const y = existing.reduce((maximum, item) => Math.max(maximum, item.layout.y + item.layout.h), 0);
@@ -39,12 +63,17 @@ function nextWidget(module: ModuleId, existing: DashboardWidget[]): DashboardWid
     module,
     title: metric?.label ?? 'Widget nou',
     metric_id: metric?.id ?? 'sales.total',
+    metric_version: 1,
+    query_contract_version: 1,
     visualization: 'kpi',
     dimension: null,
     time_grain: 'month',
     filter_mode: 'inherit',
     filters: {},
     options: {},
+    comparisons: [],
+    sort: [],
+    limit: 30,
     layout: { x: 0, y, w: 6, h: 5, min_w: 4, min_h: 4 },
   };
 }
@@ -52,10 +81,12 @@ function nextWidget(module: ModuleId, existing: DashboardWidget[]): DashboardWid
 export function CustomDashboardsPage() {
   const identity = useIdentity();
   const search = useGlobalSearch();
+  const updateSearch = useUpdateGlobalSearch();
   const period = search.period ?? currentBusinessMonth();
   const queryClient = useQueryClient();
   const listQuery = useQuery(dashboardsQuery);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const catalogQuery = useQuery(analyticsCatalogQuery());
+  const [selectedId, setSelectedId] = useState<string | null>(search.dashboard_id ?? null);
   const [draft, setDraft] = useState<DashboardDocument | null>(null);
   const [mode, setMode] = useState<'view' | 'configure'>('view');
   const [editLayout, setEditLayout] = useState(false);
@@ -63,20 +94,51 @@ export function CustomDashboardsPage() {
   const [message, setMessage] = useState<string | null>(null);
 
   const documents = listQuery.data?.items ?? [];
-  const selected = documents.find((item) => item.id === selectedId) ?? null;
+  const selectedCurrent = documents.find((item) => item.id === selectedId) ?? null;
+  const versionsQuery = useQuery({
+    ...dashboardVersionsQuery(selectedId ?? ''),
+    enabled: Boolean(selectedId),
+  });
+  const selected =
+    versionsQuery.data?.find((item) => item.version === search.dashboard_version) ??
+    selectedCurrent;
 
   useEffect(() => {
     if (selected) setDraft(cloneDocument(selected));
   }, [selected]);
 
   useEffect(() => {
-    if (!selectedId && documents[0]) setSelectedId(documents[0].id);
-  }, [documents, selectedId]);
+    if (search.dashboard_id && documents.some((item) => item.id === search.dashboard_id)) {
+      if (selectedId !== search.dashboard_id) setSelectedId(search.dashboard_id);
+      return;
+    }
+    if (!selectedId && documents[0]) {
+      setSelectedId(documents[0].id);
+      updateSearch(
+        { dashboard_id: documents[0].id, dashboard_version: documents[0].version },
+        true,
+      );
+    }
+  }, [documents, search.dashboard_id, selectedId, updateSearch]);
 
-  const canEdit = Boolean(
-    draft &&
-      (draft.owner_subject === identity.subject || identity.capabilities.includes('insight:admin')),
+  useEffect(() => {
+    if (selected && search.dashboard_version !== selected.version && !versionsQuery.isPending) {
+      updateSearch({ dashboard_version: selected.version }, true);
+    }
+  }, [search.dashboard_version, selected, updateSearch, versionsQuery.isPending]);
+
+  const historical = Boolean(
+    selectedCurrent && selected && selected.version !== selectedCurrent.version,
   );
+  const canEdit = Boolean(draft && !historical && dashboardCanEdit(draft, identity));
+  const canManageSharing = Boolean(
+    draft && !historical && dashboardCanManageSharing(draft, identity),
+  );
+  const canDelete = Boolean(draft && !historical && dashboardCanDelete(draft, identity));
+  const subjectsQuery = useQuery({
+    ...dashboardSubjectsQuery,
+    enabled: canManageSharing,
+  });
 
   useEffect(() => {
     if (!canEdit) {
@@ -101,10 +163,22 @@ export function CustomDashboardsPage() {
     onSuccess: async (document) => {
       setDraft(document);
       setSelectedId(document.id);
+      updateSearch({ dashboard_id: document.id, dashboard_version: document.version }, true);
       setMessage('Dashboard creat.');
       await queryClient.invalidateQueries({ queryKey: ['dashboards'] });
     },
     onError: (error) => setMessage(error instanceof Error ? error.message : 'Crearea a eșuat.'),
+  });
+  const cloneMutation = useMutation({
+    mutationFn: (document: DashboardDocument) => createDashboard(cloneCreateInput(document)),
+    onSuccess: async (document) => {
+      setDraft(document);
+      setSelectedId(document.id);
+      updateSearch({ dashboard_id: document.id, dashboard_version: document.version }, true);
+      setMessage('Dashboard clonat, privat și fără ACL moștenit.');
+      await queryClient.invalidateQueries({ queryKey: ['dashboards'] });
+    },
+    onError: (error) => setMessage(error instanceof Error ? error.message : 'Clonarea a eșuat.'),
   });
   const updateMutation = useMutation({
     mutationFn: ({ id, document }: { id: string; document: DashboardDocument }) =>
@@ -113,10 +187,14 @@ export function CustomDashboardsPage() {
         description: document.description,
         visibility: document.visibility,
         widgets: document.widgets,
+        acl: document.acl,
+        scope_ceiling: document.scope_ceiling,
+        query_contract_version: document.query_contract_version,
         version: document.version,
       }),
     onSuccess: async (document) => {
       setDraft(document);
+      updateSearch({ dashboard_version: document.version }, true);
       setMessage('Dashboard salvat.');
       await queryClient.invalidateQueries({ queryKey: ['dashboards'] });
     },
@@ -127,6 +205,7 @@ export function CustomDashboardsPage() {
     onSuccess: async () => {
       setSelectedId(null);
       setDraft(null);
+      updateSearch({ dashboard_id: undefined, dashboard_version: undefined }, true);
       setMessage(null);
       await queryClient.invalidateQueries({ queryKey: ['dashboards'] });
     },
@@ -144,6 +223,28 @@ export function CustomDashboardsPage() {
           }
         : current,
     );
+
+  const duplicateWidget = (id: string): void =>
+    setDraft((current) => {
+      if (!current) return current;
+      const source = current.widgets.find((widget) => widget.id === id);
+      if (!source) return current;
+      const bottom = current.widgets.reduce(
+        (maximum, widget) => Math.max(maximum, widget.layout.y + widget.layout.h),
+        0,
+      );
+      return {
+        ...current,
+        widgets: [
+          ...current.widgets,
+          {
+            ...structuredClone(source),
+            id: crypto.randomUUID(),
+            layout: { ...source.layout, x: 0, y: bottom },
+          },
+        ],
+      };
+    });
 
   const applyLayout = useCallback((items: DashboardLayoutItem[]): void => {
     setDraft((current) =>
@@ -189,7 +290,7 @@ export function CustomDashboardsPage() {
     if (draft && canEdit) updateMutation.mutate({ id: draft.id, document: draft });
   };
   const remove = (): void => {
-    if (draft && canEdit && window.confirm('Ștergi dashboardul?')) {
+    if (draft && canDelete && window.confirm('Ștergi dashboardul?')) {
       deleteMutation.mutate(draft.id);
     }
   };
@@ -210,6 +311,14 @@ export function CustomDashboardsPage() {
         templates={availableTemplates}
         onSelect={(id) => {
           setSelectedId(id);
+          const document = documents.find((item) => item.id === id);
+          updateSearch(
+            {
+              dashboard_id: id,
+              dashboard_version: document?.version,
+            },
+            true,
+          );
           setMode('view');
           setMessage(null);
         }}
@@ -236,6 +345,23 @@ export function CustomDashboardsPage() {
                   onChange={(event) => setDraft({ ...draft, name: event.target.value })}
                 />
                 <p>{draft.description || 'Fără descriere'}</p>
+                {versionsQuery.data && versionsQuery.data.length > 0 ? (
+                  <label className="dashboard-version-picker">
+                    <span>Versiune</span>
+                    <select
+                      value={String(draft.version)}
+                      onChange={(event) =>
+                        updateSearch({ dashboard_version: Number(event.target.value) })
+                      }
+                    >
+                      {versionsQuery.data.map((version) => (
+                        <option key={version.version} value={version.version}>
+                          v{version.version}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
                 {!canEdit ? (
                   <span className="save-message">
                     <Share2 size={11} /> Partajat read-only
@@ -245,6 +371,15 @@ export function CustomDashboardsPage() {
                 ) : null}
               </div>
               <div className="dashboard-mode">
+                <button
+                  type="button"
+                  className="button button--ghost"
+                  disabled={cloneMutation.isPending}
+                  onClick={() => cloneMutation.mutate(draft)}
+                >
+                  <CopyPlus size={14} />
+                  Clonează
+                </button>
                 <button
                   type="button"
                   className={mode === 'view' ? 'is-active' : ''}
@@ -304,13 +439,31 @@ export function CustomDashboardsPage() {
                   editMode={canEdit && editLayout}
                   resetToken={resetToken}
                   onLayoutChange={canEdit ? applyLayout : () => undefined}
+                  onUrlStateChange={(event) => {
+                    updateSearch({
+                      drill: updateDrillPath(search.drill, {
+                        dimension: event.dimensionId,
+                        value: event.value,
+                        label: event.label,
+                      }),
+                      ...(event.dimensionId === 'store' ||
+                      event.dimensionId === 'site_code' ||
+                      event.dimensionId === 'id'
+                        ? { stores: event.value }
+                        : {}),
+                    });
+                  }}
                 />
               </>
             ) : canEdit ? (
               <DashboardEditor
                 draft={draft}
                 availableModules={availableModules}
+                metrics={catalogQuery.data?.metrics ?? []}
                 pending={updateMutation.isPending}
+                canManageSharing={canManageSharing}
+                subjects={subjectsQuery.data ?? []}
+                subjectsPending={subjectsQuery.isPending}
                 onDraftChange={setDraft}
                 onAddWidget={(module) =>
                   setDraft({
@@ -319,6 +472,7 @@ export function CustomDashboardsPage() {
                   })
                 }
                 onUpdateWidget={updateWidget}
+                onDuplicateWidget={duplicateWidget}
                 onRemoveWidget={(id) =>
                   setDraft({
                     ...draft,
@@ -326,7 +480,7 @@ export function CustomDashboardsPage() {
                   })
                 }
                 onSave={save}
-                onDelete={remove}
+                {...(canDelete ? { onDelete: remove } : {})}
               />
             ) : null}
           </>

@@ -22,6 +22,13 @@ interface RequestOptions<T> {
   body?: unknown;
 }
 
+interface BlobRequestOptions {
+  signal?: AbortSignal;
+  timeoutMs?: number;
+  method?: 'GET' | 'POST' | 'PUT';
+  body?: unknown;
+}
+
 function requestUrl(path: string, search?: URLSearchParams): string {
   const suffix = search && search.size > 0 ? `?${search.toString()}` : '';
   return `${environment.apiBaseUrl}${path}${suffix}`;
@@ -105,4 +112,43 @@ export function getJson<T>(
   options: Omit<RequestOptions<T>, 'method' | 'body'>,
 ): Promise<T> {
   return requestJson(path, search, options);
+}
+
+export async function requestBlob(
+  path: string,
+  search: URLSearchParams | undefined,
+  { signal, timeoutMs = 8_000, method = 'GET', body }: BlobRequestOptions = {},
+): Promise<{ blob: Blob; filename: string | null }> {
+  const timeoutController = new AbortController();
+  const timeout = window.setTimeout(() => timeoutController.abort(), timeoutMs);
+  const abort = (): void => timeoutController.abort();
+  if (signal?.aborted) timeoutController.abort();
+  else signal?.addEventListener('abort', abort, { once: true });
+
+  try {
+    const response = await fetch(requestUrl(path, search), {
+      method,
+      credentials: 'include',
+      headers: {
+        Accept: 'text/csv, application/octet-stream',
+        ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      signal: timeoutController.signal,
+    });
+    if (!response.ok) throw await parseError(response);
+    return {
+      blob: await response.blob(),
+      filename: response.headers.get('content-disposition'),
+    };
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new ApiError('Request cancelled or deadline exceeded.', 0, null);
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+    signal?.removeEventListener('abort', abort);
+  }
 }

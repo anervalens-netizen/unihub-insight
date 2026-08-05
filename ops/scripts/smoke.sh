@@ -45,7 +45,7 @@ public_sha="$(
   exit 1
 }
 
-for path in /livez /readyz /metrics /docs /redoc /openapi.json; do
+for path in /livez /readyz /metrics /ready-metrics /docs /redoc /openapi.json; do
   status="$(curl --silent --show-error --max-time 5 --output /dev/null --write-out '%{http_code}' "$PUBLIC_URL$path")"
   [[ "$status" == 404 ]] || {
     echo "public diagnostic $path returned HTTP $status" >&2
