@@ -77,9 +77,24 @@ export function createChartDesign(
     palette,
     primary: palette[0] ?? '#4f46e5',
     secondary: palette[4] ?? palette[1] ?? '#2563eb',
-    positive: preferences.palette === 'monochrome' ? palette[1] ?? '#475569' : dark ? '#5eead4' : '#0f766e',
-    warning: preferences.palette === 'monochrome' ? palette[2] ?? '#64748b' : dark ? '#fbbf24' : '#d97706',
-    negative: preferences.palette === 'monochrome' ? palette[3] ?? '#94a3b8' : dark ? '#fb7185' : '#be123c',
+    positive:
+      preferences.palette === 'monochrome'
+        ? (palette[1] ?? '#475569')
+        : dark
+          ? '#5eead4'
+          : '#0f766e',
+    warning:
+      preferences.palette === 'monochrome'
+        ? (palette[2] ?? '#64748b')
+        : dark
+          ? '#fbbf24'
+          : '#d97706',
+    negative:
+      preferences.palette === 'monochrome'
+        ? (palette[3] ?? '#94a3b8')
+        : dark
+          ? '#fb7185'
+          : '#be123c',
     text: dark ? '#eef4fb' : '#172033',
     muted: dark ? '#9eacc0' : '#64748b',
     subtle: dark ? '#6f7f96' : '#94a3b8',
@@ -145,21 +160,24 @@ function mergeTextStyle(value: unknown, design: ChartDesign): PlainRecord {
 function styleAxis(value: unknown, design: ChartDesign): unknown {
   if (Array.isArray(value)) return value.map((item) => styleAxis(item, design));
   if (!isPlainRecord(value)) return value;
+  const axisLine = value['axisLine'];
+  const axisTick = value['axisTick'];
+  const splitLine = value['splitLine'];
   return {
     ...value,
     axisLine: {
       lineStyle: { color: design.border },
-      ...(isPlainRecord(value.axisLine) ? value.axisLine : {}),
+      ...(isPlainRecord(axisLine) ? axisLine : {}),
     },
     axisTick: {
       show: false,
-      ...(isPlainRecord(value.axisTick) ? value.axisTick : {}),
+      ...(isPlainRecord(axisTick) ? axisTick : {}),
     },
-    axisLabel: mergeTextStyle(value.axisLabel, design),
-    nameTextStyle: mergeTextStyle(value.nameTextStyle, design),
+    axisLabel: mergeTextStyle(value['axisLabel'], design),
+    nameTextStyle: mergeTextStyle(value['nameTextStyle'], design),
     splitLine: {
       lineStyle: { color: design.grid, type: 'dashed', opacity: 0.9 },
-      ...(isPlainRecord(value.splitLine) ? value.splitLine : {}),
+      ...(isPlainRecord(splitLine) ? splitLine : {}),
     },
   };
 }
@@ -172,7 +190,7 @@ function styleLegend(value: unknown, design: ChartDesign): unknown {
     itemWidth: 13,
     itemHeight: 7,
     itemGap: design.preferences.density === 'compact' ? 9 : 13,
-    textStyle: mergeTextStyle(existing.textStyle, design),
+    textStyle: mergeTextStyle(existing['textStyle'], design),
     ...existing,
   };
 }
@@ -195,59 +213,79 @@ function styleTooltip(value: unknown, design: ChartDesign): unknown {
   };
 }
 
+function labelStyle(existing: PlainRecord, design: ChartDesign): PlainRecord {
+  return {
+    position: 'top',
+    color: design.muted,
+    fontSize: design.preferences.density === 'compact' ? 9 : 10,
+    ...existing,
+    show: design.preferences.showLabels || existing['show'] === true,
+  };
+}
+
 function styleSeries(value: unknown, design: ChartDesign): unknown {
   if (Array.isArray(value)) return value.map((item) => styleSeries(item, design));
   if (!isPlainRecord(value)) return value;
-  const type = typeof value.type === 'string' ? value.type : '';
-  const existingItemStyle = isPlainRecord(value.itemStyle) ? value.itemStyle : {};
-  const existingLabel = isPlainRecord(value.label) ? value.label : {};
-  const existingEmphasis = isPlainRecord(value.emphasis) ? value.emphasis : {};
+  const typeValue = value['type'];
+  const type = typeof typeValue === 'string' ? typeValue : '';
+  const itemStyleValue = value['itemStyle'];
+  const labelValue = value['label'];
+  const emphasisValue = value['emphasis'];
+  const existingItemStyle = isPlainRecord(itemStyleValue) ? itemStyleValue : {};
+  const existingLabel = isPlainRecord(labelValue) ? labelValue : {};
+  const existingEmphasis = isPlainRecord(emphasisValue) ? emphasisValue : {};
   const base: PlainRecord = {
     ...value,
-    universalTransition: value.universalTransition ?? true,
+    universalTransition: value['universalTransition'] ?? true,
     emphasis: { focus: 'series', ...existingEmphasis },
   };
+
   if (type === 'line') {
-    base.smooth = design.preferences.smoothLines ? (value.smooth ?? 0.16) : false;
-    base.showSymbol = value.showSymbol ?? false;
-    base.symbol = value.symbol ?? 'circle';
-    base.symbolSize = value.symbolSize ?? 6;
+    base['smooth'] = design.preferences.smoothLines ? (value['smooth'] ?? 0.16) : false;
+    base['showSymbol'] = value['showSymbol'] ?? false;
+    base['symbol'] = value['symbol'] ?? 'circle';
+    base['symbolSize'] = value['symbolSize'] ?? 6;
+    base['label'] = labelStyle(existingLabel, design);
   }
   if (type === 'bar') {
-    base.barMaxWidth = value.barMaxWidth ?? (design.preferences.density === 'compact' ? 26 : 34);
-    base.itemStyle = {
+    base['barMaxWidth'] =
+      value['barMaxWidth'] ?? (design.preferences.density === 'compact' ? 26 : 34);
+    base['itemStyle'] = {
       borderRadius: [7, 7, 2, 2],
       ...existingItemStyle,
     };
-    base.label = {
-      show: design.preferences.showLabels,
-      position: 'top',
-      color: design.muted,
-      fontSize: design.preferences.density === 'compact' ? 9 : 10,
-      ...existingLabel,
-    };
+    base['label'] = labelStyle(existingLabel, design);
   }
   if (type === 'pie') {
-    base.itemStyle = {
+    base['itemStyle'] = {
       borderColor: design.surface,
       borderWidth: 2,
       borderRadius: 7,
       ...existingItemStyle,
     };
-    base.label = {
-      show: design.preferences.showLabels,
+    base['label'] = {
       color: design.text,
       fontSize: design.preferences.density === 'compact' ? 9 : 10,
       ...existingLabel,
+      show: design.preferences.showLabels || existingLabel['show'] === true,
     };
   }
   if (type === 'scatter') {
-    base.symbolSize = value.symbolSize ?? 10;
-    base.itemStyle = {
+    base['symbolSize'] = value['symbolSize'] ?? 10;
+    base['itemStyle'] = {
       opacity: 0.82,
       shadowBlur: 8,
       shadowColor: withAlpha(design.primary, 0.22),
       ...existingItemStyle,
+    };
+    base['label'] = labelStyle(existingLabel, design);
+  }
+  if (type === 'heatmap') {
+    base['label'] = {
+      color: design.text,
+      fontSize: design.preferences.density === 'compact' ? 8 : 9,
+      ...existingLabel,
+      show: design.preferences.showLabels || existingLabel['show'] === true,
     };
   }
   return base;
@@ -284,7 +322,9 @@ export function applyChartDesign(
 ): EChartsCoreOption {
   const mapped = styleValue(option, design);
   const record = isPlainRecord(mapped) ? mapped : {};
-  const existingAria = isPlainRecord(record.aria) ? record.aria : {};
+  const ariaValue = record['aria'];
+  const textStyleValue = record['textStyle'];
+  const existingAria = isPlainRecord(ariaValue) ? ariaValue : {};
   return {
     ...record,
     color: design.palette,
@@ -297,7 +337,7 @@ export function applyChartDesign(
     textStyle: {
       color: design.text,
       fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
-      ...(isPlainRecord(record.textStyle) ? record.textStyle : {}),
+      ...(isPlainRecord(textStyleValue) ? textStyleValue : {}),
     },
     aria: {
       enabled: true,
