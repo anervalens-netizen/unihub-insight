@@ -26,7 +26,7 @@ function usePersistentBoolean(key: string, initial: boolean): [boolean, (value: 
 function useTheme() {
   const [dark, setDark] = usePersistentBoolean('unihub-insight:dark', false);
   useEffect(() => {
-    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    document.documentElement.dataset['theme'] = dark ? 'dark' : 'light';
   }, [dark]);
   return { dark, setDark };
 }
