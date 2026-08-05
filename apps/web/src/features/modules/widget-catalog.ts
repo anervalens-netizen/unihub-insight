@@ -1,4 +1,5 @@
 import type { DashboardWidgetDefinition } from '../../components/dashboard/types';
+import type { ModuleAnalytics } from './schemas';
 import {
   ModuleAlertsWidget,
   ModuleBreakdownWidget,
@@ -10,7 +11,6 @@ import {
   ModuleMatrixWidget,
   ModuleTrendWidget,
 } from './widgets';
-import type { ModuleAnalytics } from './schemas';
 
 export function moduleWidgets(data: ModuleAnalytics): DashboardWidgetDefinition[] {
   return [

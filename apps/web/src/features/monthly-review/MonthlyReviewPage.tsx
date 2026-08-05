@@ -5,8 +5,8 @@ import { useMemo, useState } from 'react';
 
 import { useGlobalSearch } from '../../app/search-hooks';
 import { EChart } from '../../components/charts/EChart';
-import { ExcelExportButton } from '../../components/ui/ExcelExportButton';
 import { ErrorState } from '../../components/ui/ErrorState';
+import { ExcelExportButton } from '../../components/ui/ExcelExportButton';
 import { LoadingState } from '../../components/ui/LoadingState';
 import { analyticsSearchParams } from '../../lib/download';
 import { formatCurrency, formatDate, formatInteger, formatPercent } from '../../lib/format';

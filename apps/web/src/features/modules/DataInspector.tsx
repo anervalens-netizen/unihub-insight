@@ -107,7 +107,16 @@ export function DataInspector({
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
   return createPortal(
-    <div className="widget-modal-backdrop" role="presentation" onMouseDown={onClose}>
+    <div
+      className="widget-modal-backdrop"
+      role="button"
+      tabIndex={0}
+      aria-label="Închide inspectorul de date"
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') onClose();
+      }}
+      onMouseDown={onClose}
+    >
       <section
         className="data-inspector"
         role="dialog"
@@ -155,8 +164,10 @@ export function DataInspector({
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row, index) => (
-                  <tr key={`${widgetId}-${index}`}>
+                {rows.map((row) => (
+                  <tr
+                    key={`${widgetId}-${columns.map((column) => String(row[column] ?? '')).join('|')}`}
+                  >
                     {columns.map((column) => (
                       <td key={column}>{String(row[column] ?? '')}</td>
                     ))}

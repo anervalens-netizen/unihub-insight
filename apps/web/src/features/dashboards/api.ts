@@ -2,10 +2,10 @@ import { queryOptions } from '@tanstack/react-query';
 
 import { getJson, requestEmpty, requestJson } from '../../lib/api';
 import {
-  dashboardDocumentSchema,
-  dashboardListSchema,
   type DashboardCreateInput,
   type DashboardUpdateInput,
+  dashboardDocumentSchema,
+  dashboardListSchema,
 } from './schemas';
 
 export const dashboardsQuery = queryOptions({

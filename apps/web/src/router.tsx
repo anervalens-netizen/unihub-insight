@@ -4,7 +4,7 @@ import {
   createRouter,
   type ErrorComponentProps,
 } from '@tanstack/react-router';
-import { lazy, Suspense, type ReactNode } from 'react';
+import { lazy, type ReactNode, Suspense } from 'react';
 
 import { AppShell } from './app/AppShell';
 import { ErrorState } from './components/ui/ErrorState';

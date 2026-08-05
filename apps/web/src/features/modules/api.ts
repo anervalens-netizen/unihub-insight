@@ -2,7 +2,7 @@ import { queryOptions } from '@tanstack/react-query';
 
 import { getJson } from '../../lib/api';
 import type { GlobalSearch } from '../../lib/search';
-import { moduleAnalyticsSchema, type ModuleId } from './schemas';
+import { type ModuleId, moduleAnalyticsSchema } from './schemas';
 
 export function moduleAnalyticsQuery(module: ModuleId, search: GlobalSearch & { period: string }) {
   const params = new URLSearchParams({ period: search.period, comparison: search.comparison });

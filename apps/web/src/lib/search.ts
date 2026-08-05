@@ -29,8 +29,8 @@ export function currentBusinessMonth(now = new Date()): string {
   const parts = Object.fromEntries(
     formatter.formatToParts(now).map((part) => [part.type, part.value]),
   );
-  const year = parts['year'];
-  const month = parts['month'];
+  const year = parts.year;
+  const month = parts.month;
   if (!year || !month) throw new Error('Business month could not be resolved.');
   return `${year}-${month}`;
 }

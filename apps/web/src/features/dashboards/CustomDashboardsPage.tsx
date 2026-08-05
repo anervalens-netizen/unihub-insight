@@ -15,7 +15,7 @@ import { CustomDashboardPreview } from './CustomDashboardPreview';
 import { DashboardEditor } from './DashboardEditor';
 import { DashboardLibrary } from './DashboardLibrary';
 import type { DashboardDocument, DashboardWidget } from './schemas';
-import { dashboardTemplates, moduleMetrics, type DashboardTemplate } from './templates';
+import { type DashboardTemplate, dashboardTemplates, moduleMetrics } from './templates';
 
 const moduleCapability: Record<ModuleId, Capability> = {
   sales: 'insight:analytics',
