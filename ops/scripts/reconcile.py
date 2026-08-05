@@ -231,9 +231,9 @@ async def specialized_differences(
         )
         workforce = await connection.fetchrow(
             f"""
-            SELECT COALESCE(SUM(row.active_agent_count), 0)::numeric AS headcount
-            FROM reporting_workforce_month_v1 row
-            WHERE row.period = $1 AND {scope_sql}
+            SELECT COUNT(DISTINCT row.agent)::numeric AS headcount
+            FROM reporting_agent_month row
+            WHERE row.import_month = $1 AND {scope_sql}
             """,
             *params,
         )
