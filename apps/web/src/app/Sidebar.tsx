@@ -33,7 +33,7 @@ export function Sidebar({
             <Link
               key={item.to}
               to={item.to}
-              search={(previous) => previous}
+              search={true}
               activeOptions={{ exact: item.to === '/' }}
               className="nav-link"
               activeProps={{ className: 'nav-link nav-link--active' }}
