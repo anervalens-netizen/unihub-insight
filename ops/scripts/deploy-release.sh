@@ -93,6 +93,7 @@ UV_LINK_MODE=copy \
   "$UV_BIN" sync --project "$RELEASE/apps/api" --frozen --no-dev
 chgrp -R unihub-insight "$BASE/python"
 chmod -R g+rX,o-rwx "$BASE/python"
+chown -R root:unihub-insight "$RELEASE"
 
 # The service account can read the release but cannot modify it. The root
 # deployer retains ownership so old immutable releases can be retired safely.
