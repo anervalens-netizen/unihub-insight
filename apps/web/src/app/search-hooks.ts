@@ -1,4 +1,4 @@
-import { useNavigate, useSearch } from '@tanstack/react-router';
+import { useLocation, useNavigate, useSearch } from '@tanstack/react-router';
 import { useCallback } from 'react';
 
 import { type GlobalSearch, type GlobalSearchPatch, globalSearchSchema } from '../lib/search';
@@ -9,13 +9,14 @@ export function useGlobalSearch(): GlobalSearch {
 
 export function useUpdateGlobalSearch() {
   const navigate = useNavigate();
+  const pathname = useLocation({ select: (location) => location.pathname });
+  const search = useGlobalSearch();
   return useCallback(
     (patch: GlobalSearchPatch, replace = false): void => {
-      void navigate({
-        search: (previous) => globalSearchSchema.parse({ ...previous, ...patch }),
-        replace,
-      });
+      const nextSearch = globalSearchSchema.parse({ ...search, ...patch });
+      // The pathname is runtime-dynamic but constrained to the registered router location.
+      void navigate({ to: pathname, search: nextSearch, replace } as never);
     },
-    [navigate],
+    [navigate, pathname, search],
   );
 }
