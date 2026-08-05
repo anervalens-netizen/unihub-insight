@@ -131,10 +131,12 @@ PY
 
 systemctl is-active --quiet docker.service
 systemctl is-active --quiet unihub-insight-api.service
+systemctl is-active --quiet unihub-insight-backup.timer
+systemctl is-enabled --quiet unihub-insight-backup.timer
 docker inspect unihub_postgres --format '{{.State.Running}}' | grep -qx true
 docker exec unihub_postgres pg_isready -q
 docker inspect unihub-caddy --format '{{.State.Running}}' | grep -qx true
-docker inspect unihub-caddy --format '{{range .Mounts}}{{println .Source " " .Destination " " .Mode}}{{end}}' \
+docker inspect unihub-caddy --format '{{range .Mounts}}{{if eq .Destination "/opt/unihub-insight"}}{{println .Source .Destination .Mode}}{{end}}{{end}}' \
   | grep -Fqx '/opt/unihub-insight /opt/unihub-insight ro'
 docker exec unihub-caddy caddy validate \
   --config /etc/caddy/Caddyfile --adapter caddyfile

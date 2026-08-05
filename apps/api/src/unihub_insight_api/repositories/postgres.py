@@ -286,6 +286,7 @@ class PostgresAnalyticsRepository:
 
     async def _fetch_summary(self, scope: AnalyticsScope, period: str) -> asyncpg.Record:
         clauses, params = self._scope_sql(scope, period)
+        target_source = self._target_source_sql(scope, params)
         async with self.pool.acquire() as connection:
             row = await connection.fetchrow(
                 f"""
@@ -303,9 +304,10 @@ class PostgresAnalyticsRepository:
                 ),
                 target_summary AS (
                     SELECT COALESCE(SUM(target.target_value), 0) AS total_target
-                    FROM store_targets target
-                    WHERE target.import_month = $1
-                      AND EXISTS (
+                    FROM (
+                        {target_source}
+                    ) target
+                    WHERE EXISTS (
                           SELECT 1 FROM filtered item WHERE item.site_code = target.site_code
                       )
                 ),
@@ -374,6 +376,7 @@ class PostgresAnalyticsRepository:
 
     async def _fetch_performance(self, scope: AnalyticsScope, period: str) -> Sequence[asyncpg.Record]:
         clauses, params = self._scope_sql(scope, period)
+        target_source = self._target_source_sql(scope, params)
         async with self.pool.acquire() as connection:
             return await connection.fetch(
                 f"""
@@ -389,10 +392,7 @@ class PostgresAnalyticsRepository:
                     GROUP BY agg.site_code
                 ),
                 targets AS (
-                    SELECT site_code, COALESCE(SUM(target_value), 0) AS target_value
-                    FROM store_targets
-                    WHERE import_month = $1
-                    GROUP BY site_code
+                    {target_source}
                 )
                 SELECT
                     performance.site_code,
@@ -408,6 +408,24 @@ class PostgresAnalyticsRepository:
                 """,
                 *params,
             )
+
+    @staticmethod
+    def _target_source_sql(scope: AnalyticsScope, params: list[Any]) -> str:
+        if scope.agent:
+            params.append(scope.agent)
+            return f"""
+                SELECT site_code, COALESCE(SUM(target_value), 0) AS target_value
+                FROM agent_targets
+                WHERE import_month = $1
+                  AND agent = ${len(params)}
+                GROUP BY site_code
+            """
+        return """
+            SELECT site_code, COALESCE(SUM(target_value), 0) AS target_value
+            FROM store_targets
+            WHERE import_month = $1
+            GROUP BY site_code
+        """
 
     @staticmethod
     def _scope_sql(scope: AnalyticsScope, period: str) -> tuple[list[str], list[Any]]:

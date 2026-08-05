@@ -123,6 +123,10 @@ if ! systemctl start unihub-insight-backup.service; then
   restore_previous
   exit 1
 fi
+if ! systemctl enable --now unihub-insight-backup.timer; then
+  restore_previous
+  exit 1
+fi
 # Restarting the API starts and waits for its required ordered migration unit.
 if ! systemctl restart unihub-insight-api.service; then
   restore_previous
