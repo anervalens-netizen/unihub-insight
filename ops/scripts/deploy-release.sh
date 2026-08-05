@@ -13,8 +13,8 @@ CURRENT="$BASE/current"
 PREVIOUS="$(readlink -f "$CURRENT" 2>/dev/null || true)"
 
 SOURCE="$(cd "$SOURCE" && pwd)"
-[[ "$SOURCE_SHA" =~ ^[0-9a-f]{7,64}$ ]] || {
-  echo "source SHA must be a lowercase hexadecimal Git SHA" >&2
+[[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+  echo "source SHA must be an exact 40-character lowercase Git SHA" >&2
   exit 1
 }
 [[ -f "$SOURCE/release-evidence.json" ]] || {
@@ -44,20 +44,25 @@ for path in sorted(pathlib.Path(source, "apps/web/dist").rglob("*")):
         digest.update(b"\n")
 if digest.hexdigest() != evidence.get("dist_sha256"):
     raise SystemExit("release build digest mismatch")
+build_info = json.loads(pathlib.Path(source, "apps/web/dist/build-info.json").read_text())
+if build_info != {"source_sha": expected_sha}:
+    raise SystemExit("public build metadata source SHA mismatch")
 PY
 [[ -s "$SOURCE/apps/web/dist/index.html" ]] || {
   echo "release is missing the verified SPA build" >&2
   exit 1
 }
 
-id unihub-insight >/dev/null 2>&1 \
-  || useradd --system --home "$BASE" --shell /usr/sbin/nologin unihub-insight
-install -d -o unihub-insight -g unihub-insight -m 0750 "$BASE/releases"
+id unihub-insight >/dev/null 2>&1 || {
+  echo "missing pre-provisioned service identity: unihub-insight" >&2
+  exit 1
+}
+install -d -o root -g unihub-insight -m 0750 "$BASE/releases"
 [[ ! -e "$RELEASE" ]] || {
   echo "release already exists: $RELEASE" >&2
   exit 1
 }
-install -d -o unihub-insight -g unihub-insight -m 0750 "$RELEASE"
+install -d -o root -g unihub-insight -m 0750 "$RELEASE"
 rsync -a --delete --exclude='.git/' --exclude='node_modules/' --exclude='.venv/' "$SOURCE/" "$RELEASE/"
 printf '%s\n' "$SOURCE_SHA" > "$RELEASE/SOURCE_SHA"
 chown -R root:unihub-insight "$RELEASE"
@@ -70,13 +75,23 @@ fi
   echo "missing runtime uv; install it at $BASE/bin/uv or set UNIHUB_INSIGHT_UV" >&2
   exit 1
 }
-"$UV_BIN" sync --project "$RELEASE/apps/api" --frozen --no-dev
+install -d -o root -g unihub-insight -m 0750 "$BASE/python"
+install -d -o root -g root -m 0700 "$BASE/cache/uv"
+UV_PYTHON_INSTALL_DIR="$BASE/python" \
+UV_CACHE_DIR="$BASE/cache/uv" \
+UV_LINK_MODE=copy \
+  "$UV_BIN" sync --project "$RELEASE/apps/api" --frozen --no-dev
+chgrp -R unihub-insight "$BASE/python"
+chmod -R g+rX,o-rwx "$BASE/python"
 
 # The service account can read the release but cannot modify it. The root
 # deployer retains ownership so old immutable releases can be retired safely.
 find "$RELEASE" -type d -exec chmod 0750 {} +
 find "$RELEASE" -type f -exec chmod 0640 {} +
 find "$RELEASE" -type f \( -path '*/bin/*' -o -name '*.sh' \) -exec chmod 0750 {} +
+
+docker exec unihub-caddy caddy validate \
+  --config /etc/caddy/Caddyfile --adapter caddyfile
 
 ln -sfn "$RELEASE" "$BASE/current.next"
 mv -Tf "$BASE/current.next" "$CURRENT"
@@ -87,19 +102,18 @@ restore_previous() {
     ln -sfn "$PREVIOUS" "$BASE/current.next"
     mv -Tf "$BASE/current.next" "$CURRENT"
     systemctl restart unihub-insight-api.service || true
+  else
+    [[ ! -L "$CURRENT" ]] || unlink "$CURRENT"
+    systemctl stop unihub-insight-api.service >/dev/null 2>&1 || true
   fi
 }
 
-if ! systemctl start unihub-insight-migrate.service; then
+if ! systemctl start unihub-insight-backup.service; then
   restore_previous
   exit 1
 fi
+# Restarting the API starts and waits for its required ordered migration unit.
 if ! systemctl restart unihub-insight-api.service; then
-  restore_previous
-  exit 1
-fi
-if ! docker exec unihub-caddy caddy validate \
-  --config /etc/caddy/Caddyfile --adapter caddyfile; then
   restore_previous
   exit 1
 fi
@@ -109,7 +123,15 @@ if ! bash "$CURRENT/ops/scripts/smoke.sh"; then
   exit 1
 fi
 
-find "$BASE/releases" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' \
-  | sort -nr | tail -n +6 | cut -d' ' -f2- | xargs -r rm -rf
+while IFS= read -r old_release; do
+  [[ "$old_release" == "$BASE/releases/"* ]] || {
+    echo "refusing unsafe release cleanup target: $old_release" >&2
+    exit 1
+  }
+  find "$old_release" -depth -delete
+done < <(
+  find "$BASE/releases" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' \
+    | sort -nr | tail -n +6 | cut -d' ' -f2-
+)
 
 echo "deployed $SOURCE_SHA"

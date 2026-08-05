@@ -14,6 +14,3 @@ UNIHUB_INSIGHT_MANAGEMENT_GROUPS="unihub-manager,unihub-admin,authentik Admins"
 UNIHUB_INSIGHT_HR_GROUPS="unihub-hr,unihub-admin,authentik Admins"
 UNIHUB_INSIGHT_PNL_GROUPS="unihub-pnl,unihub-admin,authentik Admins"
 UNIHUB_INSIGHT_ADMIN_GROUPS="unihub-admin,authentik Admins"
-
-# Used only by the one-shot migration service, never by the API runtime.
-UNIHUB_INSIGHT_MIGRATION_DATABASE_URL=postgresql://unihub_insight_migration_runner:REPLACE@127.0.0.1:5432/unihub

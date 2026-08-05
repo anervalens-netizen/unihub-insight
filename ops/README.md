@@ -6,7 +6,9 @@ This directory contains the complete pre-deploy package. No script executes agai
 
 - `/opt/unihub-insight/releases/<SOURCE_SHA>` — immutable release directories;
 - `/opt/unihub-insight/current` — atomic active symlink;
-- `/etc/unihub-insight/insight.env` — root-owned runtime secrets, mode `0640`;
+- `/etc/unihub-insight/insight.env` — root-only API runtime secrets, mode `0600`;
+- `/etc/unihub-insight/migration.env` — separate root-only migration
+  credential, mode `0600`; never loaded into the API service;
 - `unihub-insight-api.service` — read API;
 - `unihub-insight-migrate.service` — one-shot metadata migration;
 - PostgreSQL authorities `unihub_insight_reader`, `unihub_insight_metadata`,
@@ -25,7 +27,9 @@ This directory contains the complete pre-deploy package. No script executes agai
 1. As the `unihub` database owner, create the Insight authorities, process
    identities and pre-owned `insight` schema with
    `postgres/roles-before-migration.sql.template`.
-2. Create `/etc/unihub-insight/insight.env` from `env/insight.production.example`; generate the proxy secret with `openssl rand -hex 32`.
+2. Create the two root-owned `0600` files from
+   `env/insight.production.example` and `env/migration.production.example`;
+   generate the proxy secret with `openssl rand -hex 32`.
 3. Install the systemd units from `systemd/` and run `systemctl daemon-reload`.
 4. Add `caddy/unihub-insight.caddy.template` to the existing Docker Caddyfile,
    mount `/opt/unihub-insight:/opt/unihub-insight:ro` in `unihub-caddy`, and set
@@ -56,7 +60,9 @@ strips browser-supplied `X-Authentik-*` and `X-UniHub-Proxy-Secret` headers, the
 injects `UNIHUB_INSIGHT_PROXY_SECRET` only on the API upstream. The public client
 must never choose identity headers or the proxy secret. Keep the API value in
 `/etc/unihub-insight/insight.env` and the Caddy value in its private `.env`,
-never in Git.
+never in Git. The migration DSN exists only in root-only
+`/etc/unihub-insight/migration.env`; systemd reads it for the one-shot
+migration service.
 
 ## Backups
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ENV_FILE="${1:-/etc/unihub-insight/insight.env}"
+ENV_FILE="${1:-/etc/unihub-insight/migration.env}"
 DESTINATION="${2:-/var/backups/unihub-insight}"
 [[ -f "$ENV_FILE" ]] || {
   echo "missing $ENV_FILE" >&2

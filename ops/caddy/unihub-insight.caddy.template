@@ -1,11 +1,14 @@
 # Add this site block to the existing /opt/Mobiup/infra/caddy/Caddyfile.
 # The unihub-caddy compose service must also mount the release root read-only:
 #   - /opt/unihub-insight:/opt/unihub-insight:ro
-# Its existing .env must define UNIHUB_INSIGHT_PROXY_SECRET. The value is
-# deliberately used only on the API upstream request below.
+# Its existing .env must define UNIHUB_INSIGHT_PROXY_SECRET. Caddy reads it at
+# request time so the value is not expanded into the adapted JSON config.
 
 http://insight.unihub.ro, insight.unihub.ro {
 	import proxy_defaults
+	# Strip the boundary secret before every handler, including Authentik
+	# callbacks. Only the API reverse proxy below may add it again.
+	request_header -X-UniHub-Proxy-Secret
 
 	# Authentik callback paths must remain reachable without forward-auth.
 	handle /outpost.goauthentik.io/* {
@@ -16,31 +19,32 @@ http://insight.unihub.ro, insight.unihub.ro {
 	@insight_diagnostics path /livez /readyz /metrics /docs /redoc /openapi.json
 	respond @insight_diagnostics 404
 
+	# Exact, non-sensitive release identity stays public for deployment checks.
+	handle /build-info.json {
+		root * /opt/unihub-insight/current/apps/web/dist
+		header Cache-Control "no-store"
+		file_server
+	}
+
 	# Keep the existing cache contract: immutable static assets and an
 	# uncached HTML shell. Missing static files do not receive SPA fallback.
-	@insight_assets path /assets/* *.js *.css *.woff2 *.png *.svg
+	@insight_assets path /assets/*
 	header @insight_assets Cache-Control "public, max-age=31536000, immutable"
-	@insight_shell {
-		not path /assets/* *.js *.css *.woff2 *.png *.svg
-	}
-	header @insight_shell Cache-Control "no-store"
 
 	@insight_api path /api/*
 	handle @insight_api {
 		route {
 			# Never trust browser-supplied identity or boundary headers. The
 			# imported authentik_forward snippet also strips X-Authentik-*.
-			request_header -X-UniHub-Proxy-Secret
 			import authentik_forward
 			reverse_proxy 172.23.0.1:8100 {
-				header_up X-UniHub-Proxy-Secret {$UNIHUB_INSIGHT_PROXY_SECRET}
+				header_up X-UniHub-Proxy-Secret {env.UNIHUB_INSIGHT_PROXY_SECRET}
 			}
 		}
 	}
 
 	handle @insight_assets {
 		route {
-			request_header -X-UniHub-Proxy-Secret
 			import authentik_forward
 			root * /opt/unihub-insight/current/apps/web/dist
 			file_server
@@ -49,8 +53,8 @@ http://insight.unihub.ro, insight.unihub.ro {
 
 	handle {
 		route {
-			request_header -X-UniHub-Proxy-Secret
 			import authentik_forward
+			header Cache-Control "no-store"
 			root * /opt/unihub-insight/current/apps/web/dist
 			try_files {path} /index.html
 			file_server

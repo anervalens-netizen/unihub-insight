@@ -1,14 +1,16 @@
 [Unit]
 Description=Backup UniHub Insight metadata
 After=network-online.target docker.service
-Wants=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
 
 [Service]
 Type=oneshot
 User=root
 Group=root
 WorkingDirectory=/opt/unihub-insight/current
-ExecStart=/bin/bash /opt/unihub-insight/current/ops/scripts/backup-metadata.sh
+ExecStartPre=/bin/bash -c 'for attempt in {1..45}; do (echo >/dev/tcp/127.0.0.1/5432) >/dev/null 2>&1 && exit 0; sleep 2; done; exit 1'
+ExecStart=/bin/bash /opt/unihub-insight/current/ops/scripts/backup-metadata.sh /etc/unihub-insight/migration.env
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict

@@ -1,0 +1,3 @@
+# Root-only credential for migrations, backups and restore drills. Never load
+# this file into the long-running API service.
+UNIHUB_INSIGHT_MIGRATION_DATABASE_URL=postgresql://unihub_insight_migration_runner:REPLACE@127.0.0.1:5432/unihub

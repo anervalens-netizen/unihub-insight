@@ -6,7 +6,7 @@ set -euo pipefail
   exit 2
 }
 BACKUP="${2:?backup required}"
-ENV_FILE="${3:-/etc/unihub-insight/insight.env}"
+ENV_FILE="${3:-/etc/unihub-insight/migration.env}"
 [[ -f "$BACKUP" ]] || {
   echo "missing backup: $BACKUP" >&2
   exit 1

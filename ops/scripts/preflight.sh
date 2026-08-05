@@ -3,9 +3,15 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ENV_FILE="${1:-/etc/unihub-insight/insight.env}"
+MIGRATION_ENV_FILE="${2:-/etc/unihub-insight/migration.env}"
 BASE="${UNIHUB_INSIGHT_BASE:-/opt/unihub-insight}"
-RELEASE="${2:-$BASE/current}"
+RELEASE="${3:-$BASE/current}"
 LOCAL_API="${UNIHUB_INSIGHT_LOCAL_API:-http://172.23.0.1:8100}"
+
+[[ $EUID -eq 0 ]] || {
+  echo "run as root so private environment files can be verified" >&2
+  exit 1
+}
 
 required=(python3 psql curl systemctl docker sha256sum ss)
 for command in "${required[@]}"; do
@@ -37,14 +43,28 @@ RELEASE="$(readlink -f "$RELEASE")"
   echo "missing environment file: $ENV_FILE" >&2
   exit 1
 }
-[[ "$(stat -c '%a' "$ENV_FILE")" =~ ^(600|640)$ ]] || {
-  echo "environment file must use mode 600 or 640" >&2
+[[ "$(stat -c '%a' "$ENV_FILE")" == 600 ]] || {
+  echo "runtime environment file must use mode 600" >&2
   exit 1
 }
+[[ -f "$MIGRATION_ENV_FILE" ]] || {
+  echo "missing environment file: $MIGRATION_ENV_FILE" >&2
+  exit 1
+}
+[[ "$(stat -c '%a' "$MIGRATION_ENV_FILE")" == 600 ]] || {
+  echo "migration environment file must use mode 600" >&2
+  exit 1
+}
+if grep -Eq '^[[:space:]]*UNIHUB_INSIGHT_MIGRATION_DATABASE_URL=' "$ENV_FILE"; then
+  echo "migration credential must not be present in the API runtime file" >&2
+  exit 1
+fi
 
 set -a
 # shellcheck disable=SC1090
 source "$ENV_FILE"
+# shellcheck disable=SC1090
+source "$MIGRATION_ENV_FILE"
 set +a
 
 for variable in \
@@ -79,11 +99,14 @@ python3 - "$RELEASE/release-evidence.json" "$RELEASE" "$RELEASE/SOURCE_SHA" <<'P
 import hashlib
 import json
 import pathlib
+import re
 import sys
 
 evidence_path, release, source_sha_path = sys.argv[1:]
 evidence = json.loads(pathlib.Path(evidence_path).read_text())
 source_sha = pathlib.Path(source_sha_path).read_text().strip()
+if not re.fullmatch(r"[0-9a-f]{40}", source_sha):
+    raise SystemExit("release source SHA is not exact")
 if evidence.get("source_sha") != source_sha:
     raise SystemExit("release evidence source SHA mismatch")
 if evidence.get("prepared_host") != "dell-standby":
@@ -99,6 +122,11 @@ for path in sorted(pathlib.Path(release, "apps/web/dist").rglob("*")):
         digest.update(b"\n")
 if digest.hexdigest() != evidence.get("dist_sha256"):
     raise SystemExit("release build digest mismatch")
+build_info = json.loads(
+    pathlib.Path(release, "apps/web/dist/build-info.json").read_text()
+)
+if build_info != {"source_sha": source_sha}:
+    raise SystemExit("public build metadata source SHA mismatch")
 PY
 
 systemctl is-active --quiet docker.service

@@ -17,6 +17,11 @@ The API secret is `UNIHUB_INSIGHT_TRUSTED_PROXY_SECRET` in
 `UNIHUB_INSIGHT_PROXY_SECRET`. They must match and must never appear in Git,
 browser JavaScript, Authentik claims, systemd unit text or logs.
 
+The migration DSN is isolated in root-only `/etc/unihub-insight/migration.env`.
+It is absent from the API runtime environment; systemd reads it only for the
+one-shot migration service, while root-owned backup/restore scripts load it
+directly.
+
 Capability defaults and required negative tests live in
 [ops/authentik/README.md](../ops/authentik/README.md). Production must verify
 no-session redirect, forged-header 401, capability 403, sensitive-module

@@ -9,8 +9,8 @@ OUTPUT="${3:?output directory required}"
 	echo "missing source directory: $SOURCE" >&2
 	exit 1
 }
-[[ "$SOURCE_SHA" =~ ^[0-9a-f]{7,64}$ ]] || {
-	echo "source SHA must be a lowercase hexadecimal Git SHA" >&2
+[[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+	echo "source SHA must be an exact 40-character lowercase Git SHA" >&2
 	exit 1
 }
 SOURCE="$(cd "$SOURCE" && pwd)"
@@ -61,6 +61,7 @@ rsync -a --delete \
 cd "$OUTPUT"
 npm ci --ignore-scripts
 "$UV_BIN" sync --project apps/api --frozen --all-groups
+export PATH="$(dirname "$UV_BIN"):$PATH"
 VITE_API_BASE_URL=/api/v1 \
 VITE_RETAIL_BASE_URL=https://retail.unihub.ro \
 npm run verify
@@ -69,9 +70,16 @@ npm run verify
 	exit 1
 }
 
+printf '{"source_sha":"%s"}\n' "$SOURCE_SHA" \
+	> apps/web/dist/build-info.json
+
 # Dependencies are rebuilt on the primary with its pinned runtime uv. The
 # artifact therefore contains source plus the Dell-verified SPA build only.
-rm -rf node_modules apps/web/node_modules apps/api/.venv
+for dependency_path in node_modules apps/web/node_modules apps/api/.venv; do
+	if [[ -e "$dependency_path" || -L "$dependency_path" ]]; then
+		find "$dependency_path" -depth -delete
+	fi
+done
 DIST_SHA256="$(find apps/web/dist -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}')"
 printf '{\n  "source_sha": "%s",\n  "prepared_host": "%s",\n  "verified": true,\n  "build": true,\n  "dist_sha256": "%s"\n}\n' \
 	"$SOURCE_SHA" "$(hostname -s)" "$DIST_SHA256" > release-evidence.json

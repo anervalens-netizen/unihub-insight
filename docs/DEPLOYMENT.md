@@ -29,7 +29,9 @@ rsync -a "/var/tmp/unihub-insight-releases/$SHA/" \
 
 ## Primary topology
 
-Install the units from `ops/systemd/` and configure `/etc/unihub-insight/insight.env`.
+Install the units from `ops/systemd/` and configure the root-owned `0600` files
+`/etc/unihub-insight/insight.env` and `/etc/unihub-insight/migration.env`.
+The API unit loads only the first; migrations and backups use only the second.
 The API listens only on Docker's host bridge `172.23.0.1:8100`; PostgreSQL is
 the Docker container `unihub_postgres` published to host `127.0.0.1:5432`.
 
@@ -60,10 +62,11 @@ sudo /opt/unihub-insight/current/ops/scripts/preflight.sh
 sudo /opt/unihub-insight/current/ops/scripts/smoke.sh
 ```
 
-`preflight.sh` checks the Dell evidence, immutable build digest, Docker
-PostgreSQL/Caddy state, Caddy configuration, API bind, migration registry and
-read-only database boundary. `smoke.sh` checks local liveness/readiness,
-public SPA reachability and public 404 responses for diagnostics.
+`preflight.sh` checks the Dell evidence, immutable build digest and public
+`build-info.json`, Docker PostgreSQL/Caddy state, Caddy configuration, API bind,
+migration registry and read-only database boundary. `smoke.sh` checks local
+liveness/readiness, public SPA reachability and public 404 responses for
+diagnostics.
 
 Rollback is code-only and keeps the database at its current schema:
 
