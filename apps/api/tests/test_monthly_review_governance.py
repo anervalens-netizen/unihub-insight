@@ -83,8 +83,7 @@ def test_review_periods_are_strictly_bounded() -> None:
     )
     with pytest.raises(ValueError, match="bounded"):
         validate_review_periods(
-            [f"2025-{month:02d}" for month in range(1, 13)]
-            + ["2024-01", "2024-02", "2024-03", "2024-04", "2024-05"]
+            [f"2025-{month:02d}" for month in range(1, 13)] + ["2024-01", "2024-02", "2024-03", "2024-04", "2024-05"]
         )
     with pytest.raises(ValueError, match="YYYY-MM"):
         validate_review_periods(["2026-13"])
