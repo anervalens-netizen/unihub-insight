@@ -56,11 +56,5 @@ strict = true
 plugins = ["pydantic.mypy"]
 mypy_path = "src"
 exclude = ["tests/"]
-
-[[tool.mypy.overrides]]
-module = ["asyncpg", "asyncpg.*", "xlsxwriter", "xlsxwriter.*"]
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "unihub_insight_api.repositories.monthly_review"
-disable_error_code = ["assignment", "arg-type"]
+allow_redefinition = true
+disable_error_code = ["import-untyped"]
