@@ -16,6 +16,7 @@ export default defineConfig({
     sourcemap: true,
     cssCodeSplit: true,
     reportCompressedSize: true,
+    chunkSizeWarningLimit: 550,
     rollupOptions: {
       output: {
         manualChunks(id) {
@@ -30,9 +31,8 @@ export default defineConfig({
           }
           if (normalized.includes('/@tanstack/')) return 'vendor-tanstack';
           if (normalized.includes('/gridstack/')) return 'vendor-grid';
-          if (normalized.includes('/echarts/') || normalized.includes('/zrender/')) {
-            return 'vendor-charts';
-          }
+          if (normalized.includes('/zrender/')) return 'vendor-zrender';
+          if (normalized.includes('/echarts/')) return 'vendor-echarts';
           return 'vendor';
         },
       },
