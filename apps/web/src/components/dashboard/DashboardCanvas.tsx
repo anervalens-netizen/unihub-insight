@@ -84,6 +84,7 @@ export function DashboardCanvas({
       },
       host,
     );
+    if (!grid) return;
     gridRef.current = grid;
     const persist = (): void => {
       const items = (grid.save(false) as GridStackWidget[])
@@ -97,7 +98,7 @@ export function DashboardCanvas({
     };
     grid.on('change', persist);
     return () => {
-      grid.off('change', persist);
+      grid.off('change');
       grid.destroy(false);
       gridRef.current = null;
     };
@@ -160,8 +161,8 @@ export function DashboardCanvas({
             <div className="grid-stack-item-content">
               <WidgetFrame
                 title={widget.title}
-                subtitle={widget.subtitle}
                 editMode={editMode}
+                {...(widget.subtitle === undefined ? {} : { subtitle: widget.subtitle })}
                 {...inspectProps}
               >
                 <Widget />
