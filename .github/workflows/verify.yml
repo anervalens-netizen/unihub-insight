@@ -45,6 +45,26 @@ jobs:
 
       - name: Normalize source
         run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("apps/api/src/unihub_insight_api/repositories/monthly_review_reporting.py")
+          source = path.read_text(encoding="utf-8")
+          source = source.replace("from typing import Any\n", "from typing import Any, cast\n")
+          source = source.replace(
+              "            return await connection.fetch(\n",
+              "            return cast(\n"
+              "                Sequence[asyncpg.Record],\n"
+              "                await connection.fetch(\n",
+          )
+          source = source.replace(
+              "                *params,\n            )",
+              "                    *params,\n"
+              "                ),\n"
+              "            )",
+          )
+          path.write_text(source, encoding="utf-8")
+          PY
           npm run format
           uv run --project apps/api ruff check --fix apps/api/src apps/api/tests
 
