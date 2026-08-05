@@ -100,14 +100,14 @@ export function ModuleKpiFour() {
   return <ModuleKpiWidget index={3} />;
 }
 
-function ChartToggle({
+function ChartToggle<Kind extends ChartKind>({
   options,
   value,
   onChange,
 }: {
-  options: readonly ChartKind[];
-  value: ChartKind;
-  onChange: (value: ChartKind) => void;
+  options: readonly Kind[];
+  value: Kind;
+  onChange: (value: Kind) => void;
 }) {
   const labels: Partial<Record<ChartKind, string>> = {
     line: 'Linie',
