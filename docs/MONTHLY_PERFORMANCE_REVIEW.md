@@ -24,7 +24,9 @@ The report also compares the month-over-month seasonal lift with the same transi
 - returns by store, product and agent;
 - explicit alerts and methodology.
 
-## Performance score
+## Governed metrics and scoring
+
+Every executive metric ID is versioned in the central metric catalog. The scoring and status thresholds are defined by `services/monthly_review_contract.py`, and contract tests compare that governance definition with the runtime calculation.
 
 The score is a prioritization aid, not a compensation formula:
 
@@ -45,9 +47,19 @@ The sales difference is reconciled exactly into:
 
 A rounding correction is assigned to the last component so the three drivers always equal the exact sales difference.
 
-## Cohort and identity
+## Canonical data path
 
-The live adapter uses the currently eligible stores in the selected scope and reads historical transactions for that cohort. Explicit store selection dominates parent organizational filters. Agent targets come from `agent_targets`; an agent never inherits the full store target.
+The production API does not aggregate the report directly from `sales_transactions`.
+
+- store and agent facts come from `reporting_agent_month`;
+- product facts and distribution come from `reporting_item_month`;
+- targets come from `store_targets` and `agent_targets`;
+- return value and product attributes, which are absent from the reporting tables, come from the versioned read-only view `insight.monthly_review_item_month`;
+- the view is defined by migration `002_monthly_review_item_month.sql`, uses a security barrier and exposes monthly aggregates only;
+- the API reader has no direct `SELECT` privilege on `sales_transactions`;
+- every request is bounded to at most 16 distinct months and at most 500 product candidates.
+
+The live adapter uses the currently eligible stores in the selected scope. Explicit store selection dominates parent organizational filters. Agent targets come from `agent_targets`; an agent never inherits the full store target.
 
 ## Exports
 
