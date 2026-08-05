@@ -37,9 +37,9 @@ Docker container `unihub_postgres` published to host `127.0.0.1:5432`.
 Metadata backup/restore runs PostgreSQL 18's `pg_dump`/`pg_restore` inside that
 container, avoiding host-client version drift.
 
-Add `ops/caddy/unihub-insight.caddy.template` to the existing
-`/opt/Mobiup/infra/caddy/Caddyfile`. Add this read-only mount to the existing
-`unihub-caddy` Compose service:
+The live `/opt/Mobiup/infra/caddy/Caddyfile` includes the site represented by
+`ops/caddy/unihub-insight.caddy.template`. The `unihub-caddy` Compose service
+already has these read-only mounts:
 
 ```yaml
 - /opt/unihub-insight:/opt/unihub-insight:ro
@@ -86,13 +86,12 @@ sudo /opt/unihub-insight/current/ops/scripts/rollback.sh PREVIOUS_SOURCE_SHA
 The database role/grant SQL and `migrate.py` remain Terra-owned and are not
 changed by this deployment lane.
 
-## Live prerequisites still required
+## Recurring production release gates
 
-- Terra's approved database roles, grants, migrations and migration registry;
-- generated API and Caddy secrets with correct file modes;
-- the `unihub-insight` service account, `/opt/unihub-insight` directories and
-  primary runtime `uv`;
-- Caddy site inclusion, read-only release mount, Authentik provider/outpost,
-  Cloudflare/DNS/TLS routing and Caddy reload;
-- live reconciliation, authorization negatives, backup/restore drill and
-  public smoke evidence.
+The runtime, roles, secrets, service account, Caddy/Authentik, Cloudflare routing and monitoring are live. Every production candidate must still verify rather than assume:
+
+- approved grants/migrations and the read-only boundary;
+- exact artifact SHA/digest and immutable current symlink;
+- Caddy config, UDS, Authentik access and public diagnostic 404s;
+- representative live reconciliation and authorization negatives;
+- backup/restore readiness, metrics/alerts, smoke and rollback path.

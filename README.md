@@ -6,17 +6,18 @@
 
 ## Starea curentă
 
-Versiunea inițială `0.1.0` livrează fundația tehnică și primul vertical slice:
+Aplicația este live pe serverul principal și are o fundație operațională solidă. Nu este încă viziunea completă de produs: Overview și Raportul lunar sunt suprafețele mature, iar cele șapte module de domeniu folosesc încă predominant același șablon analitic generic.
 
-- shell desktop full-width, fără limitările mobile din UniHub Retail;
-- rutare tipizată și filtre globale păstrate în URL;
-- Overview funcțional cu KPI, evoluție cumulată, contribuții, risc și alerte;
-- canvas GridStack pe 24 de coloane, drag & resize, mod View/Edit și layout persistent;
-- ECharts 6 modular, încărcat doar pe pagina analitică;
-- TanStack Query, Router și Table;
-- API FastAPI separat, cu mod demo determinist și adaptor PostgreSQL read-only;
-- contracte API validate, health checks, teste și bugete explicite de performanță;
-- documentație canonică, roadmap și ADR-uri.
+| Suprafață | Stare |
+| --- | --- |
+| Deploy, Authentik, acces limitat la Andrei/Alexandra/Bogdan, PostgreSQL read-only, monitorizare | `LIVE` |
+| Shell desktop, filtre în URL, Overview | `LIVE` |
+| Raport lunar cu istoric/comparații și XLSX numeric | `LIVE` |
+| Sales, Performance, Campaigns, Workforce, Compensation, Finance, Planning | `PARȚIAL` — date live, dar UI încă generic |
+| Custom Dashboards, inspect și export | `PARȚIAL` |
+| Drill/cross-filter, toate read-model-urile, chart catalog și reconcilierea completă | `ÎN PLAN` |
+
+Ținta completă, research-ul ECharts și regulile de execuție Luna/Terra sunt în [Planul integrat](docs/PLAN_DEZVOLTARE_INTEGRAT.md), iar statusul compact este în [Roadmap](ROADMAP.md).
 
 ## Stack
 
@@ -32,7 +33,7 @@ Versiunea inițială `0.1.0` livrează fundația tehnică și primul vertical sl
 | API | FastAPI 0.139, Pydantic v2 |
 | Date | PostgreSQL prin `asyncpg`, rol read-only |
 | Tooling Python | Python 3.13, uv, Ruff, mypy, pytest |
-| Testare web | Vitest; browser E2E intră la integrarea live |
+| Testare web | Vitest + Playwright/browser smoke și fluxuri analitice |
 
 ## Pornire locală
 
@@ -79,6 +80,7 @@ npm run verify
 ## Documentație
 
 - [Arhitectură](APP_ARCHITECTURE.md)
+- [Plan integrat de dezvoltare](docs/PLAN_DEZVOLTARE_INTEGRAT.md)
 - [Roadmap](ROADMAP.md)
 - [Specificație produs](docs/PRODUCT_SPEC.md)
 - [Contracte de date](docs/DATA_CONTRACTS.md)

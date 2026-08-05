@@ -18,12 +18,14 @@ Finance and Planning do not accept agent scope. Compensation is visible only wit
 - **Planning** — actual, forecast, target gap and forecast accuracy.
 - **Custom** — personal and shared dashboards assembled from governed metrics.
 
+Current reality: Overview and Monthly Review are the differentiated mature views. Sales through Planning currently render mostly the same generic KPI/trend/distribution/matrix/table canvas; the specialized sub-tabs and deeper drill/cross-filter behavior above are target behavior from the [integrated plan](PLAN_DEZVOLTARE_INTEGRAT.md), not completed functionality.
+
 ## Dashboard interaction
 
 - Use **Edit layout** to drag a card by its header and resize it from its edges.
 - Use **Layout implicit** to restore the versioned default.
 - Expand any card to fullscreen.
-- Use the table icon to inspect the exact backing rows and export CSV.
+- In current generic modules, use the table icon to inspect the response rows and export CSV. The target inspector will rerun the exact widget query server-side in the same snapshot.
 - Chart toggles offer only visualizations compatible with the analytical contract.
 
 ## Custom dashboards
@@ -35,7 +37,7 @@ Start blank or clone Director, Regional Manager, Finance or Risk templates. A ca
 - **Override** — ignores global business filters and uses only specified local values; period/comparison remain global.
 - **Ignore** — analyzes network scope for the selected period/comparison.
 
-Every non-inherited state is shown on the card. Shared dashboards are read-only for users other than the owner or Insight administrator.
+Every non-inherited state is shown on the card. Current `shared` visibility is global inside the authorized Insight audience; targeted per-user ACL, revocation and scope ceilings are planned and must replace it before sharing is considered complete.
 
 ## Data-state interpretation
 
@@ -44,7 +46,7 @@ Every non-inherited state is shown on the card. Shared dashboards are read-only 
 - Cutoff is the last covered business date, not page-load time.
 - Forecast run-rate is labeled separately from persisted AI forecast.
 - Missing data is not silently converted to zero.
-- Salary views with fewer than three people are completely suppressed.
+- Salary views with fewer than three people are suppressed. The current direct salary/person read path is transitional; the target contract removes it and permits only an aggregate Retail read-model protected against identification and filter differencing.
 
 ## Operational actions
 

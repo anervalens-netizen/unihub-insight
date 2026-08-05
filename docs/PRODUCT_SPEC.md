@@ -20,19 +20,26 @@ UniHub Insight is the desktop decision cockpit for the UniHub Retail business. I
 4. Explain a chart through its underlying table and metric definition.
 5. Build a reusable dashboard for a recurring managerial workflow.
 6. Move to UniHub Retail with the same context when an operational action is needed.
+7. Read an automatically generated explanation whose claims link to the exact metric, scope, cutoff and backing rows.
 
 ## Information architecture
 
-| Module | Core question |
-| --- | --- |
-| Overview | How is the business doing and where should I look? |
-| Sales | What drives sales, pace, mix and transaction quality? |
-| Performance | Which organizational entities are strong, weak or unstable? |
-| Campaigns | How are commercial mechanisms adopted and performing? |
-| Workforce | Do staffing, stability and productivity support performance? |
-| Finance | Where is revenue converted into profit or lost to cost? |
-| Planning | What is likely to happen and what changes the outcome? |
-| Custom | Which recurring view does this user need? |
+| Module | Core question | Target surfaces |
+| --- | --- | --- |
+| Overview | How is the business doing and where should I look? | health, target/forecast, comparisons, profit/cost where authorized, risk, data alerts |
+| Monthly Review | What happened in the selected month versus history? | YoY, MoM, 3/6/12-month context, hierarchy, products, returns, numeric XLSX |
+| Sales | What drives sales, pace, mix and transaction quality? | Pace, Trend, Mix, Drivers, Transactions, Calendar |
+| Performance | Which organizational entities are strong, weak or unstable? | hierarchy, Rankings, Distribution, Target matrix, Consistency, Productivity, Visits |
+| Campaigns | How are commercial mechanisms adopted and performing? | Overview, Promo, Incentive, Concurs, Focus, Folii |
+| Workforce | Do staffing, stability and productivity support performance? | People, Movements, Stability, Coverage, Productivity, Visits, Grile |
+| Compensation | How does approved aggregate remuneration relate to performance? | structure, distribution, payroll/sales, payroll/profit, suppression-safe comparison |
+| Finance | Where is revenue converted into profit or lost to cost? | Overview, Trend, Cost structure, Profitability, Reconciliation, Break-even |
+| Planning | What is likely to happen and what changes the outcome? | Current, 12 months, Accuracy, Scenarios, Sensitivity |
+| Custom | Which recurring view does this user need? | blank/template/clone, complete widget editor, targeted sharing, inspect/export |
+
+## Current product boundary
+
+Overview and Monthly Review are live differentiated experiences. Sales through Planning are currently partial: routes, data and exports exist, but most reuse one generic four-KPI/trend/distribution/matrix/table layout. Custom Dashboards has persistent CRUD and a partial editor, not yet the final query/ACL/interaction model. A page is not complete merely because it renders live data.
 
 ## Global analytical scope
 
@@ -40,18 +47,23 @@ Period/range, comparison, company, RM, ASM, one or more stores and one or more a
 
 ## Widget behavior
 
-A widget defines metric(s), dimension, time grain, comparison, a compatible visualization, local filter policy, sort, result limit, display options, size and position. The product does not expose arbitrary SQL or an unrestricted formula editor.
+A widget defines metric(s) with versions, dimension, time grain, comparison(s), analytical snapshot, a compatible `ChartSpec`, local filter policy, sort, result limit, display options, size and position. Native modules and Custom use the same bounded batch query, inspect and export contracts. The product does not expose arbitrary SQL or an unrestricted formula editor.
 
 ## UX requirements
 
 - Desktop-only analytical surface, minimum 1180 px.
 - No centered max-width container.
 - View mode prevents accidental movement; Edit mode exposes drag/resize.
-- Fullscreen and eventually Inspect data on every analytical widget.
+- Fullscreen exists on analytical widgets; current generic modules expose inspect, iar targetul este inspect server-side pe același snapshot pentru fiecare widget.
 - Cutoff, scope and source remain visible.
 - Missing, partial, stale and error states are distinct.
 - Charts never rely only on color for meaning.
+- Chart selection follows the business-question matrix in the [integrated plan](PLAN_DEZVOLTARE_INTEGRAT.md); users see only semantically compatible choices.
+- Click/cross-filter, drill path and time selection are serializable in URL and reproducible after reload.
+- Every chart has an accessible description and backing table; sensitive cohorts remain suppressed in chart, inspect and export.
+- Global Chart Studio keeps governed Executive/Ocean/Vibrant/Accessible/Monochrome presets, density, legend, labels and animation controls without changing metric semantics.
+- Generated explanations and deviation alerts are evidence-backed and versioned; they never state unsupported causality.
 
-## Non-goals for the initial product
+## Non-goals
 
 Replacing Retail imports/writes, generic arbitrary BI, causal attribution without validated methodology, real-time streaming over snapshot sources, and a mobile application.

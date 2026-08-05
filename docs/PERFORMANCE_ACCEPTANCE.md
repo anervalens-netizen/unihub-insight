@@ -13,7 +13,7 @@
 | LCP p75 | < 2,500 ms |
 | INP p75 | < 200 ms |
 
-The gate requires seven clean days and at least 100 requests per main route. Demo timings do not qualify.
+The gate requires seven clean days and at least 100 requests per main route. Demo timings do not qualify. Instrumentation and live health are present; the complete seven-day 1.0 gate over all specialized modules is not yet closed.
 
 ## Measurement
 
@@ -43,6 +43,8 @@ Measure at minimum:
 - export/inspect-data while ordinary dashboards load;
 - current open month and a 12-month historical interval;
 - broad network scope and narrow store/agent scope.
+
+Chart POC also measures ECharts bundle/chunk, first render, resize, frame time and browser memory at 1180/1440/1920/ultrawide, including a 100×36 heatmap and scatter up to the documented Canvas threshold. Canvas/SVG is selected from evidence.
 
 ## Failure criteria
 

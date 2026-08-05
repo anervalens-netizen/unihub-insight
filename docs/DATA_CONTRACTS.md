@@ -2,7 +2,15 @@
 
 ## Response metadata
 
-Every analytical response includes period, comparison, `as_of` cutoff, final/open state, data mode, currency, scope label, generation time and source. `as_of` is the last covered business date, not response time.
+Every analytical response includes period/range, comparisons, scope, `analytical_snapshot_id`, data mode, currency and generated time. Source metadata is domain-specific and includes cutoff, final/open state, coverage numerator/denominator, source generation, authority/head, rule/metric version, status and warnings. `as_of` is the last covered business date, not response time; Sales cutoff is never reused implicitly for Finance, HR or Forecast.
+
+One dashboard render resolves one eligible snapshot from `completed/promoted` generations. All widget queries, inspect and export reuse it. Consumer compatibility is additive N/N-1 across Retail publisher and Insight consumer.
+
+## Bounded query contract
+
+The target request is finite: metric IDs + versions, dimensions, time range/grain, filters by stable entity IDs, simultaneous comparisons, sort and limit. A server-side batch contains at most 8–12 widgets, deduplicates compatible work, has one deadline/cancellation context and returns data/error independently per widget. SQL, arbitrary formulas and client-provided functions are invalid.
+
+Saved widgets persist `metric_id`, `metric_version` and `query_contract_version`. Inspector and exports execute the same query and snapshot server-side; they do not reconstruct analytical rows from UI payloads.
 
 ## Initial metric definitions
 
@@ -31,7 +39,7 @@ For an open current period, future actual points are null, never repeated last v
 - Hierarchy: company → RM → ASM → store → agent.
 - Store selection is ordered, deduplicated and supports multiple `site_code` values.
 - `site_code` is the stable operational store key.
-- Agent identity in the first slice uses reporting label plus site scope; stable person identity is required before cross-store longitudinal analysis.
+- Current agent identity can use reporting label plus site scope only for the bounded current slice; stable effective-dated entity IDs are mandatory before cross-store longitudinal analysis.
 - Selected store can dominate historical parent filters where the Retail contract requires it.
 
 ## Retail invariants inherited
@@ -47,6 +55,18 @@ For an open current period, future actual points are null, never repeated last v
 
 Initial alerts are deterministic rules, not machine-learning scores. They expose the rule outcome and entity label. Thresholds move into the versioned metric/rule catalog before production expansion.
 
-## Future metric catalog fields
+## Domain contracts and privacy
 
-`id`, `version`, display name, description, unit, aggregation, formula reference, allowed dimensions/grains, comparison policy, missing policy, capability and effective dates.
+- Campaign mechanisms remain separate and carry their own cutoff/status/eligibility authority; they are not summed without a defined metric.
+- Workforce movements come from official effective-dated events, never inferred only from missing sales.
+- Compensation reads an aggregate Retail view only. No direct `salary_records`, `agent_salary_links`, names or private IDs remain granted. Total uses all rows, average uses values at least 2,000 RON, median uses all values; cohorts of one or two are suppressed across KPI, series, inspect and export, including differencing attacks through filters.
+- Finance explicitly marks `actual`/`estimated` and authority. `__FINANCE_UNALLOCATED__` belongs in company totals and never in store/RM detail. Shadow or unpromoted generations are unavailable, not actual.
+- Planning forecast identifies run, horizon, method/model, input cutoff and coverage. Target scenarios identify scenario, revision, status, rule-set hash and snapshot; drafts are not implicitly shared truth.
+
+## Export contract
+
+XLSX/CSV/PNG apply the same capability, scope ceiling, ACL, snapshot and suppression as the API. Tabular exports are bounded/paged, cancellable and audited, use native numeric cells, neutralize formula injection and carry metadata/warnings. PNG is non-persistent by default and its filename/options are sanitized.
+
+## Metric catalog fields
+
+`id`, `version`, display name, description, unit, aggregation, formula reference, allowed dimensions/grains, compatible analytical shapes/`ChartSpec`, comparison policy, missing policy, suppressibility, capability, source authority and effective dates.

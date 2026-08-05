@@ -22,8 +22,12 @@ It is absent from the API runtime environment; systemd reads it only for the
 one-shot migration service, while root-owned backup/restore scripts load it
 directly.
 
+At the 2026-08-05 baseline, application access is explicitly limited to Andrei, Alexandra and Bogdan. Release evidence must verify the exact Authentik application-group membership as well as capabilities; adding another identity is a security change, not a UI configuration.
+
 Capability defaults and required negative tests live in
 [ops/authentik/README.md](../ops/authentik/README.md). Production must verify
 no-session redirect, forged-header 401, capability 403, sensitive-module
 omission and public 404 responses for `/livez`, `/readyz`, `/metrics`, `/docs`,
 `/redoc` and `/openapi.json`.
+
+Dashboard sharing does not replace authorization. Current `shared` metadata is audience-wide; the target `dashboard_acl` must enforce subject permission, capability and scope ceiling at read/query/inspect/export before targeted sharing is declared complete.

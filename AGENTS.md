@@ -12,10 +12,11 @@ For an explicitly requested implementation task, execute end-to-end: inspect rel
 
 1. `README.md` — product entrypoint and commands.
 2. `APP_ARCHITECTURE.md` — component and data boundaries.
-3. `ROADMAP.md` — sequencing and acceptance gates.
-4. `docs/DATA_CONTRACTS.md` — analytical semantics.
-5. `docs/adr/` — decisions that must not drift silently.
-6. UniHub Retail reporting views/tables — source of business truth.
+3. `docs/PLAN_DEZVOLTARE_INTEGRAT.md` — target product, integrated execution plan and Definition of Done.
+4. `ROADMAP.md` — concise reality/closure register.
+5. `docs/DATA_CONTRACTS.md` — analytical semantics.
+6. `docs/adr/` — decisions that must not drift silently.
+7. UniHub Retail reporting views/tables — source of business truth.
 
 ## Non-negotiable invariants
 
@@ -29,6 +30,8 @@ For an explicitly requested implementation task, execute end-to-end: inspect rel
 - `Cartele` and distribution/TR locations stay outside normal Retail KPI calculations unless a dedicated metric says otherwise.
 - Quantities are net; returns reduce volume.
 - Large scans need a measured reason and a bounded deadline.
+- Dashboard widgets in one render use one eligible analytical snapshot; metadata cutoff/finality is per source domain.
+- Compensation reads only an approved aggregate read-model; no direct person/salary source or differentiating filters/exports.
 
 ## Architecture rules
 
@@ -39,6 +42,14 @@ For an explicitly requested implementation task, execute end-to-end: inspect rel
 - New metrics enter through the metric catalog before appearing in widgets.
 - Layout persistence is versioned and migratable.
 - Avoid microservices, generic event buses, generalized caches and new databases without measured need.
+
+## Agent orchestration
+
+- Root/coordinator owns shared contracts, cross-repository integration, live mutations, deploy and release closure.
+- Use Terra `xhigh` selectively for DB/read-models, semantic review, grants/RBAC/ACL, privacy, query plans, load gates and reconciliation.
+- Use Luna `xhigh` through the terminal for bounded UI/docs/chart prototypes, fixtures, targeted tests and browser QA after contracts are frozen.
+- Maximum three independent parallel lanes; never give concurrent ownership of the same contract, migration or file.
+- Agents start read-only and report exact evidence. Run targeted gates per lane and one integrated gate for the unchanged final candidate.
 
 ## Completion definition
 

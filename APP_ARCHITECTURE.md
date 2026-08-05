@@ -23,15 +23,18 @@ flowchart LR
 | --- | --- |
 | `apps/web` | Desktop shell, URL state, widgets, charts, tables, layout editing |
 | `apps/api` | Read-only analytical contracts, scope validation, RBAC boundary, queries |
-| PostgreSQL `unihub` | Canonical Retail reporting models and later Insight-owned layout metadata |
-| Authentik | Shared identity and claims; BFF integration enters before live deployment |
+| PostgreSQL `unihub` | Canonical Retail reporting models plus Insight-owned dashboard metadata |
+| Authentik + Caddy | Live public identity boundary; Caddy serves SPA, forwards verified identity and proxies API over private UDS |
 
 ## Frontend boundaries
 
 ```text
-app/                 shell, router, navigation, global filters
-features/overview/   first end-to-end analytical feature
-features/module/     bounded placeholders for roadmap modules
+app/                   shell, router, navigation, global filters
+features/overview/     live executive overview
+features/monthly-review rich historical monthly analysis
+features/modules/      current shared analytics module template
+features/dashboards/   persisted custom dashboard library/editor/preview
+features/identity/     verified user/capability context
 components/charts/   ECharts adapter and lifecycle
 components/dashboard grid/layout and widget chrome
 components/ui/       generic states
@@ -65,7 +68,14 @@ The API exposes:
 - `GET /readyz` — PostgreSQL read-only readiness in live mode;
 - `GET /api/v1/filters/options` — periods and dependent dimensions;
 - `GET /api/v1/overview` — one coherent Overview payload;
-- `GET /api/v1/catalog/metrics` — initial canonical metric definitions.
+- `GET /api/v1/modules/{module}` — actualul contract generic pentru cele șapte module;
+- `GET /api/v1/monthly-review` — raportul lunar istoric;
+- `GET /api/v1/catalog/metrics` — definiții canonice inițiale;
+- `/api/v1/dashboards` — CRUD metadata cu optimistic concurrency;
+- `/api/v1/exports/*` — XLSX pentru Overview, module și raport lunar;
+- `GET /api/v1/me` — identitate și capabilități verificate server-side.
+
+`/metrics` și ingestia RUM sunt suprafețe interne. API-ul public direct rămâne închis; traficul public intră prin Caddy/Authentik.
 
 ## Data path
 
@@ -79,12 +89,16 @@ The API exposes:
 
 ## PostgreSQL read boundary
 
-The first adapter uses existing canonical Retail sources:
+Adaptorul live folosește numai surse Retail aprobate, între care:
 
 - `reporting_agent_day`;
 - `reporting_agent_month`;
-- `store_targets`;
-- `import_snapshots`.
+- `reporting_item_month` și reporting categorie/Focus/lifecycle/profile;
+- targeturi agent/magazin și magazine;
+- status Grile, coloane salariale aprobate în prezent, `store_pnl_monthly` și forecast run-uri;
+- `import_snapshots` pentru coverage/cutoff unde contractul îl cere.
+
+Accesul salarial direct existent este tranzitoriu și trebuie înlocuit cu read-model agregat Retail, apoi revocat. Campaigns, Workforce/Visits, Compensation, Finance generation authority și Planning necesită read-model-urile descrise în [planul integrat](docs/PLAN_DEZVOLTARE_INTEGRAT.md).
 
 Connection safeguards:
 
@@ -109,8 +123,18 @@ Optimization order: measure; remove duplicate work; use canonical daily/monthly 
 
 ## Authentication and authorization
 
-Development starts in deterministic demo mode. Before production, reuse Authentik identity and groups, enforce access in API dependencies, isolate salary/P&L contracts, keep audit events free of sensitive values, and preserve contextual deep-links to Retail for writes.
+Producția reutilizează Authentik și grupul aplicației; numai utilizatorii autorizați ajung la SPA, iar API-ul recalculează capabilitățile pentru analytics, management, HR, P&L și admin. Capabilitățile sunt verificate la endpoint, dashboard, inspect și export; ascunderea UI nu este control de securitate. Logurile/auditul nu conțin salarii, CNP sau valori sensibile. Acțiunile operaționale rămân deep-link contextual către Retail.
+
+Modul demo determinist există numai pentru dezvoltare/test și nu dovedește matricea reală Authentik.
 
 ## Evolution
 
-The first Overview is deliberately a vertical slice. New modules reuse the same URL scope, response metadata, metric definitions, widget chrome and performance gates instead of creating separate mini-applications.
+### Baseline live
+
+Overview și Monthly Review sunt suprafețe distincte și mature. Sales, Performance, Campaigns, Workforce, Compensation, Finance și Planning sunt live ca rutare/date, dar folosesc predominant același payload și catalog generic de nouă widgeturi. Custom Dashboards persistă configurații, însă execută încă cereri independente pe widget și are sharing global, nu ACL per subject.
+
+### Arhitectura țintă
+
+Retail publică read-model-uri versionate. Insight rezolvă un `analytical_snapshot_id`, apoi un query batch finit execută 8–12 widgeturi cu deadline comun, deduplicare și eroare izolată. Catalogul versionat de metrici/dimensiuni și `ChartSpec` alimentează identic modulele specializate, custom dashboards, inspectorul server-side și exporturile. Metadata de cutoff/finalitate rămâne per domeniu; nicio pagină Finance/HR/Planning nu moștenește metadata Sales.
+
+Detaliile, ordinea de dependență și porțile sunt canonice în [Planul integrat](docs/PLAN_DEZVOLTARE_INTEGRAT.md).
