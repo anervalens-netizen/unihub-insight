@@ -8,10 +8,23 @@ if [[ -z "$EXPECTED_SHA" && -f /opt/unihub-insight/current/SOURCE_SHA ]]; then
   EXPECTED_SHA="$(</opt/unihub-insight/current/SOURCE_SHA)"
 fi
 
-curl --fail --silent --show-error --max-time 5 "$LOCAL_API/livez" \
-  | grep -q '"status":"ok"'
-curl --fail --silent --show-error --max-time 5 "$LOCAL_API/readyz" \
-  | grep -q '"status":"ready"'
+wait_for_status() {
+  local url="$1"
+  local expected="$2"
+
+  for _attempt in {1..30}; do
+    if curl --fail --silent --max-time 2 "$url" | grep -q "$expected"; then
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "timed out waiting for $url" >&2
+  return 1
+}
+
+wait_for_status "$LOCAL_API/livez" '"status":"ok"'
+wait_for_status "$LOCAL_API/readyz" '"status":"ready"'
 status="$(curl --silent --show-error --max-time 10 --output /dev/null --write-out '%{http_code}' "$PUBLIC_URL/")"
 [[ "$status" =~ ^(200|3[0-9][0-9])$ ]] || {
   echo "public SPA returned HTTP $status" >&2
