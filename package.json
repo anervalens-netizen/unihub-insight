@@ -17,7 +17,7 @@
     "lint": "npm --workspace @unihub-insight/web run lint && uv run --project apps/api ruff check apps/api/src apps/api/tests",
     "format": "npm --workspace @unihub-insight/web run format && uv run --project apps/api ruff format apps/api/src apps/api/tests",
     "format:check": "npm --workspace @unihub-insight/web run format:check && uv run --project apps/api ruff format --check apps/api/src apps/api/tests",
-    "typecheck": "npm --workspace @unihub-insight/web run typecheck && uv run --project apps/api mypy apps/api/src",
+    "typecheck": "npm --workspace @unihub-insight/web run typecheck && uv run --project apps/api mypy --config-file apps/api/pyproject.toml apps/api/src",
     "test": "npm --workspace @unihub-insight/web run test && uv run --project apps/api pytest apps/api/tests",
     "build": "npm --workspace @unihub-insight/web run build",
     "verify": "bash scripts/verify.sh"
