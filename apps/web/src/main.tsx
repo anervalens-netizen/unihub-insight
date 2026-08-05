@@ -10,6 +10,7 @@ import './features.css';
 import './dashboard-editor.css';
 import './monthly-review.css';
 import './chart-studio.css';
+import './chart-studio-a11y.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Root element #root is missing.');
