@@ -1,4 +1,7 @@
 from unihub_insight_api.domain import Capability, MetricDefinition, MetricUnit
+from unihub_insight_api.services.monthly_review_contract import (
+    MONTHLY_REVIEW_METRICS,
+)
 
 
 def metric(
@@ -214,4 +217,5 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         aggregation="weighted-derived",
         capability=Capability.MANAGEMENT,
     ),
+    *MONTHLY_REVIEW_METRICS,
 )
