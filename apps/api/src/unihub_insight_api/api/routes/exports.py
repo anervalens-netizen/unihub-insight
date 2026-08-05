@@ -94,7 +94,7 @@ async def export_module(
         )
     if module in {ModuleId.FINANCE, ModuleId.PLANNING} and scope.agent:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Filtrul Agent nu este compatibil cu modulul {module.value}.",
         )
     data = await repository.get_module(module, scope)
@@ -118,7 +118,7 @@ async def export_monthly_review(
     normalized_section = section.casefold()
     if normalized_section not in REPORT_SECTIONS:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Secțiunea de export nu este suportată.",
         )
     data = await repository.get_monthly_review(scope, recent_months)
