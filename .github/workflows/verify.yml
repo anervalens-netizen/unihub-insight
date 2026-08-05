@@ -66,6 +66,7 @@ jobs:
           path.write_text(source, encoding="utf-8")
           PY
           npm run format
+          npm --workspace @unihub-insight/web exec -- biome check --write src tests vite.config.ts
           uv run --project apps/api ruff check --fix apps/api/src apps/api/tests
 
       - name: Verify source
