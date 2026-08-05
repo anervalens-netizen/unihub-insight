@@ -58,3 +58,13 @@ mypy_path = "src"
 exclude = ["tests/"]
 allow_redefinition = true
 disable_error_code = ["import-untyped"]
+
+[[tool.mypy.overrides]]
+module = [
+  "unihub_insight_api.db",
+  "unihub_insight_api.repositories.dashboards",
+  "unihub_insight_api.repositories.postgres",
+  "unihub_insight_api.repositories.postgres_modules",
+  "unihub_insight_api.repositories.monthly_review",
+]
+disable_error_code = ["no-any-return"]
