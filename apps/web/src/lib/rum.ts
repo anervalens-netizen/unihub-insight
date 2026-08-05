@@ -58,14 +58,23 @@ function observeLcp(): void {
   }
   const flush = (): void => {
     if (latest > 0) {
-      send({ metric: 'LCP', value_ms: latest, rating: rating('LCP', latest), navigation_type: navigationType() });
+      send({
+        metric: 'LCP',
+        value_ms: latest,
+        rating: rating('LCP', latest),
+        navigation_type: navigationType(),
+      });
       latest = 0;
     }
     observer.disconnect();
   };
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') flush();
-  }, { once: true });
+  document.addEventListener(
+    'visibilitychange',
+    () => {
+      if (document.visibilityState === 'hidden') flush();
+    },
+    { once: true },
+  );
 }
 
 function observeInp(): void {
@@ -88,13 +97,22 @@ function observeInp(): void {
   const flush = (): void => {
     const value = Math.max(0, ...interactions.values());
     if (value > 0) {
-      send({ metric: 'INP', value_ms: value, rating: rating('INP', value), navigation_type: navigationType() });
+      send({
+        metric: 'INP',
+        value_ms: value,
+        rating: rating('INP', value),
+        navigation_type: navigationType(),
+      });
     }
     observer.disconnect();
   };
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') flush();
-  }, { once: true });
+  document.addEventListener(
+    'visibilitychange',
+    () => {
+      if (document.visibilityState === 'hidden') flush();
+    },
+    { once: true },
+  );
 }
 
 export async function initializeRum(): Promise<void> {
