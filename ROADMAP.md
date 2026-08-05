@@ -56,7 +56,7 @@ Dependențele se implementează vertical: o suprafață ajunge `LIVE` numai cân
 ## Porți deschise după RC1
 
 - Finance și Compensation sunt corect `UNAVAILABLE` în producție: tabelele de generații/head nu publică încă o generație eligibilă. Datele legacy nu sunt promovate implicit.
-- Migrarea Retail 047 este aditivă pentru compatibilitatea N/N-1. Granturile raw Finance/Planning se revocă numai după două release-uri Insight compatibile și rollback B→A verificat.
+- Migrarea Retail 047 este aditivă pentru compatibilitatea N/N-1. Granturile raw Finance/Planning se revocă numai după două release-uri Insight compatibile și rollback B→A verificat. Release-ul pre-RC1 nu conține migrarea metadata 003 și este refuzat preventiv ca țintă; rollback-ul eligibil este RC B→RC A.
 - RC1 trebuie promovat prin artifact immutable, reconciliat live, trecut prin backup/restore și rollback, apoi acceptat vizual de owner.
 - Versiunea `1.0.0` cere șapte zile curate conform [Performance Acceptance](docs/PERFORMANCE_ACCEPTANCE.md).
 

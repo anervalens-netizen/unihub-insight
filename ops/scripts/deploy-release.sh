@@ -110,9 +110,16 @@ systemctl daemon-reload
 
 restore_previous() {
   if [[ -n "$PREVIOUS" ]]; then
-    ln -sfn "$PREVIOUS" "$BASE/current.next"
-    mv -Tf "$BASE/current.next" "$CURRENT"
-    systemctl restart unihub-insight-api.service || true
+    if bash "$CURRENT/ops/scripts/check-release-migrations.sh" "$PREVIOUS"; then
+      ln -sfn "$PREVIOUS" "$BASE/current.next"
+      mv -Tf "$BASE/current.next" "$CURRENT"
+      systemctl reset-failed unihub-insight-migrate.service unihub-insight-api.service || true
+      systemctl restart unihub-insight-api.service || true
+    else
+      echo "previous release is incompatible with applied metadata migrations; keeping candidate active" >&2
+      systemctl reset-failed unihub-insight-migrate.service unihub-insight-api.service || true
+      systemctl restart unihub-insight-api.service || true
+    fi
   else
     [[ ! -L "$CURRENT" ]] || unlink "$CURRENT"
     systemctl stop unihub-insight-api.service >/dev/null 2>&1 || true

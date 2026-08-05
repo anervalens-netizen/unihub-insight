@@ -17,6 +17,7 @@ PREVIOUS="$(readlink -f "$BASE/current" 2>/dev/null || true)"
   echo "release is not deployable: $TARGET" >&2
   exit 1
 }
+bash "$BASE/current/ops/scripts/check-release-migrations.sh" "$RELEASE"
 docker exec unihub-caddy caddy validate \
   --config /etc/caddy/Caddyfile --adapter caddyfile
 ln -sfn "$RELEASE" "$BASE/current.next"

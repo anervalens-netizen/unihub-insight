@@ -77,7 +77,10 @@ boundary. `smoke.sh` checks local
 liveness/readiness, public SPA reachability and public 404 responses for
 diagnostics.
 
-Rollback is code-only and keeps the database at its current schema:
+Rollback is code-only and keeps the database at its current schema. Before
+switching the symlink it verifies that the target contains every applied
+migration with the recorded checksum; an incompatible target is refused
+without stopping the active release:
 
 ```bash
 sudo /opt/unihub-insight/current/ops/scripts/rollback.sh PREVIOUS_SOURCE_SHA
