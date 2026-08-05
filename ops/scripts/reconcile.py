@@ -221,7 +221,8 @@ async def specialized_differences(
         campaign = await connection.fetchrow(
             f"""
             SELECT COALESCE(SUM(row.actual_sales), 0) AS sales,
-                   COUNT(DISTINCT row.site_code)::numeric AS stores,
+                   COUNT(DISTINCT row.site_code)
+                       FILTER (WHERE row.actual_sales > 0)::numeric AS stores,
                    COALESCE(MAX(row.active_product_count), 0)::numeric AS products
             FROM reporting_campaign_month_v1 row
             WHERE row.period = $1 AND {scope_sql}
