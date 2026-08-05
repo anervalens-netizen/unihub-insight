@@ -12,7 +12,7 @@ on:
       - '.github/workflows/quality.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: quality-${{ github.ref }}
@@ -21,35 +21,9 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
-        with:
-          ref: ${{ github.head_ref }}
-          fetch-depth: 0
-
-      - name: Apply final report type correction
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path('apps/api/src/unihub_insight_api/repositories/monthly_review.py')
-          text = path.read_text(encoding='utf-8')
-          old = '''            entity = ProductEntity(product_id, label, brand, category)
-            products.append(
-                product_row(
-                    entity,
-'''
-          new = '''            product_entity = ProductEntity(product_id, label, brand, category)
-            products.append(
-                product_row(
-                    product_entity,
-'''
-          if old in text:
-              path.write_text(text.replace(old, new, 1), encoding='utf-8')
-          PY
-
       - uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
@@ -59,41 +33,11 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
-
-      - name: Install dependencies
+      - name: Install web dependencies
         run: |
-          npm ci --ignore-scripts
-          uv sync --project apps/api --frozen --all-groups
-
-      - name: Format and verify
-        shell: bash
+          if [[ -f package-lock.json ]]; then npm ci --ignore-scripts; else npm install --ignore-scripts --no-audit --no-fund; fi
+      - name: Install API dependencies
         run: |
-          npm run format
-          set +e
-          npm run verify > verification-output.txt 2>&1
-          status=$?
-          cat verification-output.txt
-          echo "$status" > verification-status.txt
-          exit 0
-
-      - name: Publish verified correction
-        shell: bash
-        run: |
-          set -euo pipefail
-          status="$(cat verification-status.txt)"
-          git checkout origin/main -- .github/workflows/quality.yml
-          rm -f .github/workflows/monthly-review-mypy-fix.yml
-          rm -f ruff-output.txt
-          if [[ "$status" == "0" ]]; then
-            rm -f verification-output.txt verification-status.txt
-          fi
-          git add -A
-          if git diff --cached --quiet; then
-            [[ "$status" == "0" ]]
-            exit
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "fix: complete monthly review verification"
-          git push origin "HEAD:${{ github.head_ref }}"
-          [[ "$status" == "0" ]]
+          if [[ -f apps/api/uv.lock ]]; then uv sync --project apps/api --frozen --all-groups; else uv sync --project apps/api --all-groups; fi
+      - name: Verify
+        run: npm run verify
