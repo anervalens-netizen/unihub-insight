@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
 const numeric = z.coerce.number();
-const nullableNumeric = z.union([numeric, z.null()]);
+export const nullableReviewNumeric = z.union([z.null(), numeric]);
+const nullableNumeric = nullableReviewNumeric;
 const status = z.enum([
   'outperforming',
   'healthy',
