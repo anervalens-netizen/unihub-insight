@@ -80,7 +80,9 @@ jobs:
           uv sync --project apps/api --frozen --all-groups
 
       - name: Apply safe and unsafe Biome fixes
-        run: npm --workspace @unihub-insight/web exec -- biome check --write --unsafe src tests vite.config.ts
+        run: |
+          cd apps/web
+          npx biome check --write --unsafe src tests vite.config.ts
 
       - name: Format and verify
         shell: bash
