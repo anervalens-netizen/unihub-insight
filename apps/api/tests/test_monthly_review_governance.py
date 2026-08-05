@@ -91,7 +91,12 @@ def test_review_periods_are_strictly_bounded() -> None:
 
 
 def test_active_repository_uses_reporting_models_not_raw_transactions() -> None:
-    source = inspect.getsource(ReportingMonthlyReviewRepository)
+    methods = (
+        ReportingMonthlyReviewRepository._review_store_rows,
+        ReportingMonthlyReviewRepository._review_agent_rows,
+        ReportingMonthlyReviewRepository._review_product_rows,
+    )
+    source = "\n".join(inspect.getsource(method) for method in methods)
     assert "FROM reporting_agent_month" in source
     assert "FROM reporting_item_month" in source
     assert "insight.monthly_review_item_month" in source
