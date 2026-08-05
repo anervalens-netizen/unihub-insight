@@ -35,12 +35,15 @@ asyncio_mode = "auto"
 
 [tool.ruff]
 target-version = "py313"
-line-length = 100
+line-length = 120
 src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC", "RUF"]
-ignore = ["B008"]
+ignore = ["B008", "RUF001"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/unihub_insight_api/repositories/monthly_review.py" = ["E501"]
 
 [tool.ruff.format]
 quote-style = "double"
