@@ -8,13 +8,14 @@ export function useGlobalSearch(): GlobalSearch {
 }
 
 export function useUpdateGlobalSearch() {
-  const navigate = useNavigate({ from: '__root__' });
-  const search = useGlobalSearch();
+  const navigate = useNavigate();
   return useCallback(
     (patch: GlobalSearchPatch, replace = false): void => {
-      const nextSearch = globalSearchSchema.parse({ ...search, ...patch });
-      void navigate({ search: nextSearch, replace });
+      void navigate({
+        search: (previous) => globalSearchSchema.parse({ ...previous, ...patch }),
+        replace,
+      });
     },
-    [navigate, search],
+    [navigate],
   );
 }
