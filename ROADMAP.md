@@ -44,14 +44,14 @@ Dependențele se implementează vertical: o suprafață ajunge `LIVE` numai cân
 - [ ] Read-model-uri Retail v1 sunt publicate aditiv; Workforce/Visits/Campaigns rămân `partial`, iar Finance/Compensation nu au încă head eligibil.
 - [ ] Catalogul și snapshotul sunt versionate; matricea metrică × dimensiune × chart este în curs de restrângere la combinații dovedite.
 - [x] Query batch finit, snapshot fail-closed, deadline comun, izolare per widget, inspect și CSV server-side.
-- [ ] Intervalele și URL state există; drill-ul de bază cu breadcrumb/reset/reload trece browser QA, dar comparațiile multiple simultane și toate nivelurile de cross-filter rămân deschise.
+- [ ] Intervalele și URL state există; drill-ul de bază cu breadcrumb/reset/reload și comparațiile multiple din dashboard trec browser QA, dar modulul nativ nu redă încă toate comparațiile simultan și toate nivelurile de cross-filter.
 - [ ] `ChartSpec` ECharts 6.1 Canvas are dataset/encode, fallback, PNG și interacțiuni de bază; POC-ul Canvas/SVG, keyboard QA și toate formele specializate rămân deschise.
 - [ ] Cele șapte module au sub-view-uri/rețete distincte, dar încă reutilizează componente generice și nu acoperă toate contractele specializate din plan.
 - [x] Compensation folosește exclusiv agregatul aprobat, fără persoană/nume/filtre diferențiatoare.
-- [ ] Custom dashboards acoperă blank/template/clone/duplicate/layout/versionare/ACL/scope/batch; editorul multi-dimensiune și toate opțiunile semantice rămân deschise.
-- [ ] XLSX/CSV/PNG și audit există; paritatea metrică modul→dashboard→inspect→export nu este încă demonstrată pentru toate modulele.
-- [ ] Matricea negativă, reconcilierea și restore/rollback tehnic trec; load/concurrency, RUM, off-host post-schema și N/N-1 acceptat rămân deschise.
-- [ ] Suita Playwright trece 29/29 pentru cele 10 rute, 1180/1440/1920/ultrawide, light/dark, densități, inspector, drill/reload și 403; toate sub-view-urile și stările empty/partial/stale rămân deschise.
+- [ ] Custom dashboards acoperă blank/template/clone/duplicate/layout/versionare/ACL/scope/batch, inclusiv lifecycle v1→v2 și export din inspector; editorul multi-dimensiune și toate opțiunile semantice rămân deschise.
+- [ ] XLSX/CSV/PNG și audit există și acțiunile native/custom trec browser QA; paritatea metrică modul→dashboard→inspect→export nu este încă demonstrată pentru toate modulele.
+- [ ] Reconcilierea, rollback B→A→B, load/concurrency și backup-ul off-host post-release trec; matricea reală a celor trei utilizatori Authentik, RUM pe 7 zile și N/N-1 acceptat rămân deschise.
+- [ ] Suita Playwright trece 43/43 pentru cele 10 rute, toate sub-view-urile declarate, 1180/1440/1920/ultrawide, light/dark, densități, empty/partial/stale/unavailable/403, PNG/XLSX/CSV, drill/reload și dashboard lifecycle; pilotul vizual owner rămâne poartă distinctă.
 - [ ] Acceptare vizuală owner și șapte zile curate de SLI producție.
 
 ## Porți deschise după RC1

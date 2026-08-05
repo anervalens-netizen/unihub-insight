@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CopyPlus, Eye, Lock, Save, Settings2, Share2, Unlock } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useGlobalSearch, useUpdateGlobalSearch } from '../../app/search-hooks';
 import type { DashboardLayoutItem } from '../../components/dashboard/types';
@@ -20,11 +20,14 @@ import {
   updateDashboard,
 } from './api';
 import { CustomDashboardPreview } from './CustomDashboardPreview';
-import { DashboardEditor } from './DashboardEditor';
 import { DashboardLibrary } from './DashboardLibrary';
 import { dashboardCanDelete, dashboardCanEdit, dashboardCanManageSharing } from './permissions';
 import type { DashboardDocument, DashboardWidget } from './schemas';
 import { type DashboardTemplate, dashboardTemplates, moduleMetrics } from './templates';
+
+const DashboardEditor = lazy(() =>
+  import('./DashboardEditor').then((module) => ({ default: module.DashboardEditor })),
+);
 
 const moduleCapability: Record<ModuleId, Capability> = {
   sales: 'insight:analytics',
@@ -122,10 +125,10 @@ export function CustomDashboardsPage() {
   }, [documents, search.dashboard_id, selectedId, updateSearch]);
 
   useEffect(() => {
-    if (selected && search.dashboard_version !== selected.version && !versionsQuery.isPending) {
+    if (selected && search.dashboard_version !== selected.version && !versionsQuery.isFetching) {
       updateSearch({ dashboard_version: selected.version }, true);
     }
-  }, [search.dashboard_version, selected, updateSearch, versionsQuery.isPending]);
+  }, [search.dashboard_version, selected, updateSearch, versionsQuery.isFetching]);
 
   const historical = Boolean(
     selectedCurrent && selected && selected.version !== selectedCurrent.version,
@@ -196,7 +199,10 @@ export function CustomDashboardsPage() {
       setDraft(document);
       updateSearch({ dashboard_version: document.version }, true);
       setMessage('Dashboard salvat.');
-      await queryClient.invalidateQueries({ queryKey: ['dashboards'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['dashboards'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard-versions', document.id] }),
+      ]);
     },
     onError: (error) => setMessage(error instanceof Error ? error.message : 'Salvarea a eșuat.'),
   });
@@ -457,32 +463,34 @@ export function CustomDashboardsPage() {
                 />
               </>
             ) : canEdit ? (
-              <DashboardEditor
-                draft={draft}
-                availableModules={availableModules}
-                metrics={catalogQuery.data?.metrics ?? []}
-                pending={updateMutation.isPending}
-                canManageSharing={canManageSharing}
-                subjects={subjectsQuery.data ?? []}
-                subjectsPending={subjectsQuery.isPending}
-                onDraftChange={setDraft}
-                onAddWidget={(module) =>
-                  setDraft({
-                    ...draft,
-                    widgets: [...draft.widgets, nextWidget(module, draft.widgets)],
-                  })
-                }
-                onUpdateWidget={updateWidget}
-                onDuplicateWidget={duplicateWidget}
-                onRemoveWidget={(id) =>
-                  setDraft({
-                    ...draft,
-                    widgets: draft.widgets.filter((item) => item.id !== id),
-                  })
-                }
-                onSave={save}
-                {...(canDelete ? { onDelete: remove } : {})}
-              />
+              <Suspense fallback={<LoadingState label="Se încarcă editorul…" />}>
+                <DashboardEditor
+                  draft={draft}
+                  availableModules={availableModules}
+                  metrics={catalogQuery.data?.metrics ?? []}
+                  pending={updateMutation.isPending}
+                  canManageSharing={canManageSharing}
+                  subjects={subjectsQuery.data ?? []}
+                  subjectsPending={subjectsQuery.isPending}
+                  onDraftChange={setDraft}
+                  onAddWidget={(module) =>
+                    setDraft({
+                      ...draft,
+                      widgets: [...draft.widgets, nextWidget(module, draft.widgets)],
+                    })
+                  }
+                  onUpdateWidget={updateWidget}
+                  onDuplicateWidget={duplicateWidget}
+                  onRemoveWidget={(id) =>
+                    setDraft({
+                      ...draft,
+                      widgets: draft.widgets.filter((item) => item.id !== id),
+                    })
+                  }
+                  onSave={save}
+                  {...(canDelete ? { onDelete: remove } : {})}
+                />
+              </Suspense>
             ) : null}
           </>
         ) : (

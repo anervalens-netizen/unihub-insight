@@ -233,6 +233,7 @@ export function ModuleTrendWidget() {
         option={option}
         className="chart--fill"
         ariaLabel={`Evoluție ${data.title}`}
+        pngExport={{ filename: `${data.module}-${data.meta.period}-trend`, pixelRatio: 2 }}
         onEvent={handlePointEvent}
         onDoubleEvent={handlePointEvent}
         {...(onUrlStateReset ? { onBlankReset: onUrlStateReset } : {})}
@@ -305,6 +306,7 @@ export function ModuleDistributionWidget() {
         option={option}
         className="chart--fill"
         ariaLabel={`Distribuție ${data.title}`}
+        pngExport={{ filename: `${data.module}-${data.meta.period}-distribution`, pixelRatio: 2 }}
         onEvent={handleDistributionEvent}
         onDoubleEvent={handleDistributionEvent}
         {...(onUrlStateReset ? { onBlankReset: onUrlStateReset } : {})}
@@ -381,6 +383,7 @@ export function ModuleMatrixWidget() {
       option={option}
       className="chart--fill"
       ariaLabel={`Matrice temporală ${data.title}`}
+      pngExport={{ filename: `${data.module}-${data.meta.period}-matrix`, pixelRatio: 2 }}
       onEvent={handleMatrixEvent}
       onDoubleEvent={handleMatrixEvent}
       {...(onUrlStateReset ? { onBlankReset: onUrlStateReset } : {})}

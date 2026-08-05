@@ -13,7 +13,7 @@
 | LCP p75 | < 2,500 ms |
 | INP p75 | < 200 ms |
 
-The gate requires seven clean days and at least 100 requests per main route. Demo timings do not qualify. Instrumentation and live health are present; the complete seven-day 1.0 gate over all specialized modules is not yet closed.
+The gate requires seven clean days and at least 100 real requests per main route. Demo and synthetic load timings do not qualify. Instrumentation, live health and the bounded concurrency probe are present; the complete seven-day 1.0 gate over all specialized modules is not yet closed.
 
 ## Measurement
 
