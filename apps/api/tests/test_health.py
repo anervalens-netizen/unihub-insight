@@ -15,3 +15,13 @@ def test_demo_readiness(client: TestClient) -> None:
 
     assert response.status_code == 200
     assert response.json() == {"status": "ready", "data_mode": "demo"}
+
+
+def test_metrics_exposes_bounded_http_telemetry(client: TestClient) -> None:
+    client.get("/livez")
+
+    response = client.get("/metrics")
+
+    assert response.status_code == 200
+    assert "unihub_insight_http_requests_total" in response.text
+    assert 'route="/livez"' in response.text

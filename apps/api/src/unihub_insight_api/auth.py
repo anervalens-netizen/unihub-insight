@@ -10,6 +10,13 @@ from unihub_insight_api.config import Settings
 from unihub_insight_api.domain import Capability, UserContext
 
 ALL_CAPABILITIES = frozenset(Capability)
+ADMIN_CAPABILITIES = frozenset(
+    {
+        Capability.ANALYTICS,
+        Capability.MANAGEMENT,
+        Capability.ADMIN,
+    }
+)
 
 
 def _groups(value: str | None) -> tuple[str, ...]:
@@ -31,7 +38,7 @@ def _capabilities(settings: Settings, groups: tuple[str, ...]) -> frozenset[Capa
     if group_set & settings.parse_groups(settings.pnl_groups):
         capabilities.update({Capability.ANALYTICS, Capability.MANAGEMENT, Capability.PNL})
     if group_set & settings.parse_groups(settings.admin_groups):
-        capabilities.update(ALL_CAPABILITIES)
+        capabilities.update(ADMIN_CAPABILITIES)
     return frozenset(capabilities)
 
 

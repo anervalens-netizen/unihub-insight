@@ -4,6 +4,7 @@ from unihub_insight_api.api.routes.dashboards import router as dashboards_router
 from unihub_insight_api.api.routes.exports import router as exports_router
 from unihub_insight_api.api.routes.health import router as health_router
 from unihub_insight_api.api.routes.monthly_review import router as monthly_review_router
+from unihub_insight_api.api.routes.telemetry import router as telemetry_router
 
 __all__ = [
     "analytics_router",
@@ -12,4 +13,5 @@ __all__ = [
     "exports_router",
     "health_router",
     "monthly_review_router",
+    "telemetry_router",
 ]

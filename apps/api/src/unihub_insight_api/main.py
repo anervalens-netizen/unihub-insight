@@ -16,9 +16,11 @@ from unihub_insight_api.api.routes import (
     exports_router,
     health_router,
     monthly_review_router,
+    telemetry_router,
 )
 from unihub_insight_api.config import Settings, get_settings
 from unihub_insight_api.db import close_pool, create_metadata_pool, create_pool
+from unihub_insight_api.observability import configure_logging, metrics
 from unihub_insight_api.repositories.dashboards import (
     MemoryDashboardStore,
     PostgresDashboardStore,
@@ -37,7 +39,14 @@ def _request_id(value: str | None) -> str:
     return uuid.uuid4().hex
 
 
+def _route_label(request: Request) -> str:
+    route = request.scope.get("route")
+    path = getattr(route, "path", None)
+    return path if isinstance(path, str) else "unmatched"
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
+    configure_logging()
     resolved_settings = settings or get_settings()
 
     @asynccontextmanager
@@ -89,6 +98,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         started = time.perf_counter()
         response = await call_next(request)
         duration_ms = (time.perf_counter() - started) * 1000
+        metrics.record_http(
+            route=_route_label(request),
+            method=request.method,
+            status_code=response.status_code,
+            duration_seconds=duration_ms / 1000,
+        )
         response.headers["X-Request-ID"] = request_id
         response.headers["Server-Timing"] = f"app;dur={duration_ms:.2f}"
         response.headers["Cache-Control"] = "private, no-store"
@@ -109,6 +124,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(monthly_review_router)
     app.include_router(exports_router)
     app.include_router(dashboards_router)
+    app.include_router(telemetry_router)
     return app
 
 
