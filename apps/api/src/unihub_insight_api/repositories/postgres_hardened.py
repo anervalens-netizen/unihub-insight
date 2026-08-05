@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 from typing import Any
 
 from unihub_insight_api.domain import (
@@ -12,7 +12,6 @@ from unihub_insight_api.domain import (
     BreakdownRow,
     InsightAlert,
     KpiMetric,
-    MetricUnit,
     ModuleAnalyticsResponse,
     RiskLevel,
 )
@@ -22,7 +21,6 @@ from unihub_insight_api.repositories.postgres_modules import (
     append_reporting_scope,
     finance_metrics,
 )
-
 
 MIN_SALARY_FOR_AVERAGE = Decimal("2000")
 MIN_COMPENSATION_POPULATION = 3

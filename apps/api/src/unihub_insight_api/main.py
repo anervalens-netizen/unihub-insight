@@ -29,7 +29,6 @@ from unihub_insight_api.repositories.monthly_review import (
     PostgresMonthlyReviewRepository,
 )
 
-
 REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 
 

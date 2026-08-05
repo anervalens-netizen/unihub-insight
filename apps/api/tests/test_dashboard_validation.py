@@ -3,7 +3,6 @@ from fastapi.testclient import TestClient
 from unihub_insight_api.config import Settings
 from unihub_insight_api.main import create_app
 
-
 BASE_WIDGET = {
     "id": "sales-kpi",
     "module": "sales",

@@ -6,7 +6,7 @@ import math
 import random
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from zoneinfo import ZoneInfo
 
 from unihub_insight_api.domain import (
@@ -30,11 +30,9 @@ from unihub_insight_api.domain import (
 )
 from unihub_insight_api.repositories.demo import (
     DEMO_AGENTS,
-    DEMO_STORES,
     DemoAnalyticsRepository,
 )
 from unihub_insight_api.services import scope_label
-
 
 BUCHAREST = ZoneInfo("Europe/Bucharest")
 QUANT = Decimal("0.01")

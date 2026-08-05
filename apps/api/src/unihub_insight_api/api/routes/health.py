@@ -7,7 +7,6 @@ from fastapi import APIRouter, HTTPException, Request, status
 from unihub_insight_api.config import Settings
 from unihub_insight_api.db import check_pool
 
-
 router = APIRouter(tags=["health"])
 
 

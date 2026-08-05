@@ -39,7 +39,6 @@ from unihub_insight_api.repositories.postgres import (
 )
 from unihub_insight_api.services import previous_period, scope_label
 
-
 MODULE_DEFINITIONS: dict[
     ModuleId, tuple[str, str, Capability, tuple[ValueAxis, ...], tuple[ChartKind, ...]]
 ] = {
@@ -1121,7 +1120,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             if int(row["year"]) == current_year and int(row["month"]) == current_month
         ]
         payroll = sum((_money(row["total_salary"]) for row in current), Decimal(0))
-        salaries = sorted((_money(row["total_salary"]) for row in current))
+        salaries = sorted(_money(row["total_salary"]) for row in current)
         average = _money(payroll / Decimal(len(salaries))) if salaries else Decimal(0)
         if salaries:
             middle = len(salaries) // 2

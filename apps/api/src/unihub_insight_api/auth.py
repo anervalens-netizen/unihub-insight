@@ -9,7 +9,6 @@ from fastapi import Depends, HTTPException, Request, status
 from unihub_insight_api.config import Settings
 from unihub_insight_api.domain import Capability, UserContext
 
-
 ALL_CAPABILITIES = frozenset(Capability)
 
 

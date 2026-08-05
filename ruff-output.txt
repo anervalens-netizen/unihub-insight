@@ -1,26 +1,3 @@
-
-> unihub-insight@0.1.0 verify
-> bash scripts/verify.sh
-
-
-> unihub-insight@0.1.0 format:check
-> npm --workspace @unihub-insight/web run format:check && uv run --project apps/api ruff format --check apps/api/src apps/api/tests
-
-
-> @unihub-insight/web@0.1.0 format:check
-> biome format src tests vite.config.ts
-
-Checked 56 files in 23ms. No fixes applied.
-47 files already formatted
-
-> unihub-insight@0.1.0 lint
-> npm --workspace @unihub-insight/web run lint && uv run --project apps/api ruff check apps/api/src apps/api/tests
-
-
-> @unihub-insight/web@0.1.0 lint
-> biome check src tests vite.config.ts
-
-Checked 56 files in 72ms. No fixes applied.
 SIM105 Use `contextlib.suppress(FileNotFoundError)` instead of `try`-`except`-`pass`
   --> apps/api/src/unihub_insight_api/api/routes/exports.py:48:5
    |
@@ -649,5 +626,5 @@ RUF001 String contains ambiguous `–` (EN DASH). Did you mean `-` (HYPHEN-MINUS
 191 |         capability=Capability.PNL,
     |
 
-Found 57 errors.
+Found 86 errors (29 fixed, 57 remaining).
 No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import calendar
+from collections.abc import Sequence
 from datetime import UTC, date, datetime
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Any, Sequence
+from decimal import ROUND_HALF_UP, Decimal
+from typing import Any
 
 import asyncpg
 
@@ -26,7 +27,6 @@ from unihub_insight_api.domain import (
     RiskLevel,
 )
 from unihub_insight_api.services import previous_period, scope_label
-
 
 MONEY = Decimal("0.01")
 PERCENT = Decimal("0.01")

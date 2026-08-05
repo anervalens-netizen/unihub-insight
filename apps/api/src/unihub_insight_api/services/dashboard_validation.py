@@ -12,7 +12,6 @@ from unihub_insight_api.domain import (
     UserContext,
 )
 
-
 MODULE_CAPABILITIES: dict[ModuleId, Capability] = {
     ModuleId.SALES: Capability.ANALYTICS,
     ModuleId.PERFORMANCE: Capability.ANALYTICS,

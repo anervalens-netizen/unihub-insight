@@ -17,7 +17,6 @@ from unihub_insight_api.services.excel_export import (
     overview_workbook,
 )
 
-
 router = APIRouter(prefix="/api/v1/exports", tags=["exports"])
 
 MODULE_CAPABILITIES: dict[ModuleId, Capability] = {

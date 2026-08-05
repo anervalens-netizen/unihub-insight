@@ -21,7 +21,6 @@ from unihub_insight_api.services.dashboard_validation import (
     validate_dashboard,
 )
 
-
 router = APIRouter(prefix="/api/v1/dashboards", tags=["dashboards"])
 
 

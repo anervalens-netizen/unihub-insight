@@ -16,7 +16,6 @@ from pydantic import BaseModel
 from unihub_insight_api.domain import ModuleAnalyticsResponse, OverviewResponse
 from unihub_insight_api.domain.monthly_review import MonthlyReviewResponse
 
-
 ExcelKind = Literal["text", "integer", "decimal", "currency", "percent", "date", "datetime"]
 
 

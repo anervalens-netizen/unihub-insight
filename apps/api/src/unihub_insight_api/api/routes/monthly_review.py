@@ -6,7 +6,6 @@ from unihub_insight_api.api.dependencies import RepositoryDependency, ScopeDepen
 from unihub_insight_api.auth import require_capability
 from unihub_insight_api.domain import Capability, MonthlyReviewResponse, UserContext
 
-
 router = APIRouter(prefix="/api/v1", tags=["monthly-review"])
 
 

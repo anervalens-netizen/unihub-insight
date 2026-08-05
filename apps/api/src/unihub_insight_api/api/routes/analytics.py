@@ -17,7 +17,6 @@ from unihub_insight_api.domain import (
 )
 from unihub_insight_api.services import METRIC_CATALOG
 
-
 router = APIRouter(prefix="/api/v1", tags=["analytics"])
 
 MODULE_CAPABILITIES: dict[ModuleId, Capability] = {

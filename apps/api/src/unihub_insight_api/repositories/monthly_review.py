@@ -41,7 +41,6 @@ from unihub_insight_api.repositories.postgres_hardened import (
 )
 from unihub_insight_api.services import scope_label
 
-
 ZERO = Decimal(0)
 HUNDRED = Decimal("100")
 

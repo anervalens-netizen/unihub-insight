@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field
 from unihub_insight_api.api.dependencies import AnalyticsUserDependency
 from unihub_insight_api.observability import metrics
 
-
 router = APIRouter(tags=["telemetry"])
 
 

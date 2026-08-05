@@ -7,7 +7,6 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Final
 
-
 HTTP_BUCKETS: Final[tuple[float, ...]] = (0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0)
 WEB_VITAL_BUCKETS_MS: Final[tuple[float, ...]] = (
     100.0,

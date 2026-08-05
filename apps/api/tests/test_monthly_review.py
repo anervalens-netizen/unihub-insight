@@ -2,12 +2,12 @@ from decimal import Decimal
 
 from fastapi.testclient import TestClient
 
+from unihub_insight_api.domain import ReviewStatus
 from unihub_insight_api.repositories.monthly_review import (
     Aggregate,
     bridge,
     classify_status,
 )
-from unihub_insight_api.domain import ReviewStatus
 
 
 def test_monthly_review_demo_contract(client: TestClient) -> None:
