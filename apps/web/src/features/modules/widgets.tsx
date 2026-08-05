@@ -116,7 +116,7 @@ function ChartToggle({
     donut: 'Donut',
   };
   return (
-    <div className="chart-toggle" role="group" aria-label="Tip de grafic">
+    <div className="chart-toggle">
       {options.map((option) => (
         <button
           key={option}

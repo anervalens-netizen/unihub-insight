@@ -20,92 +20,1281 @@ Checked 56 files in 23ms. No fixes applied.
 > @unihub-insight/web@0.1.0 lint
 > biome check src tests vite.config.ts
 
-src/app/GlobalFilters.tsx:215:37 lint/a11y/useSemanticElements ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Checked 56 files in 73ms. No fixes applied.
+I001 [*] Import block is un-sorted or un-formatted
+  --> apps/api/src/unihub_insight_api/api/routes/analytics.py:1:1
+   |
+ 1 | / from __future__ import annotations
+ 2 | |
+ 3 | | from typing import Annotated
+ 4 | |
+ 5 | | from fastapi import APIRouter, Depends, HTTPException, Query, status
+ 6 | |
+ 7 | | from unihub_insight_api.api.dependencies import RepositoryDependency, ScopeDependency
+ 8 | | from unihub_insight_api.auth import require_capability
+ 9 | | from unihub_insight_api.domain import (
+10 | |     Capability,
+11 | |     FilterOptionsResponse,
+12 | |     MetricDefinition,
+13 | |     ModuleAnalyticsResponse,
+14 | |     ModuleId,
+15 | |     OverviewResponse,
+16 | |     UserContext,
+17 | | )
+18 | | from unihub_insight_api.services import METRIC_CATALOG
+   | |______________________________________________________^
+   |
+help: Organize imports
 
-  × The elements with this role can be changed to the following elements:
-    <fieldset>
-  
-    214 │   return (
-  > 215 │     <div className="global-filters" role="group" aria-label="Filtre globale">
-        │                                     ^^^^^^^^^^^^
-    216 │       <div className="filter-heading" title={`${count} filtre business active`}>
-    217 │         <Filter size={16} />
-  
-  i For examples and more information, see WAI-ARIA Roles
-  
-  i Replace with one of these elements:
-  
-  - <fieldset>
-  
+I001 [*] Import block is un-sorted or un-formatted
+ --> apps/api/src/unihub_insight_api/api/routes/auth.py:1:1
+  |
+1 | / from fastapi import APIRouter
+2 | |
+3 | | from unihub_insight_api.api.dependencies import UserDependency
+4 | | from unihub_insight_api.domain import UserContext
+  | |_________________________________________________^
+  |
+help: Organize imports
 
-src/components/dashboard/WidgetFrame.tsx:76:15 lint/a11y/useSemanticElements ━━━━━━━━━━━━━━━━━━━━━━━
+I001 [*] Import block is un-sorted or un-formatted
+  --> apps/api/src/unihub_insight_api/api/routes/dashboards.py:1:1
+   |
+ 1 | / from __future__ import annotations
+ 2 | |
+ 3 | | from fastapi import APIRouter, HTTPException, Response, status
+ 4 | |
+ 5 | | from unihub_insight_api.api.dependencies import AnalyticsUserDependency, DashboardStoreDependency
+ 6 | | from unihub_insight_api.domain import (
+ 7 | |     Capability,
+ 8 | |     DashboardCreateRequest,
+ 9 | |     DashboardDocument,
+10 | |     DashboardListResponse,
+11 | |     DashboardUpdateRequest,
+12 | | )
+13 | | from unihub_insight_api.repositories.dashboards import (
+14 | |     DashboardConflictError,
+15 | |     DashboardNotFoundError,
+16 | | )
+17 | | from unihub_insight_api.services.dashboard_validation import (
+18 | |     DashboardCapabilityError,
+19 | |     DashboardValidationError,
+20 | |     user_can_read,
+21 | |     validate_dashboard,
+22 | | )
+   | |_^
+   |
+help: Organize imports
 
-  × The elements with this role can be changed to the following elements:
-    <button>
-  
-    74 │             <div
-    75 │               className="widget-modal-backdrop"
-  > 76 │               role="button"
-       │               ^^^^^^^^^^^^^
-    77 │               tabIndex={0}
-    78 │               aria-label="Închide fereastra extinsă"
-  
-  i For examples and more information, see WAI-ARIA Roles
-  
-  i Replace with one of these elements:
-  
-  - <button>
-  
+I001 [*] Import block is un-sorted or un-formatted
+  --> apps/api/src/unihub_insight_api/api/routes/exports.py:1:1
+   |
+ 1 | / from __future__ import annotations
+ 2 | |
+ 3 | | import os
+ 4 | | from pathlib import Path
+ 5 | | from typing import Annotated
+ 6 | |
+ 7 | | from fastapi import APIRouter, Depends, HTTPException, Query, status
+ 8 | | from fastapi.responses import FileResponse
+ 9 | | from starlette.background import BackgroundTask
+10 | |
+11 | | from unihub_insight_api.api.dependencies import RepositoryDependency, ScopeDependency
+12 | | from unihub_insight_api.auth import require_capability
+13 | | from unihub_insight_api.domain import Capability, ModuleId, UserContext
+14 | | from unihub_insight_api.services.excel_export import (
+15 | |     module_workbook,
+16 | |     monthly_review_workbook,
+17 | |     overview_workbook,
+18 | | )
+   | |_^
+   |
+help: Organize imports
 
-src/features/modules/DataInspector.tsx:112:7 lint/a11y/useSemanticElements ━━━━━━━━━━━━━━━━━━━━━━━━━
+SIM105 Use `contextlib.suppress(FileNotFoundError)` instead of `try`-`except`-`pass`
+  --> apps/api/src/unihub_insight_api/api/routes/exports.py:49:5
+   |
+48 |   def _remove_file(path: Path) -> None:
+49 | /     try:
+50 | |         os.unlink(path)
+51 | |     except FileNotFoundError:
+52 | |         pass
+   | |____________^
+   |
+help: Replace `try`-`except`-`pass` with `with contextlib.suppress(FileNotFoundError): ...`
 
-  × The elements with this role can be changed to the following elements:
-    <button>
-  
-    110 │     <div
-    111 │       className="widget-modal-backdrop"
-  > 112 │       role="button"
-        │       ^^^^^^^^^^^^^
-    113 │       tabIndex={0}
-    114 │       aria-label="Închide inspectorul de date"
-  
-  i For examples and more information, see WAI-ARIA Roles
-  
-  i Replace with one of these elements:
-  
-  - <button>
-  
+I001 [*] Import block is un-sorted or un-formatted
+ --> apps/api/src/unihub_insight_api/api/routes/health.py:1:1
+  |
+1 | / from __future__ import annotations
+2 | |
+3 | | from typing import cast
+4 | |
+5 | | from fastapi import APIRouter, HTTPException, Request, status
+6 | |
+7 | | from unihub_insight_api.config import Settings
+8 | | from unihub_insight_api.db import check_pool
+  | |____________________________________________^
+  |
+help: Organize imports
 
-src/features/modules/widgets.tsx:119:35 lint/a11y/useSemanticElements ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+I001 [*] Import block is un-sorted or un-formatted
+ --> apps/api/src/unihub_insight_api/api/routes/monthly_review.py:1:1
+  |
+1 | / from typing import Annotated
+2 | |
+3 | | from fastapi import APIRouter, Depends, Query
+4 | |
+5 | | from unihub_insight_api.api.dependencies import RepositoryDependency, ScopeDependency
+6 | | from unihub_insight_api.auth import require_capability
+7 | | from unihub_insight_api.domain import Capability, MonthlyReviewResponse, UserContext
+  | |____________________________________________________________________________________^
+  |
+help: Organize imports
 
-  × The elements with this role can be changed to the following elements:
-    <fieldset>
-  
-    117 │   };
-    118 │   return (
-  > 119 │     <div className="chart-toggle" role="group" aria-label="Tip de grafic">
-        │                                   ^^^^^^^^^^^^
-    120 │       {options.map((option) => (
-    121 │         <button
-  
-  i For examples and more information, see WAI-ARIA Roles
-  
-  i Replace with one of these elements:
-  
-  - <fieldset>
-  
+I001 [*] Import block is un-sorted or un-formatted
+ --> apps/api/src/unihub_insight_api/api/routes/telemetry.py:1:1
+  |
+1 | / from __future__ import annotations
+2 | |
+3 | | from typing import Literal
+4 | |
+5 | | from fastapi import APIRouter, Response, status
+6 | | from pydantic import BaseModel, Field
+7 | |
+8 | | from unihub_insight_api.api.dependencies import AnalyticsUserDependency
+9 | | from unihub_insight_api.observability import metrics
+  | |____________________________________________________^
+  |
+help: Organize imports
 
-Checked 56 files in 85ms. No fixes applied.
-Found 4 errors.
-check ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+I001 [*] Import block is un-sorted or un-formatted
+  --> apps/api/src/unihub_insight_api/auth.py:1:1
+   |
+ 1 | / from __future__ import annotations
+ 2 | |
+ 3 | | import secrets
+ 4 | | from collections.abc import Callable
+ 5 | | from typing import Annotated, cast
+ 6 | |
+ 7 | | from fastapi import Depends, HTTPException, Request, status
+ 8 | |
+ 9 | | from unihub_insight_api.config import Settings
+10 | | from unihub_insight_api.domain import Capability, UserContext
+   | |_____________________________________________________________^
+   |
+help: Organize imports
 
-  × Some errors were emitted while running checks.
-  
+RUF022 [*] `__all__` is not sorted
+  --> apps/api/src/unihub_insight_api/domain/__init__.py:50:11
+   |
+48 |   )
+49 |
+50 |   __all__ = [
+   |  ___________^
+51 | |     "AlertSeverity",
+52 | |     "AnalyticsScope",
+53 | |     "BreakdownRow",
+54 | |     "Capability",
+55 | |     "ChartKind",
+56 | |     "ComparisonMetric",
+57 | |     "ComparisonMode",
+58 | |     "DailyPoint",
+59 | |     "DashboardCreateRequest",
+60 | |     "DashboardDocument",
+61 | |     "DashboardLayout",
+62 | |     "DashboardListResponse",
+63 | |     "DashboardUpdateRequest",
+64 | |     "DashboardVisibility",
+65 | |     "DashboardWidget",
+66 | |     "DataMode",
+67 | |     "DeltaKind",
+68 | |     "DimensionShare",
+69 | |     "DriverBridge",
+70 | |     "FilterAgent",
+71 | |     "FilterMode",
+72 | |     "FilterOptionsResponse",
+73 | |     "FilterStore",
+74 | |     "InsightAlert",
+75 | |     "KpiMetric",
+76 | |     "MatrixCell",
+77 | |     "MetricDefinition",
+78 | |     "MetricUnit",
+79 | |     "ModuleAnalyticsResponse",
+80 | |     "ModuleId",
+81 | |     "MonthlyReviewResponse",
+82 | |     "MonthlyTrendPoint",
+83 | |     "OverviewMeta",
+84 | |     "OverviewResponse",
+85 | |     "PerformanceReviewRow",
+86 | |     "PerformanceRow",
+87 | |     "ProductReviewRow",
+88 | |     "ReturnReviewRow",
+89 | |     "ReviewStatus",
+90 | |     "SeasonalityPoint",
+91 | |     "RiskLevel",
+92 | |     "TrendPoint",
+93 | |     "UserContext",
+94 | |     "ValueAxis",
+95 | | ]
+   | |_^
+   |
+help: Apply an isort-style sorting to `__all__`
 
-npm error Lifecycle script `lint` failed with error:
-npm error code 1
-npm error path /home/runner/work/unihub-insight/unihub-insight/apps/web
-npm error workspace @unihub-insight/web@0.1.0
-npm error location /home/runner/work/unihub-insight/unihub-insight/apps/web
-npm error command failed
-npm error command sh -c biome check src tests vite.config.ts
+I001 [*] Import block is un-sorted or un-formatted
+  --> apps/api/src/unihub_insight_api/main.py:1:1
+   |
+ 1 | / from __future__ import annotations
+ 2 | |
+ 3 | | import re
+ 4 | | import time
+ 5 | | import uuid
+ 6 | | from collections.abc import AsyncIterator, Awaitable, Callable
+ 7 | | from contextlib import asynccontextmanager
+ 8 | |
+ 9 | | from fastapi import FastAPI, Request, Response
+10 | | from fastapi.middleware.cors import CORSMiddleware
+11 | | from fastapi.responses import ORJSONResponse
+12 | |
+13 | | from unihub_insight_api.api.routes import (
+14 | |     analytics_router,
+15 | |     auth_router,
+16 | |     dashboards_router,
+17 | |     exports_router,
+18 | |     health_router,
+19 | |     monthly_review_router,
+20 | | )
+21 | | from unihub_insight_api.config import Settings, get_settings
+22 | | from unihub_insight_api.db import close_pool, create_metadata_pool, create_pool
+23 | | from unihub_insight_api.repositories.dashboards import (
+24 | |     MemoryDashboardStore,
+25 | |     PostgresDashboardStore,
+26 | | )
+27 | | from unihub_insight_api.repositories.monthly_review import (
+28 | |     DemoMonthlyReviewRepository,
+29 | |     PostgresMonthlyReviewRepository,
+30 | | )
+   | |_^
+   |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> apps/api/src/unihub_insight_api/observability.py:1:1
+  |
+1 | / from __future__ import annotations
+2 | |
+3 | | import json
+4 | | import logging
+5 | | import threading
+6 | | from collections import defaultdict
+7 | | from dataclasses import dataclass, field
+8 | | from typing import Final
+  | |________________________^
+  |
+help: Organize imports
+
+E501 Line too long (104 > 100)
+  --> apps/api/src/unihub_insight_api/observability.py:88:101
+   |
+86 |     def render(self) -> str:
+87 |         lines = [
+88 |             "# HELP unihub_insight_http_requests_total HTTP requests by finite route and status class.",
+   |                                                                                                     ^^^^
+89 |             "# TYPE unihub_insight_http_requests_total counter",
+90 |         ]
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> apps/api/src/unihub_insight_api/repositories/demo.py:1:1
+   |
+ 1 | / from __future__ import annotations
+ 2 | |
+ 3 | | import calendar
+ 4 | | import hashlib
+ 5 | | import math
+ 6 | | import random
+ 7 | | from datetime import UTC, date, datetime
+ 8 | | from decimal import Decimal, ROUND_HALF_UP
+ 9 | | from zoneinfo import ZoneInfo
+10 | |
+11 | | from unihub_insight_api.domain import (
+12 | |     AlertSeverity,
+13 | |     AnalyticsScope,
+14 | |     DailyPoint,
+15 | |     DataMode,
+16 | |     DimensionShare,
+17 | |     FilterAgent,
+18 | |     FilterOptionsResponse,
+19 | |     FilterStore,
+20 | |     InsightAlert,
+21 | |     KpiMetric,
+22 | |     MetricUnit,
+23 | |     OverviewMeta,
+24 | |     OverviewResponse,
+25 | |     PerformanceRow,
+26 | |     RiskLevel,
+27 | | )
+28 | | from unihub_insight_api.services import previous_period, scope_label
+   | |____________________________________________________________________^
+   |
+help: Organize imports
+
+E501 Line too long (101 > 100)
+   --> apps/api/src/unihub_insight_api/repositories/demo.py:481:101
+    |
+479 |                     severity=AlertSeverity.INFO,
+480 |                     title="Fără abateri majore",
+481 |                     description="Regulile inițiale nu au detectat un risc comercial major în scope.",
+    |                                                                                                     ^
+482 |                 )
+483 |             )
+    |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> apps/api/src/unihub_insight_api/repositories/demo_modules.py:1:1
+   |
+ 1 | / from __future__ import annotations
+ 2 | |
+ 3 | | import calendar
+ 4 | | import hashlib
+ 5 | | import math
+ 6 | | import random
+ 7 | | from dataclasses import dataclass
+ 8 | | from datetime import UTC, date, datetime
+ 9 | | from decimal import Decimal, ROUND_HALF_UP
+10 | | from zoneinfo import ZoneInfo
+11 | |
+12 | | from unihub_insight_api.domain import (
+13 | |     AlertSeverity,
+14 | |     AnalyticsScope,
+15 | |     BreakdownRow,
+16 | |     Capability,
+17 | |     ChartKind,
+18 | |     DataMode,
+19 | |     DimensionShare,
+20 | |     InsightAlert,
+21 | |     KpiMetric,
+22 | |     MatrixCell,
+23 | |     MetricUnit,
+24 | |     ModuleAnalyticsResponse,
+25 | |     ModuleId,
+26 | |     OverviewMeta,
+27 | |     RiskLevel,
+28 | |     TrendPoint,
+29 | |     ValueAxis,
+30 | | )
+31 | | from unihub_insight_api.repositories.demo import (
+32 | |     DEMO_AGENTS,
+33 | |     DEMO_STORES,
+34 | |     DemoAnalyticsRepository,
+35 | | )
+36 | | from unihub_insight_api.services import scope_label
+   | |___________________________________________________^
+   |
+help: Organize imports
+
+F401 [*] `unihub_insight_api.repositories.demo.DEMO_STORES` imported but unused
+  --> apps/api/src/unihub_insight_api/repositories/demo_modules.py:33:5
+   |
+31 | from unihub_insight_api.repositories.demo import (
+32 |     DEMO_AGENTS,
+33 |     DEMO_STORES,
+   |     ^^^^^^^^^^^
+34 |     DemoAnalyticsRepository,
+35 | )
+   |
+help: Remove unused import: `unihub_insight_api.repositories.demo.DEMO_STORES`
+
+RUF001 String contains ambiguous `–` (EN DASH). Did you mean `-` (HYPHEN-MINUS)?
+   --> apps/api/src/unihub_insight_api/repositories/demo_modules.py:108:35
+    |
+106 |         ),
+107 |         charts=(ChartKind.LINE, ChartKind.BAR, ChartKind.HEATMAP, ChartKind.TABLE),
+108 |         categories=("< 3 luni", "3–12 luni", "1–3 ani", "3+ ani"),
+    |                                   ^
+109 |         base=Decimal("38"),
+110 |     ),
+    |
+
+RUF001 String contains ambiguous `–` (EN DASH). Did you mean `-` (HYPHEN-MINUS)?
+   --> apps/api/src/unihub_insight_api/repositories/demo_modules.py:108:48
+    |
+106 |         ),
+107 |         charts=(ChartKind.LINE, ChartKind.BAR, ChartKind.HEATMAP, ChartKind.TABLE),
+108 |         categories=("< 3 luni", "3–12 luni", "1–3 ani", "3+ ani"),
+    |                                                ^
+109 |         base=Decimal("38"),
+110 |     ),
+    |
+
+E501 Line too long (121 > 100)
+   --> apps/api/src/unihub_insight_api/repositories/demo_modules.py:599:101
+    |
+597 |             severity=AlertSeverity.INFO,
+598 |             title="Date demo deterministe",
+599 |             description="Structura și interacțiunile sunt reale; valorile vor fi reconciliate la conectarea PostgreSQL.",
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^
+600 |         )
+601 |     ]
+    |
+
+E501 Line too long (106 > 100)
+   --> apps/api/src/unihub_insight_api/repositories/demo_modules.py:609:101
+    |
+607 |                     severity=AlertSeverity.WARNING,
+608 |                     title="Entitate sub pragul de atenție",
+609 |                     description=f"Indicatorul de progres este {row.progress_pct}% în perioada selectată.",
+    |                                                                                                     ^^^^^^
+610 |                     entity_label=row.label,
+611 |                 )
+    |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1:1
+   |
+ 1 | / from __future__ import annotations
+ 2 | |
+ 3 | | import asyncio
+ 4 | | import hashlib
+ 5 | | import math
+ 6 | | import random
+ 7 | | from collections import defaultdict
+ 8 | | from collections.abc import Iterable, Sequence
+ 9 | | from dataclasses import dataclass
+10 | | from datetime import UTC, datetime
+11 | | from decimal import Decimal
+12 | | from typing import Any
+13 | |
+14 | | import asyncpg
+15 | |
+16 | | from unihub_insight_api.domain import (
+17 | |     AlertSeverity,
+18 | |     AnalyticsScope,
+19 | |     DataMode,
+20 | |     InsightAlert,
+21 | |     MetricUnit,
+22 | |     OverviewMeta,
+23 | | )
+24 | | from unihub_insight_api.domain.monthly_review import (
+25 | |     ComparisonMetric,
+26 | |     DeltaKind,
+27 | |     DriverBridge,
+28 | |     MonthlyReviewResponse,
+29 | |     MonthlyTrendPoint,
+30 | |     PerformanceReviewRow,
+31 | |     ProductReviewRow,
+32 | |     ReturnReviewRow,
+33 | |     ReviewStatus,
+34 | |     SeasonalityPoint,
+35 | | )
+36 | | from unihub_insight_api.repositories.demo import DEMO_AGENTS
+37 | | from unihub_insight_api.repositories.demo_modules import DemoInsightRepository
+38 | | from unihub_insight_api.repositories.postgres import _delta, _money, _percent, _ratio
+39 | | from unihub_insight_api.repositories.postgres_hardened import (
+40 | |     PostgresHardenedInsightRepository,
+41 | | )
+42 | | from unihub_insight_api.services import scope_label
+   | |___________________________________________________^
+   |
+help: Organize imports
+
+E501 Line too long (139 > 100)
+   --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:912:101
+    |
+910 | …
+911 | …
+912 | …i exporturile sunt reale; valorile sunt deterministe până la conectarea PostgreSQL.",
+    |                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+913 | …
+914 | …
+    |
+
+E501 Line too long (123 > 100)
+   --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:919:101
+    |
+917 |                     severity=AlertSeverity.WARNING,
+918 |                     title="Entitate prioritară",
+919 |                     description=f"Scor {row.performance_score}; YoY {row.yoy_pct}% și vs media recentă {row.recent_pct}%.",
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^
+920 |                     entity_label=row.label,
+921 |                 )
+    |
+
+E501 Line too long (111 > 100)
+   --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:959:101
+    |
+957 | …     alerts=alerts,
+958 | …     methodology=[
+959 | …         "Comparația YoY folosește aceeași lună din anul precedent și cohorta organizațională curentă.",
+    |                                                                                               ^^^^^^^^^^^
+960 | …         f"Reperul recent este media aritmetică a ultimelor {recent_months} luni complete/observate; lunile fără rezultat contribuie…
+961 | …         "Scorul combină target 40%, YoY 25%, reper recent 25% și consistență 10%.",
+    |
+
+E501 Line too long (150 > 100)
+   --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:960:101
+    |
+958 | …
+959 | …anul precedent și cohorta organizațională curentă.",
+960 | …timelor {recent_months} luni complete/observate; lunile fără rezultat contribuie cu zero.",
+    |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+961 | …recent 25% și consistență 10%.",
+962 | …ări în bonuri, produse/bon și valoare/produs.",
+    |
+
+E501 Line too long (106 > 100)
+   --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:962:101
+    |
+960 | …         f"Reperul recent este media aritmetică a ultimelor {recent_months} luni complete/observate; lunile fără rezultat contribuie…
+961 | …         "Scorul combină target 40%, YoY 25%, reper recent 25% și consistență 10%.",
+962 | …         "Driverii descompun exact diferența de vânzări în bonuri, produse/bon și valoare/produs.",
+    |                                                                                               ^^^^^^
+963 | …         "Retururile sunt raportate separat la vânzarea brută pozitivă.",
+964 | …     ],
+    |
+
+E501 Line too long (154 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1191:101
+     |
+1189 | …
+1190 | …
+1191 | … filtrele organizaționale curente; selecția explicită de magazine domină filtrele părinte.",
+     |                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1192 | …_period}; reperul recent este media lunilor {', '.join(recent_periods)}.",
+1193 | … lună recentă contribuie cu zero, astfel încât pierderea distribuției nu este ascunsă.",
+     |
+
+E501 Line too long (136 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1192:101
+     |
+1190 | …
+1191 | …active și filtrele organizaționale curente; selecția explicită de magazine domină filtrele părinte.",
+1192 | …ious_year_period}; reperul recent este media lunilor {', '.join(recent_periods)}.",
+     |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1193 | …at într-o lună recentă contribuie cu zero, astfel încât pierderea distribuției nu este ascunsă.",
+1194 | …oY 25%, reper recent 25%, consistență 10%.",
+     |
+
+E501 Line too long (150 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1193:101
+     |
+1191 | …și filtrele organizaționale curente; selecția explicită de magazine domină filtrele părinte.",
+1192 | …ar_period}; reperul recent este media lunilor {', '.join(recent_periods)}.",
+1193 | …-o lună recentă contribuie cu zero, astfel încât pierderea distribuției nu este ascunsă.",
+     |                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1194 | … reper recent 25%, consistență 10%.",
+1195 | …re/produs = diferența exactă de vânzări.",
+     |
+
+E501 Line too long (102 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1195:101
+     |
+1193 | …     "Magazinele sau produsele fără rezultat într-o lună recentă contribuie cu zero, astfel încât pierderea distribuției nu este as…
+1194 | …     "Scorul de performanță: target 40%, YoY 25%, reper recent 25%, consistență 10%.",
+1195 | …     "Driver bridge: bonuri + produse/bon + valoare/produs = diferența exactă de vânzări.",
+     |                                                                                           ^^
+1196 | …     "Vânzările și unitățile sunt nete de retururi; rata retur = valoare retur / vânzare brută pozitivă.",
+1197 | …     "Exportul Excel păstrează numerele ca valori numerice și separă fiecare nivel într-o foaie dedicată.",
+     |
+
+E501 Line too long (117 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1196:101
+     |
+1194 |                 "Scorul de performanță: target 40%, YoY 25%, reper recent 25%, consistență 10%.",
+1195 |                 "Driver bridge: bonuri + produse/bon + valoare/produs = diferența exactă de vânzări.",
+1196 |                 "Vânzările și unitățile sunt nete de retururi; rata retur = valoare retur / vânzare brută pozitivă.",
+     |                                                                                                     ^^^^^^^^^^^^^^^^^
+1197 |                 "Exportul Excel păstrează numerele ca valori numerice și separă fiecare nivel într-o foaie dedicată.",
+1198 |             ],
+     |
+
+E501 Line too long (118 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1197:101
+     |
+1195 |                 "Driver bridge: bonuri + produse/bon + valoare/produs = diferența exactă de vânzări.",
+1196 |                 "Vânzările și unitățile sunt nete de retururi; rata retur = valoare retur / vânzare brută pozitivă.",
+1197 |                 "Exportul Excel păstrează numerele ca valori numerice și separă fiecare nivel într-o foaie dedicată.",
+     |                                                                                                     ^^^^^^^^^^^^^^^^^^
+1198 |             ],
+1199 |         )
+     |
+
+E501 Line too long (109 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1276:101
+     |
+1274 | …     SUM(sale.total_value) AS sales,
+1275 | …     SUM(sale.quantity) AS units,
+1276 | …     SUM(CASE WHEN NOT sale.is_return THEN sale.total_value ELSE 0 END) AS gross_sales,
+     |                                                                                ^^^^^^^^^
+1277 | …     SUM(CASE WHEN sale.is_return THEN ABS(sale.total_value) ELSE 0 END) AS return_value,
+1278 | …     SUM(CASE WHEN focus.item_code IS NOT NULL AND NOT sale.is_return THEN GREATEST(sale.quantity, 0) ELSE 0 END) AS focus_units,
+     |
+
+E501 Line too long (111 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1277:101
+     |
+1275 | …     SUM(sale.quantity) AS units,
+1276 | …     SUM(CASE WHEN NOT sale.is_return THEN sale.total_value ELSE 0 END) AS gross_sales,
+1277 | …     SUM(CASE WHEN sale.is_return THEN ABS(sale.total_value) ELSE 0 END) AS return_value,
+     |                                                                                ^^^^^^^^^^^
+1278 | …     SUM(CASE WHEN focus.item_code IS NOT NULL AND NOT sale.is_return THEN GREATEST(sale.quantity, 0) ELSE 0 END) AS focus_units,
+1279 | …     COUNT(DISTINCT sale.sale_date) FILTER (WHERE NOT sale.is_return) AS working_days
+     |
+
+E501 Line too long (151 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1278:101
+     |
+1276 | …THEN sale.total_value ELSE 0 END) AS gross_sales,
+1277 | … ABS(sale.total_value) ELSE 0 END) AS return_value,
+1278 | …NOT NULL AND NOT sale.is_return THEN GREATEST(sale.quantity, 0) ELSE 0 END) AS focus_units,
+     |                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1279 | …LTER (WHERE NOT sale.is_return) AS working_days
+1280 | …
+     |
+
+E501 Line too long (107 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1279:101
+     |
+1277 | …            SUM(CASE WHEN sale.is_return THEN ABS(sale.total_value) ELSE 0 END) AS return_value,
+1278 | …            SUM(CASE WHEN focus.item_code IS NOT NULL AND NOT sale.is_return THEN GREATEST(sale.quantity, 0) ELSE 0 END) AS focus_u…
+1279 | …            COUNT(DISTINCT sale.sale_date) FILTER (WHERE NOT sale.is_return) AS working_days
+     |                                                                                       ^^^^^^^
+1280 | …     FROM sales_transactions sale
+1281 | …     JOIN eligible ON eligible.site_code = sale.site_code
+     |
+
+E501 Line too long (125 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1292:101
+     |
+1290 |                     FROM (
+1291 |                         SELECT sale.import_month, sale.site_code, sale.sale_date, sale.bon_nr,
+1292 |                                SUM(CASE WHEN NOT sale.is_return THEN GREATEST(sale.quantity, 0) ELSE 0 END) AS positive_units
+     |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^
+1293 |                         FROM sales_transactions sale
+1294 |                         JOIN eligible ON eligible.site_code = sale.site_code
+     |
+
+E501 Line too long (138 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1310:101
+     |
+1308 | …AS receipts,
+1309 | …, 0) AS receipt_2plus,
+1310 | …NULL THEN store_target.target_value ELSE agent_target.target_value END, 0) AS target
+     |                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1311 | …
+1312 | …_code)
+     |
+
+E501 Line too long (154 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1314:101
+     |
+1312 | …
+1313 | …ode)
+1314 | …target.import_month = requested.import_month AND store_target.site_code = eligible.site_code
+     |                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1315 | …target.import_month = requested.import_month AND agent_target.site_code = eligible.site_code AND agent_target.agent = $2
+1316 | …_code
+     |
+
+E501 Line too long (182 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1315:101
+     |
+1313 | …
+1314 | …month = requested.import_month AND store_target.site_code = eligible.site_code
+1315 | …month = requested.import_month AND agent_target.site_code = eligible.site_code AND agent_target.agent = $2
+     |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1316 | …
+1317 | …
+     |
+
+E501 Line too long (109 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1338:101
+     |
+1336 | …     MAX(store.regional) AS regional, MAX(store.asm) AS asm,
+1337 | …     SUM(sale.total_value) AS sales, SUM(sale.quantity) AS units,
+1338 | …     SUM(CASE WHEN NOT sale.is_return THEN sale.total_value ELSE 0 END) AS gross_sales,
+     |                                                                                ^^^^^^^^^
+1339 | …     SUM(CASE WHEN sale.is_return THEN ABS(sale.total_value) ELSE 0 END) AS return_value,
+1340 | …     SUM(CASE WHEN focus.item_code IS NOT NULL AND NOT sale.is_return THEN GREATEST(sale.quantity, 0) ELSE 0 END) AS focus_units,
+     |
+
+E501 Line too long (111 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1339:101
+     |
+1337 | …     SUM(sale.total_value) AS sales, SUM(sale.quantity) AS units,
+1338 | …     SUM(CASE WHEN NOT sale.is_return THEN sale.total_value ELSE 0 END) AS gross_sales,
+1339 | …     SUM(CASE WHEN sale.is_return THEN ABS(sale.total_value) ELSE 0 END) AS return_value,
+     |                                                                                ^^^^^^^^^^^
+1340 | …     SUM(CASE WHEN focus.item_code IS NOT NULL AND NOT sale.is_return THEN GREATEST(sale.quantity, 0) ELSE 0 END) AS focus_units,
+1341 | …     COUNT(DISTINCT sale.sale_date) FILTER (WHERE NOT sale.is_return) AS working_days
+     |
+
+E501 Line too long (151 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1340:101
+     |
+1338 | …THEN sale.total_value ELSE 0 END) AS gross_sales,
+1339 | … ABS(sale.total_value) ELSE 0 END) AS return_value,
+1340 | …NOT NULL AND NOT sale.is_return THEN GREATEST(sale.quantity, 0) ELSE 0 END) AS focus_units,
+     |                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1341 | …LTER (WHERE NOT sale.is_return) AS working_days
+1342 | …
+     |
+
+E501 Line too long (107 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1341:101
+     |
+1339 | …            SUM(CASE WHEN sale.is_return THEN ABS(sale.total_value) ELSE 0 END) AS return_value,
+1340 | …            SUM(CASE WHEN focus.item_code IS NOT NULL AND NOT sale.is_return THEN GREATEST(sale.quantity, 0) ELSE 0 END) AS focus_u…
+1341 | …            COUNT(DISTINCT sale.sale_date) FILTER (WHERE NOT sale.is_return) AS working_days
+     |                                                                                       ^^^^^^^
+1342 | …     FROM sales_transactions sale
+1343 | …     JOIN stores store ON store.site_code = sale.site_code
+     |
+
+E501 Line too long (103 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1345:101
+     |
+1343 |                     JOIN stores store ON store.site_code = sale.site_code
+1344 |                     LEFT JOIN focus_products focus ON focus.item_code = sale.item_code
+1345 |                     WHERE sale.import_month = ANY($1::text[]) AND NOT sale.is_cartela AND {where_scope}
+     |                                                                                                     ^^^
+1346 |                     GROUP BY sale.import_month, sale.site_code, sale.agent
+1347 |                 ), receipt_detail AS (
+     |
+
+E501 Line too long (121 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1350:101
+     |
+1348 |                     SELECT sale.import_month, sale.site_code, sale.agent,
+1349 |                            sale.sale_date, sale.bon_nr,
+1350 |                            SUM(CASE WHEN NOT sale.is_return THEN GREATEST(sale.quantity, 0) ELSE 0 END) AS positive_units
+     |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^
+1351 |                     FROM sales_transactions sale
+1352 |                     JOIN stores store ON store.site_code = sale.site_code
+     |
+
+E501 Line too long (105 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1392:101
+     |
+1390 |                        SUM(sale.total_value) AS sales,
+1391 |                        SUM(sale.quantity) AS units,
+1392 |                        SUM(CASE WHEN NOT sale.is_return THEN sale.total_value ELSE 0 END) AS gross_sales,
+     |                                                                                                     ^^^^^
+1393 |                        SUM(CASE WHEN sale.is_return THEN ABS(sale.total_value) ELSE 0 END) AS return_value,
+1394 |                        COUNT(DISTINCT sale.site_code) FILTER (WHERE NOT sale.is_return AND sale.quantity > 0) AS distribution,
+     |
+
+E501 Line too long (107 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1393:101
+     |
+1391 |                        SUM(sale.quantity) AS units,
+1392 |                        SUM(CASE WHEN NOT sale.is_return THEN sale.total_value ELSE 0 END) AS gross_sales,
+1393 |                        SUM(CASE WHEN sale.is_return THEN ABS(sale.total_value) ELSE 0 END) AS return_value,
+     |                                                                                                     ^^^^^^^
+1394 |                        COUNT(DISTINCT sale.site_code) FILTER (WHERE NOT sale.is_return AND sale.quantity > 0) AS distribution,
+1395 |                        0 AS receipts, 0 AS receipt_2plus, 0 AS focus_units, 0 AS working_days, 0 AS target
+     |
+
+E501 Line too long (126 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1394:101
+     |
+1392 |                        SUM(CASE WHEN NOT sale.is_return THEN sale.total_value ELSE 0 END) AS gross_sales,
+1393 |                        SUM(CASE WHEN sale.is_return THEN ABS(sale.total_value) ELSE 0 END) AS return_value,
+1394 |                        COUNT(DISTINCT sale.site_code) FILTER (WHERE NOT sale.is_return AND sale.quantity > 0) AS distribution,
+     |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+1395 |                        0 AS receipts, 0 AS receipt_2plus, 0 AS focus_units, 0 AS working_days, 0 AS target
+1396 |                 FROM sales_transactions sale
+     |
+
+E501 Line too long (106 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1395:101
+     |
+1393 |                        SUM(CASE WHEN sale.is_return THEN ABS(sale.total_value) ELSE 0 END) AS return_value,
+1394 |                        COUNT(DISTINCT sale.site_code) FILTER (WHERE NOT sale.is_return AND sale.quantity > 0) AS distribution,
+1395 |                        0 AS receipts, 0 AS receipt_2plus, 0 AS focus_units, 0 AS working_days, 0 AS target
+     |                                                                                                     ^^^^^^
+1396 |                 FROM sales_transactions sale
+1397 |                 JOIN stores store ON store.site_code = sale.site_code
+     |
+
+E501 Line too long (134 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1421:101
+     |
+1419 | …
+1420 | …
+1421 | …nibil, dar rezultatele și comparațiile se vor modifica până la închiderea lunii.",
+     |                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1422 | …
+1423 | …
+     |
+
+E501 Line too long (127 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1431:101
+     |
+1429 |                     severity=AlertSeverity.CRITICAL,
+1430 |                     title="Magazine cu risc simultan",
+1431 |                     description=f"{len(risks)} magazine sunt sub prag la target, YoY și media ultimelor {recent_months} luni.",
+     |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1432 |                 )
+1433 |             )
+     |
+
+E501 Line too long (118 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1441:101
+     |
+1439 |                     severity=AlertSeverity.WARNING,
+1440 |                     title="Creștere anuală, încetinire recentă",
+1441 |                     description=f"{len(slowing)} magazine sunt încă pozitive YoY, dar au coborât sub reperul recent.",
+     |                                                                                                     ^^^^^^^^^^^^^^^^^^
+1442 |                 )
+1443 |             )
+     |
+
+E501 Line too long (131 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1453:101
+     |
+1451 | …             severity=AlertSeverity.WARNING,
+1452 | …             title="Produse cu pierdere de tracțiune",
+1453 | …             description=f"{len(product_risks)} produse din topul de impact au scădere simultană sau au ieșit din vânzare.",
+     |                                                                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1454 | …         )
+1455 | …     )
+     |
+
+E501 Line too long (118 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1463:101
+     |
+1461 |                     severity=AlertSeverity.WARNING,
+1462 |                     title="Retururi peste reper",
+1463 |                     description=f"{len(return_risks)} entități depășesc semnificativ rata istorică/recentă de retur.",
+     |                                                                                                     ^^^^^^^^^^^^^^^^^^
+1464 |                 )
+1465 |             )
+     |
+
+E501 Line too long (125 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/monthly_review.py:1472:101
+     |
+1470 |                     severity=AlertSeverity.INFO,
+1471 |                     title="Fără abateri critice",
+1472 |                     description="Nu au fost detectate combinații critice în regulile actuale de management al performanței.",
+     |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^
+1473 |                 )
+1474 |             )
+     |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> apps/api/src/unihub_insight_api/repositories/postgres.py:1:1
+   |
+ 1 | / from __future__ import annotations
+ 2 | |
+ 3 | | import asyncio
+ 4 | | import calendar
+ 5 | | from datetime import UTC, date, datetime
+ 6 | | from decimal import Decimal, ROUND_HALF_UP
+ 7 | | from typing import Any, Sequence
+ 8 | |
+ 9 | | import asyncpg
+10 | |
+11 | | from unihub_insight_api.domain import (
+12 | |     AlertSeverity,
+13 | |     AnalyticsScope,
+14 | |     DailyPoint,
+15 | |     DataMode,
+16 | |     DimensionShare,
+17 | |     FilterAgent,
+18 | |     FilterOptionsResponse,
+19 | |     FilterStore,
+20 | |     InsightAlert,
+21 | |     KpiMetric,
+22 | |     MetricUnit,
+23 | |     OverviewMeta,
+24 | |     OverviewResponse,
+25 | |     PerformanceRow,
+26 | |     RiskLevel,
+27 | | )
+28 | | from unihub_insight_api.services import previous_period, scope_label
+   | |____________________________________________________________________^
+   |
+help: Organize imports
+
+UP035 [*] Import from `collections.abc` instead: `Sequence`
+ --> apps/api/src/unihub_insight_api/repositories/postgres.py:7:1
+  |
+5 | from datetime import UTC, date, datetime
+6 | from decimal import Decimal, ROUND_HALF_UP
+7 | from typing import Any, Sequence
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+8 |
+9 | import asyncpg
+  |
+help: Import from `collections.abc`
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> apps/api/src/unihub_insight_api/repositories/postgres_hardened.py:1:1
+   |
+ 1 | / from __future__ import annotations
+ 2 | |
+ 3 | | from collections import defaultdict
+ 4 | | from collections.abc import Sequence
+ 5 | | from dataclasses import dataclass
+ 6 | | from decimal import Decimal, ROUND_HALF_UP
+ 7 | | from typing import Any
+ 8 | |
+ 9 | | from unihub_insight_api.domain import (
+10 | |     AlertSeverity,
+11 | |     AnalyticsScope,
+12 | |     BreakdownRow,
+13 | |     InsightAlert,
+14 | |     KpiMetric,
+15 | |     MetricUnit,
+16 | |     ModuleAnalyticsResponse,
+17 | |     RiskLevel,
+18 | | )
+19 | | from unihub_insight_api.repositories.postgres import _money, _percent, _ratio
+20 | | from unihub_insight_api.repositories.postgres_modules import (
+21 | |     PostgresInsightRepository,
+22 | |     append_reporting_scope,
+23 | |     finance_metrics,
+24 | | )
+   | |_^
+   |
+help: Organize imports
+
+F401 [*] `decimal.ROUND_HALF_UP` imported but unused
+ --> apps/api/src/unihub_insight_api/repositories/postgres_hardened.py:6:30
+  |
+4 | from collections.abc import Sequence
+5 | from dataclasses import dataclass
+6 | from decimal import Decimal, ROUND_HALF_UP
+  |                              ^^^^^^^^^^^^^
+7 | from typing import Any
+  |
+help: Remove unused import: `decimal.ROUND_HALF_UP`
+
+F401 [*] `unihub_insight_api.domain.MetricUnit` imported but unused
+  --> apps/api/src/unihub_insight_api/repositories/postgres_hardened.py:15:5
+   |
+13 |     InsightAlert,
+14 |     KpiMetric,
+15 |     MetricUnit,
+   |     ^^^^^^^^^^
+16 |     ModuleAnalyticsResponse,
+17 |     RiskLevel,
+   |
+help: Remove unused import: `unihub_insight_api.domain.MetricUnit`
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> apps/api/src/unihub_insight_api/repositories/postgres_modules.py:1:1
+   |
+ 1 | / from __future__ import annotations
+ 2 | |
+ 3 | | import asyncio
+ 4 | | import math
+ 5 | | from collections import defaultdict
+ 6 | | from collections.abc import Sequence
+ 7 | | from datetime import UTC, date, datetime
+ 8 | | from decimal import Decimal
+ 9 | | from typing import Any
+10 | |
+11 | | import asyncpg
+12 | |
+13 | | from unihub_insight_api.domain import (
+14 | |     AlertSeverity,
+15 | |     AnalyticsScope,
+16 | |     BreakdownRow,
+17 | |     Capability,
+18 | |     ChartKind,
+19 | |     DataMode,
+20 | |     DimensionShare,
+21 | |     InsightAlert,
+22 | |     KpiMetric,
+23 | |     MatrixCell,
+24 | |     MetricUnit,
+25 | |     ModuleAnalyticsResponse,
+26 | |     ModuleId,
+27 | |     OverviewMeta,
+28 | |     RiskLevel,
+29 | |     TrendPoint,
+30 | |     ValueAxis,
+31 | | )
+32 | | from unihub_insight_api.repositories.postgres import (
+33 | |     PostgresAnalyticsRepository,
+34 | |     _delta,
+35 | |     _money,
+36 | |     _percent,
+37 | |     _ratio,
+38 | |     _risk,
+39 | | )
+40 | | from unihub_insight_api.services import previous_period, scope_label
+   | |____________________________________________________________________^
+   |
+help: Organize imports
+
+E501 Line too long (154 > 100)
+   --> apps/api/src/unihub_insight_api/repositories/postgres_modules.py:879:101
+    |
+877 | …
+878 | …
+879 | …tus <> 'ok' OR status.target_status <> 'ok' OR status.sales_status <> 'ok')::INT AS problems,
+    |                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+880 | …or_code IS NOT NULL)::INT AS errors
+881 | …
+    |
+
+E501 Line too long (104 > 100)
+   --> apps/api/src/unihub_insight_api/repositories/postgres_modules.py:903:101
+    |
+901 |                     severity=AlertSeverity.WARNING,
+902 |                     title="Grile cu neconcordanțe",
+903 |                     description=f"{row['problems']} magazine au cel puțin o verificare diferită de OK.",
+    |                                                                                                     ^^^^
+904 |                 )
+905 |             )
+    |
+
+E501 Line too long (101 > 100)
+   --> apps/api/src/unihub_insight_api/repositories/postgres_modules.py:912:101
+    |
+910 |                     severity=AlertSeverity.CRITICAL,
+911 |                     title="Erori Grile",
+912 |                     description=f"{row['errors']} magazine păstrează o ultimă eroare de verificare.",
+    |                                                                                                     ^
+913 |                 )
+914 |             )
+    |
+
+RUF001 String contains ambiguous `–` (EN DASH). Did you mean `-` (HYPHEN-MINUS)?
+   --> apps/api/src/unihub_insight_api/repositories/postgres_modules.py:970:24
+    |
+968 |                 "< 3 luni"
+969 |                 if months < 3
+970 |                 else "3–12 luni"
+    |                        ^
+971 |                 if months < 12
+972 |                 else "1–3 ani"
+    |
+
+RUF001 String contains ambiguous `–` (EN DASH). Did you mean `-` (HYPHEN-MINUS)?
+   --> apps/api/src/unihub_insight_api/repositories/postgres_modules.py:972:24
+    |
+970 |                 else "3–12 luni"
+971 |                 if months < 12
+972 |                 else "1–3 ani"
+    |                        ^
+973 |                 if months < 36
+974 |                 else "3+ ani"
+    |
+
+E501 Line too long (130 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/postgres_modules.py:1073:101
+     |
+1071 |                 params.append(scope.regional)
+1072 |                 clauses.append(
+1073 |                     f"EXISTS (SELECT 1 FROM stores org WHERE org.site_code = {alias}.site_code AND org.regional = ${len(params)})"
+     |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1074 |                 )
+1075 |             if scope.asm:
+     |
+
+E501 Line too long (125 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/postgres_modules.py:1078:101
+     |
+1076 |                 params.append(scope.asm)
+1077 |                 clauses.append(
+1078 |                     f"EXISTS (SELECT 1 FROM stores org WHERE org.site_code = {alias}.site_code AND org.asm = ${len(params)})"
+     |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^
+1079 |                 )
+1080 |         if scope.agent:
+     |
+
+E501 Line too long (179 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/postgres_modules.py:1083:101
+     |
+1081 | …
+1082 | …
+1083 | ….person_id = {alias}.person_id AND link.agent_code = ${len(params)} AND link.match_status = 'confirmed')"
+     |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1084 | …
+1085 | …
+     |
+
+UP034 [*] Avoid extraneous parentheses
+    --> apps/api/src/unihub_insight_api/repositories/postgres_modules.py:1124:27
+     |
+1122 |         ]
+1123 |         payroll = sum((_money(row["total_salary"]) for row in current), Decimal(0))
+1124 |         salaries = sorted((_money(row["total_salary"]) for row in current))
+     |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1125 |         average = _money(payroll / Decimal(len(salaries))) if salaries else Decimal(0)
+1126 |         if salaries:
+     |
+help: Remove extraneous parentheses
+
+E501 Line too long (129 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/postgres_modules.py:1195:101
+     |
+1193 |                     severity=AlertSeverity.WARNING,
+1194 |                     title="Scope salarial foarte restrâns",
+1195 |                     description="Rezultatul conține mai puțin de trei persoane; exportul agregat trebuie suprimat în producție.",
+     |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1196 |                 )
+1197 |             )
+     |
+
+E501 Line too long (160 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/postgres_modules.py:1256:101
+     |
+1254 | …
+1255 | …
+1256 | …t[]) OR (row.linked_site_code IS NULL AND row.source_site_code = ANY(${len(params)}::text[])))"
+     |                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1257 | …
+1258 | …
+     |
+
+E501 Line too long (111 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/postgres_modules.py:1278:101
+     |
+1276 | …                     CASE WHEN pnl.source_site_code = '__FINANCE_UNALLOCATED__'
+1277 | …                          THEN pnl.source_site_code
+1278 | …                          ELSE COALESCE(link.site_code, pnl.source_site_code) END AS canonical_site_code,
+     |                                                                                                ^^^^^^^^^^^
+1279 | …                     CASE WHEN pnl.source_site_code = '__FINANCE_UNALLOCATED__'
+1280 | …                          THEN NULL ELSE link.site_code END AS linked_site_code,
+     |
+
+E501 Line too long (101 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/postgres_modules.py:1288:101
+     |
+1286 |                      AND link.source_site_code = pnl.source_site_code
+1287 |                     LEFT JOIN stores store
+1288 |                       ON store.site_code = CASE WHEN pnl.source_site_code = '__FINANCE_UNALLOCATED__'
+     |                                                                                                     ^
+1289 |                           THEN NULL ELSE COALESCE(link.site_code, pnl.source_site_code) END
+1290 |                     WHERE pnl.period BETWEEN $1 AND $2
+     |
+
+E501 Line too long (114 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/postgres_modules.py:1293:101
+     |
+1291 |                 ), preferred_kind AS (
+1292 |                     SELECT company_name, period, canonical_site_code,
+1293 |                            CASE WHEN BOOL_OR(data_kind = 'actual') THEN 'actual' ELSE 'estimated' END AS data_kind
+     |                                                                                                     ^^^^^^^^^^^^^^
+1294 |                     FROM normalized
+1295 |                     GROUP BY company_name, period, canonical_site_code
+     |
+
+E501 Line too long (113 > 100)
+    --> apps/api/src/unihub_insight_api/repositories/postgres_modules.py:1417:101
+     |
+1415 |                     severity=AlertSeverity.WARNING,
+1416 |                     title="Perioadă estimată",
+1417 |                     description="Cel puțin o componentă P&L este estimată; actualele au prioritate unde există.",
+     |                                                                                                     ^^^^^^^^^^^^^
+1418 |                 )
+1419 |             )
+     |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> apps/api/src/unihub_insight_api/services/dashboard_validation.py:1:1
+   |
+ 1 | / from __future__ import annotations
+ 2 | |
+ 3 | | from dataclasses import dataclass
+ 4 | |
+ 5 | | from unihub_insight_api.domain import (
+ 6 | |     Capability,
+ 7 | |     ChartKind,
+ 8 | |     DashboardCreateRequest,
+ 9 | |     DashboardDocument,
+10 | |     FilterMode,
+11 | |     ModuleId,
+12 | |     UserContext,
+13 | | )
+   | |_^
+   |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> apps/api/src/unihub_insight_api/services/excel_export.py:1:1
+   |
+ 1 | / from __future__ import annotations
+ 2 | |
+ 3 | | import os
+ 4 | | import tempfile
+ 5 | | from collections.abc import Iterable, Mapping, Sequence
+ 6 | | from dataclasses import dataclass
+ 7 | | from datetime import date, datetime
+ 8 | | from decimal import Decimal
+ 9 | | from enum import StrEnum
+10 | | from pathlib import Path
+11 | | from typing import Any, Literal
+12 | |
+13 | | import xlsxwriter
+14 | | from pydantic import BaseModel
+15 | |
+16 | | from unihub_insight_api.domain import ModuleAnalyticsResponse, OverviewResponse
+17 | | from unihub_insight_api.domain.monthly_review import MonthlyReviewResponse
+   | |__________________________________________________________________________^
+   |
+help: Organize imports
+
+RUF001 String contains ambiguous `–` (EN DASH). Did you mean `-` (HYPHEN-MINUS)?
+   --> apps/api/src/unihub_insight_api/services/metric_catalog.py:189:40
+    |
+187 |         "finance.operating_costs",
+188 |         "Cost operațional",
+189 |         "Costuri P&L din categoriile c3–c6.",
+    |                                        ^
+190 |         MetricUnit.CURRENCY,
+191 |         capability=Capability.PNL,
+    |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> apps/api/tests/test_dashboard_validation.py:1:1
+  |
+1 | / from fastapi.testclient import TestClient
+2 | |
+3 | | from unihub_insight_api.config import Settings
+4 | | from unihub_insight_api.main import create_app
+  | |______________________________________________^
+  |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> apps/api/tests/test_dashboards.py:1:1
+  |
+1 | from fastapi.testclient import TestClient
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> apps/api/tests/test_modules.py:1:1
+  |
+1 | from fastapi.testclient import TestClient
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> apps/api/tests/test_monthly_review.py:1:1
+   |
+ 1 | / from decimal import Decimal
+ 2 | |
+ 3 | | from fastapi.testclient import TestClient
+ 4 | |
+ 5 | | from unihub_insight_api.repositories.monthly_review import (
+ 6 | |     Aggregate,
+ 7 | |     bridge,
+ 8 | |     classify_status,
+ 9 | | )
+10 | | from unihub_insight_api.domain import ReviewStatus
+   | |__________________________________________________^
+   |
+help: Organize imports
+
+Found 85 errors.
+[*] 28 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).

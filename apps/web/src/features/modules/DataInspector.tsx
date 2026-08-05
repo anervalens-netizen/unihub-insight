@@ -107,16 +107,7 @@ export function DataInspector({
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
   return createPortal(
-    <div
-      className="widget-modal-backdrop"
-      role="button"
-      tabIndex={0}
-      aria-label="Închide inspectorul de date"
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') onClose();
-      }}
-      onMouseDown={onClose}
-    >
+    <div className="widget-modal-backdrop">
       <section
         className="data-inspector"
         role="dialog"

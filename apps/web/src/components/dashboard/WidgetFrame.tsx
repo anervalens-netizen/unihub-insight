@@ -71,16 +71,7 @@ export function WidgetFrame({
       </article>
       {expanded
         ? createPortal(
-            <div
-              className="widget-modal-backdrop"
-              role="button"
-              tabIndex={0}
-              aria-label="Închide fereastra extinsă"
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') setExpanded(false);
-              }}
-              onMouseDown={() => setExpanded(false)}
-            >
+            <div className="widget-modal-backdrop">
               <section
                 className="widget-modal"
                 role="dialog"

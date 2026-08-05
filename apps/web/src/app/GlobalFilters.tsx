@@ -212,7 +212,7 @@ export function GlobalFilters() {
   const count = activeFilterCount(search);
 
   return (
-    <div className="global-filters" role="group" aria-label="Filtre globale">
+    <div className="global-filters">
       <div className="filter-heading" title={`${count} filtre business active`}>
         <Filter size={16} />
         {count > 0 ? <span>{count}</span> : null}
