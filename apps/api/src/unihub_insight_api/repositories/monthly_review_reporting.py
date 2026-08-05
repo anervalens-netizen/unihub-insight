@@ -58,19 +58,29 @@ class ReportingMonthlyReviewRepository(PostgresMonthlyReviewRepository):
             agent_parameter = len(params)
             agent_filter_core = f"AND fact.agent = ${agent_parameter}"
             agent_filter_supplement = f"AND supplement.agent = ${agent_parameter}"
-            target_expression = "agent_target.target_value"
-            target_join = f"""
-                LEFT JOIN agent_targets agent_target
-                  ON agent_target.import_month = requested.import_month
-                 AND agent_target.site_code = eligible.site_code
-                 AND agent_target.agent = ${agent_parameter}
+            target_cte = f"""
+                targets AS (
+                    SELECT
+                        target.import_month,
+                        target.site_code,
+                        SUM(target.target_value) AS target_value
+                    FROM agent_targets target
+                    WHERE target.import_month = ANY($1::text[])
+                      AND target.agent = ${agent_parameter}
+                    GROUP BY target.import_month, target.site_code
+                )
             """
         else:
-            target_expression = "store_target.target_value"
-            target_join = """
-                LEFT JOIN store_targets store_target
-                  ON store_target.import_month = requested.import_month
-                 AND store_target.site_code = eligible.site_code
+            target_cte = """
+                targets AS (
+                    SELECT
+                        target.import_month,
+                        target.site_code,
+                        SUM(target.target_value) AS target_value
+                    FROM store_targets target
+                    WHERE target.import_month = ANY($1::text[])
+                    GROUP BY target.import_month, target.site_code
+                )
             """
         where_scope = " AND ".join(clauses)
 
@@ -119,7 +129,8 @@ class ReportingMonthlyReviewRepository(PostgresMonthlyReviewRepository):
                     WHERE supplement.import_month = ANY($1::text[])
                       {agent_filter_supplement}
                     GROUP BY supplement.import_month, supplement.site_code
-                )
+                ),
+                {target_cte}
                 SELECT
                     requested.import_month,
                     eligible.site_code,
@@ -135,12 +146,12 @@ class ReportingMonthlyReviewRepository(PostgresMonthlyReviewRepository):
                     COALESCE(core.working_days, 0) AS working_days,
                     COALESCE(supplement.gross_sales, 0) AS gross_sales,
                     COALESCE(supplement.return_value, 0) AS return_value,
-                    COALESCE({target_expression}, 0) AS target
+                    COALESCE(targets.target_value, 0) AS target
                 FROM eligible
                 CROSS JOIN requested
                 LEFT JOIN core USING (import_month, site_code)
                 LEFT JOIN supplement USING (import_month, site_code)
-                {target_join}
+                LEFT JOIN targets USING (import_month, site_code)
                 ORDER BY requested.import_month, eligible.site_code
                 """,
                     *params,
@@ -157,11 +168,13 @@ class ReportingMonthlyReviewRepository(PostgresMonthlyReviewRepository):
         clauses = self._scope_clauses(scope, params)
         agent_filter_core = ""
         agent_filter_supplement = ""
+        target_filter = ""
         if scope.agent:
             params.append(scope.agent)
             agent_parameter = len(params)
             agent_filter_core = f"AND fact.agent = ${agent_parameter}"
             agent_filter_supplement = f"AND supplement.agent = ${agent_parameter}"
+            target_filter = f"AND target.agent = ${agent_parameter}"
         where_scope = " AND ".join(clauses)
 
         async with self.pool.acquire() as connection:
@@ -211,6 +224,20 @@ class ReportingMonthlyReviewRepository(PostgresMonthlyReviewRepository):
                         supplement.import_month,
                         supplement.site_code,
                         supplement.agent
+                ),
+                targets AS (
+                    SELECT
+                        target.import_month,
+                        target.site_code,
+                        target.agent,
+                        SUM(target.target_value) AS target_value
+                    FROM agent_targets target
+                    WHERE target.import_month = ANY($1::text[])
+                      {target_filter}
+                    GROUP BY
+                        target.import_month,
+                        target.site_code,
+                        target.agent
                 )
                 SELECT
                     core.import_month,
@@ -228,11 +255,11 @@ class ReportingMonthlyReviewRepository(PostgresMonthlyReviewRepository):
                     core.working_days,
                     COALESCE(supplement.gross_sales, 0) AS gross_sales,
                     COALESCE(supplement.return_value, 0) AS return_value,
-                    COALESCE(target.target_value, 0) AS target
+                    COALESCE(targets.target_value, 0) AS target
                 FROM core
                 JOIN eligible USING (site_code)
                 LEFT JOIN supplement USING (import_month, site_code, agent)
-                LEFT JOIN agent_targets target USING (import_month, site_code, agent)
+                LEFT JOIN targets USING (import_month, site_code, agent)
                 ORDER BY core.import_month, core.site_code, core.agent
                 """,
                     *params,
