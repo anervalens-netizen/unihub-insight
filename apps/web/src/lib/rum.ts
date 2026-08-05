@@ -90,7 +90,7 @@ function observeInp(): void {
     }
   });
   try {
-    observer.observe({ type: 'event', buffered: true, durationThreshold: 40 });
+    observer.observe({ type: 'event', buffered: true });
   } catch {
     return;
   }
@@ -116,7 +116,8 @@ function observeInp(): void {
 }
 
 export async function initializeRum(): Promise<void> {
-  if (!import.meta.env.PROD || import.meta.env['VITE_RUM_ENABLED'] === 'false') return;
+  const { VITE_RUM_ENABLED } = import.meta.env;
+  if (!import.meta.env.PROD || VITE_RUM_ENABLED === 'false') return;
   observeLcp();
   observeInp();
 }
