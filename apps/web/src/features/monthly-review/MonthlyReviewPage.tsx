@@ -1,10 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import type { EChartsCoreOption } from 'echarts/core';
 import { AlertCircle, CheckCircle2, FileSpreadsheet, RefreshCw, TriangleAlert } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { useGlobalSearch } from '../../app/search-hooks';
-import { EChart } from '../../components/charts/EChart';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { ExcelExportButton } from '../../components/ui/ExcelExportButton';
 import { LoadingState } from '../../components/ui/LoadingState';
@@ -12,12 +10,13 @@ import { analyticsSearchParams } from '../../lib/download';
 import { formatCurrency, formatDate, formatInteger, formatPercent } from '../../lib/format';
 import { currentBusinessMonth } from '../../lib/search';
 import { monthlyReviewQuery } from './api';
+import { MonthlyDriverChart, MonthlyTrendChart } from './MonthlyReviewCharts';
 import { PerformanceTable, ProductTable } from './ReviewTables';
 import type { MonthlyReview } from './schemas';
 
 const sections = [
   ['summary', 'Sinteză'],
-  ['performance', 'RM & magazine'],
+  ['performance', 'Companii, RM & magazine'],
   ['products', 'Produse'],
   ['returns', 'Retururi'],
   ['agents', 'Agenți'],
@@ -32,92 +31,13 @@ function metricValue(metric: MonthlyReview['executive'][number]): string {
 }
 
 function Delta({ label, value }: { label: string; value: number | null | undefined }) {
+  const negative = (value ?? 0) < 0;
   return (
-    <span className={`review-delta ${(value ?? 0) < 0 ? 'is-negative' : 'is-positive'}`}>
+    <span className={`review-delta ${negative ? 'is-negative' : 'is-positive'}`}>
       <small>{label}</small>
       <strong>{formatPercent(value)}</strong>
     </span>
   );
-}
-
-function TrendChart({ data }: { data: MonthlyReview }) {
-  const option = useMemo<EChartsCoreOption>(
-    () => ({
-      animationDuration: 260,
-      grid: { top: 42, right: 22, bottom: 36, left: 66 },
-      tooltip: { trigger: 'axis' },
-      legend: { top: 0, right: 0 },
-      xAxis: { type: 'category', data: data.trend.map((point) => point.period) },
-      yAxis: {
-        type: 'value',
-        axisLabel: {
-          formatter: (value: string | number) => formatCurrency(Number(value), true),
-        },
-      },
-      series: [
-        {
-          type: 'line',
-          name: 'Vânzări',
-          data: data.trend.map((point) => point.sales),
-          showSymbol: false,
-          smooth: 0.16,
-          lineStyle: { width: 3, color: '#4f46e5' },
-          itemStyle: { color: '#4f46e5' },
-          areaStyle: { color: 'rgba(79,70,229,.10)' },
-        },
-        {
-          type: 'line',
-          name: 'Target',
-          data: data.trend.map((point) => point.target),
-          showSymbol: false,
-          lineStyle: { width: 2, type: 'dashed', color: '#0f766e' },
-          itemStyle: { color: '#0f766e' },
-        },
-      ],
-    }),
-    [data.trend],
-  );
-  return <EChart option={option} className="chart--fill" ariaLabel="Evoluție lunară" />;
-}
-
-function DriverChart({ data }: { data: MonthlyReview }) {
-  const driver = data.drivers[0];
-  const option = useMemo<EChartsCoreOption>(
-    () => ({
-      grid: { top: 16, right: 16, bottom: 44, left: 66 },
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-      xAxis: {
-        type: 'category',
-        data: ['Bonuri', 'Produse / bon', 'Valoare / produs'],
-        axisLabel: { interval: 0, rotate: 12 },
-      },
-      yAxis: {
-        type: 'value',
-        axisLabel: {
-          formatter: (value: string | number) => formatCurrency(Number(value), true),
-        },
-      },
-      series: [
-        {
-          type: 'bar',
-          data: driver
-            ? [
-                driver.receipts_effect,
-                driver.units_per_receipt_effect,
-                driver.value_per_unit_effect,
-              ].map((value) => ({
-                value,
-                itemStyle: {
-                  color: value < 0 ? '#be123c' : '#0f766e',
-                },
-              }))
-            : [],
-        },
-      ],
-    }),
-    [driver],
-  );
-  return <EChart option={option} className="chart--fill" ariaLabel="Driverii diferenței" />;
 }
 
 function withSection(base: URLSearchParams, section: string): URLSearchParams {
@@ -146,12 +66,14 @@ export function MonthlyReviewPage() {
       />
     );
   }
+
   const data = query.data;
   const alertIcons = {
     info: CheckCircle2,
     warning: TriangleAlert,
     critical: AlertCircle,
   } as const;
+
   return (
     <section className="monthly-review-page">
       <header className="review-hero">
@@ -159,8 +81,9 @@ export function MonthlyReviewPage() {
           <span>Raport managerial lunar</span>
           <h2>Analiză vânzări · {data.meta.period}</h2>
           <p>
-            YoY, luna precedentă și media recentă, de la rețea la produs și agent. Datele numerice
-            se exportă în Excel ca numere, nu text.
+            YoY, luna precedentă și media recentă, de la rețea la produs și agent. Graficele
+            folosesc aceleași preseturi profesionale light/dark ca restul aplicației, iar datele se
+            exportă în Excel ca valori numerice reale.
           </p>
           <div className="review-pills">
             <b>{data.meta.scope_label}</b>
@@ -218,6 +141,7 @@ export function MonthlyReviewPage() {
             filename={`sinteza-${period}.xlsx`}
           />
         </div>
+
         <div className="review-kpi-grid">
           {data.executive.map((metric) => (
             <article key={metric.id} className="review-kpi">
@@ -231,14 +155,15 @@ export function MonthlyReviewPage() {
             </article>
           ))}
         </div>
+
         <div className="review-visual-grid">
           <article className="review-panel">
             <h4>Evoluție și target</h4>
-            <TrendChart data={data} />
+            <MonthlyTrendChart data={data} />
           </article>
           <article className="review-panel">
             <h4>Driverii diferenței YoY</h4>
-            <DriverChart data={data} />
+            <MonthlyDriverChart data={data} />
             {data.drivers[0] ? (
               <p>
                 Diferență reconciliată: <b>{formatCurrency(data.drivers[0].sales_difference)}</b>.
@@ -246,6 +171,7 @@ export function MonthlyReviewPage() {
             ) : null}
           </article>
         </div>
+
         <article className="review-seasonality">
           <div>
             <span>Sezonalitate</span>
@@ -284,6 +210,7 @@ export function MonthlyReviewPage() {
             </table>
           </div>
         </article>
+
         <div className="review-alerts">
           {data.alerts.map((alert) => {
             const Icon = alertIcons[alert.severity];
@@ -304,13 +231,17 @@ export function MonthlyReviewPage() {
         <div className="review-section-heading">
           <div>
             <span>Managementul performanței</span>
-            <h3>RM, companii și magazine</h3>
+            <h3>Companii, Regional Managers și magazine</h3>
           </div>
           <ExcelExportButton
             path="/exports/monthly-review.xlsx"
             params={withSection(exportParams, 'stores')}
-            filename={`magazine-${period}.xlsx`}
+            filename={`performanta-${period}.xlsx`}
           />
+        </div>
+        <div className="review-subsection">
+          <h4>Companii</h4>
+          <PerformanceTable rows={data.companies} recentMonths={recentMonths} />
         </div>
         <div className="review-subsection">
           <h4>Regional Managers</h4>
