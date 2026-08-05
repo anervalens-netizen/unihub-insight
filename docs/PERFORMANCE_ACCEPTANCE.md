@@ -21,7 +21,7 @@ The gate requires seven clean days and at least 100 requests per main route. Dem
 - Browser reports only LCP and INP with finite rating/navigation labels.
 - Prometheus scrapes the local `/metrics` endpoint.
 - Query profiling uses `pg_stat_statements` and `EXPLAIN (ANALYZE, BUFFERS)` on a production-like copy when possible.
-- Request IDs correlate Nginx, API and database investigation without logging sensitive payloads.
+- Request IDs correlate Caddy, API and database investigation without logging sensitive payloads.
 
 ## Optimization order
 

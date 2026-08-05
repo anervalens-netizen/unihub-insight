@@ -9,11 +9,11 @@ UNIHUB_INSIGHT_DB_POOL_MIN_SIZE=1
 UNIHUB_INSIGHT_DB_POOL_MAX_SIZE=6
 UNIHUB_INSIGHT_METADATA_POOL_MAX_SIZE=3
 UNIHUB_INSIGHT_STATEMENT_TIMEOUT_MS=2500
-UNIHUB_INSIGHT_ANALYTICS_GROUPS=unihub-manager,unihub-analytics,unihub-admin,authentik Admins
-UNIHUB_INSIGHT_MANAGEMENT_GROUPS=unihub-manager,unihub-admin,authentik Admins
-UNIHUB_INSIGHT_HR_GROUPS=unihub-hr,unihub-admin,authentik Admins
-UNIHUB_INSIGHT_PNL_GROUPS=unihub-pnl,unihub-admin,authentik Admins
-UNIHUB_INSIGHT_ADMIN_GROUPS=unihub-admin,authentik Admins
+UNIHUB_INSIGHT_ANALYTICS_GROUPS="unihub-manager,unihub-analytics,unihub-admin,authentik Admins"
+UNIHUB_INSIGHT_MANAGEMENT_GROUPS="unihub-manager,unihub-admin,authentik Admins"
+UNIHUB_INSIGHT_HR_GROUPS="unihub-hr,unihub-admin,authentik Admins"
+UNIHUB_INSIGHT_PNL_GROUPS="unihub-pnl,unihub-admin,authentik Admins"
+UNIHUB_INSIGHT_ADMIN_GROUPS="unihub-admin,authentik Admins"
 
 # Used only by the one-shot migration service, never by the API runtime.
 UNIHUB_INSIGHT_MIGRATION_DATABASE_URL=postgresql://unihub_insight_migration_runner:REPLACE@127.0.0.1:5432/unihub

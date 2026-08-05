@@ -83,10 +83,8 @@ npm run verify
 - [Specificație produs](docs/PRODUCT_SPEC.md)
 - [Contracte de date](docs/DATA_CONTRACTS.md)
 - [Sistem de design](docs/DESIGN_SYSTEM.md)
-- [Dezvoltare locală](docs/DEVELOPMENT.md)
 - [Deploy](docs/DEPLOYMENT.md)
 - [Autorizare și date sensibile](docs/AUTHORIZATION.md)
-- [ADR-uri](docs/adr/)
 
 ## Principii
 

@@ -2,7 +2,7 @@
   metrics_path: /metrics
   scheme: http
   static_configs:
-    - targets: ['127.0.0.1:8100']
+    - targets: ['172.23.0.1:8100']
       labels:
         service: unihub-insight
         environment: production

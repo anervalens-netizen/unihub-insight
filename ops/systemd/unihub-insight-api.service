@@ -1,7 +1,7 @@
 [Unit]
 Description=UniHub Insight API
-After=network-online.target postgresql.service
-Wants=network-online.target
+After=network-online.target docker.service
+Wants=network-online.target docker.service
 Requires=unihub-insight-migrate.service
 
 [Service]
@@ -10,7 +10,7 @@ User=unihub-insight
 Group=unihub-insight
 WorkingDirectory=/opt/unihub-insight/current
 EnvironmentFile=/etc/unihub-insight/insight.env
-ExecStart=/opt/unihub-insight/current/apps/api/.venv/bin/uvicorn unihub_insight_api.main:app --host 127.0.0.1 --port 8100 --workers 2 --proxy-headers --forwarded-allow-ips=127.0.0.1
+ExecStart=/opt/unihub-insight/current/apps/api/.venv/bin/uvicorn unihub_insight_api.main:app --host 172.23.0.1 --port 8100 --workers 2 --proxy-headers --forwarded-allow-ips=172.23.0.2
 Restart=on-failure
 RestartSec=3
 TimeoutStartSec=45

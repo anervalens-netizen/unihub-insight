@@ -1,0 +1,5 @@
+# Copy the value, without this comment, into the existing
+# /opt/Mobiup/infra/caddy/.env. This file is a template only; never commit the
+# real value. It is distinct from the API's TRUSTED_PROXY_SECRET name so that
+# the Caddyfile makes the one-way upstream injection explicit.
+UNIHUB_INSIGHT_PROXY_SECRET=REPLACE_WITH_THE_SAME_64_HEX_CHARACTERS

@@ -3,14 +3,35 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ENV_FILE="${1:-/etc/unihub-insight/insight.env}"
+BASE="${UNIHUB_INSIGHT_BASE:-/opt/unihub-insight}"
+RELEASE="${2:-$BASE/current}"
+LOCAL_API="${UNIHUB_INSIGHT_LOCAL_API:-http://172.23.0.1:8100}"
 
-required=(node npm uv python3 psql curl systemctl nginx)
+required=(python3 psql curl systemctl docker sha256sum ss)
 for command in "${required[@]}"; do
   command -v "$command" >/dev/null || {
     echo "missing command: $command" >&2
     exit 1
   }
 done
+
+[[ -L "$BASE/current" ]] || {
+  echo "missing active release symlink: $BASE/current" >&2
+  exit 1
+}
+RELEASE="$(readlink -f "$RELEASE")"
+[[ -d "$RELEASE" ]] || {
+  echo "missing release: $RELEASE" >&2
+  exit 1
+}
+[[ -s "$RELEASE/apps/web/dist/index.html" ]] || {
+  echo "release is missing apps/web/dist/index.html" >&2
+  exit 1
+}
+[[ -x "$RELEASE/apps/api/.venv/bin/python" ]] || {
+  echo "release is missing the runtime Python environment" >&2
+  exit 1
+}
 
 [[ -f "$ENV_FILE" ]] || {
   echo "missing environment file: $ENV_FILE" >&2
@@ -54,6 +75,43 @@ done
   exit 1
 }
 
+python3 - "$RELEASE/release-evidence.json" "$RELEASE" "$RELEASE/SOURCE_SHA" <<'PY'
+import hashlib
+import json
+import pathlib
+import sys
+
+evidence_path, release, source_sha_path = sys.argv[1:]
+evidence = json.loads(pathlib.Path(evidence_path).read_text())
+source_sha = pathlib.Path(source_sha_path).read_text().strip()
+if evidence.get("source_sha") != source_sha:
+    raise SystemExit("release evidence source SHA mismatch")
+if evidence.get("prepared_host") != "dell-standby":
+    raise SystemExit("release was not prepared on dell-standby")
+if evidence.get("verified") is not True or evidence.get("build") is not True:
+    raise SystemExit("release is not fully verified")
+digest = hashlib.sha256()
+for path in sorted(pathlib.Path(release, "apps/web/dist").rglob("*")):
+    if path.is_file():
+        digest.update(hashlib.sha256(path.read_bytes()).hexdigest().encode())
+        digest.update(b"  ")
+        digest.update(str(path.relative_to(release)).encode())
+        digest.update(b"\n")
+if digest.hexdigest() != evidence.get("dist_sha256"):
+    raise SystemExit("release build digest mismatch")
+PY
+
+systemctl is-active --quiet docker.service
+systemctl is-active --quiet unihub-insight-api.service
+docker inspect unihub_postgres --format '{{.State.Running}}' | grep -qx true
+docker exec unihub_postgres pg_isready -q
+docker inspect unihub-caddy --format '{{.State.Running}}' | grep -qx true
+docker inspect unihub-caddy --format '{{range .Mounts}}{{println .Source " " .Destination " " .Mode}}{{end}}' \
+  | grep -Fqx '/opt/unihub-insight /opt/unihub-insight ro'
+docker exec unihub-caddy caddy validate \
+  --config /etc/caddy/Caddyfile --adapter caddyfile
+ss -ltnH | awk '$4 ~ /172\.23\.0\.1:8100$/ { found = 1 } END { exit !found }'
+
 psql "$UNIHUB_INSIGHT_DATABASE_URL" -Atqc \
   "SELECT current_setting('transaction_read_only')" | grep -qx on
 psql "$UNIHUB_INSIGHT_DATABASE_URL" -Atqc \
@@ -71,11 +129,9 @@ psql "$UNIHUB_INSIGHT_METADATA_DATABASE_URL" -Atqc \
   "SELECT has_table_privilege(current_user, 'insight.schema_migrations', 'UPDATE')" \
   | grep -qx f
 
-cd "$ROOT"
-npm ci --ignore-scripts
-uv sync --project apps/api --frozen --all-groups
-npm run verify
-uv run --project apps/api python ops/scripts/migrate.py --check
-nginx -t
+cd "$RELEASE"
+"$RELEASE/apps/api/.venv/bin/python" ops/scripts/migrate.py --check
+curl --fail --silent --show-error --max-time 5 "$LOCAL_API/livez" \
+  | grep -q '"status":"ok"'
 
 echo "preflight complete"

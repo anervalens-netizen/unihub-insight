@@ -1,7 +1,7 @@
 [Unit]
 Description=Backup UniHub Insight metadata
-After=network-online.target postgresql.service
-Wants=network-online.target
+After=network-online.target docker.service
+Wants=network-online.target docker.service
 
 [Service]
 Type=oneshot

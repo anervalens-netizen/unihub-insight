@@ -1,0 +1,86 @@
+# UniHub Insight deployment
+
+Insight is built and fully verified on `dell-standby`, then copied as an
+immutable artifact to the primary server. The primary does not need
+Node/npm/nginx. It needs Docker, the host PostgreSQL client, systemd and the
+pinned runtime `uv` at `/opt/unihub-insight/bin/uv` (or `UNIHUB_INSIGHT_UV`).
+
+## Dell release preparation
+
+Run from a clean checkout at the exact commit to deploy:
+
+```bash
+SHA="$(git rev-parse HEAD)"
+ops/scripts/prepare-release.sh "$PWD" "$SHA" "/var/tmp/unihub-insight-releases/$SHA"
+```
+
+The script runs `npm ci`, locked Python sync, `npm run verify` and the
+production build on Dell. It records the host, source SHA, verification state
+and a digest of `apps/web/dist` in `release-evidence.json`, then removes build
+dependencies from the artifact.
+
+Copy the resulting directory to the primary without modifying its contents.
+The destination must be unique for that SHA:
+
+```bash
+rsync -a "/var/tmp/unihub-insight-releases/$SHA/" \
+  server:"/var/tmp/unihub-insight-releases/$SHA/"
+```
+
+## Primary topology
+
+Install the units from `ops/systemd/` and configure `/etc/unihub-insight/insight.env`.
+The API listens only on Docker's host bridge `172.23.0.1:8100`; PostgreSQL is
+the Docker container `unihub_postgres` published to host `127.0.0.1:5432`.
+
+Add `ops/caddy/unihub-insight.caddy.template` to the existing
+`/opt/Mobiup/infra/caddy/Caddyfile`. Add this read-only mount to the existing
+`unihub-caddy` Compose service:
+
+```yaml
+- /opt/unihub-insight:/opt/unihub-insight:ro
+```
+
+Set the same random value in the API environment as
+`UNIHUB_INSIGHT_TRUSTED_PROXY_SECRET` and in the private Caddy environment as
+`UNIHUB_INSIGHT_PROXY_SECRET`. Validate/reload the Docker Caddy configuration
+after the site block and mount are installed. The release scripts do not edit
+the live Caddyfile or its secrets.
+
+## Install and verify
+
+```bash
+sudo install -o root -g root -m 0644 ops/systemd/*.service /etc/systemd/system/
+sudo install -o root -g root -m 0644 ops/systemd/*.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo env UNIHUB_INSIGHT_UV=/opt/unihub-insight/bin/uv \
+  /var/tmp/unihub-insight-releases/$SHA/ops/scripts/deploy-release.sh \
+  /var/tmp/unihub-insight-releases/$SHA "$SHA"
+sudo /opt/unihub-insight/current/ops/scripts/preflight.sh
+sudo /opt/unihub-insight/current/ops/scripts/smoke.sh
+```
+
+`preflight.sh` checks the Dell evidence, immutable build digest, Docker
+PostgreSQL/Caddy state, Caddy configuration, API bind, migration registry and
+read-only database boundary. `smoke.sh` checks local liveness/readiness,
+public SPA reachability and public 404 responses for diagnostics.
+
+Rollback is code-only and keeps the database at its current schema:
+
+```bash
+sudo /opt/unihub-insight/current/ops/scripts/rollback.sh PREVIOUS_SOURCE_SHA
+```
+
+The database role/grant SQL and `migrate.py` remain Terra-owned and are not
+changed by this deployment lane.
+
+## Live prerequisites still required
+
+- Terra's approved database roles, grants, migrations and migration registry;
+- generated API and Caddy secrets with correct file modes;
+- the `unihub-insight` service account, `/opt/unihub-insight` directories and
+  primary runtime `uv`;
+- Caddy site inclusion, read-only release mount, Authentik provider/outpost,
+  Cloudflare/DNS/TLS routing and Caddy reload;
+- live reconciliation, authorization negatives, backup/restore drill and
+  public smoke evidence.
