@@ -1,12 +1,11 @@
 import type { DashboardWidgetDefinition } from '../../components/dashboard/types';
+import { ModernContributionWidget, ModernSalesTrendWidget } from './modern-charts';
 import {
   AlertsWidget,
-  ContributionWidget,
   ForecastKpiWidget,
   PerformanceWidget,
   ReceiptKpiWidget,
   SalesKpiWidget,
-  SalesTrendWidget,
   TargetKpiWidget,
 } from './widgets';
 
@@ -62,8 +61,8 @@ export const overviewWidgets: DashboardWidgetDefinition[] = [
   {
     id: 'sales-trend',
     title: 'Pace comercială',
-    subtitle: 'Realizat, target, forecast și reper',
-    component: SalesTrendWidget,
+    subtitle: 'Linie, arie sau coloane · realizat, target, forecast și reper',
+    component: ModernSalesTrendWidget,
     x: 0,
     y: 5,
     w: 16,
@@ -86,8 +85,8 @@ export const overviewWidgets: DashboardWidgetDefinition[] = [
   {
     id: 'contribution',
     title: 'Contribuție pe firmă',
-    subtitle: 'Pondere în scope-ul curent',
-    component: ContributionWidget,
+    subtitle: 'Donut sau bare · pondere în scope-ul curent',
+    component: ModernContributionWidget,
     x: 0,
     y: 19,
     w: 8,
