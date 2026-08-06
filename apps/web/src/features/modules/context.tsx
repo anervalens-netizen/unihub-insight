@@ -12,6 +12,7 @@ export interface ModuleUrlStateEvent {
 interface ModuleContextValue {
   data: ModuleAnalytics;
   onUrlStateChange?: (event: ModuleUrlStateEvent) => void;
+  onEntityOpen?: (event: ModuleUrlStateEvent) => void;
   onUrlStateChanges?: (events: readonly ModuleUrlStateEvent[]) => void;
   onUrlRangeChange?: (event: ChartUrlRangeEvent) => void;
   onUrlStateReset?: () => void;
@@ -22,6 +23,7 @@ const ModuleContext = createContext<ModuleContextValue | null>(null);
 export function ModuleProvider({
   data,
   onUrlStateChange,
+  onEntityOpen,
   onUrlStateChanges,
   onUrlRangeChange,
   onUrlStateReset,
@@ -29,6 +31,7 @@ export function ModuleProvider({
 }: {
   data: ModuleAnalytics;
   onUrlStateChange?: (event: ModuleUrlStateEvent) => void;
+  onEntityOpen?: (event: ModuleUrlStateEvent) => void;
   onUrlStateChanges?: (events: readonly ModuleUrlStateEvent[]) => void;
   onUrlRangeChange?: (event: ChartUrlRangeEvent) => void;
   onUrlStateReset?: () => void;
@@ -39,6 +42,7 @@ export function ModuleProvider({
       value={{
         data,
         ...(onUrlStateChange ? { onUrlStateChange } : {}),
+        ...(onEntityOpen ? { onEntityOpen } : {}),
         ...(onUrlStateChanges ? { onUrlStateChanges } : {}),
         ...(onUrlRangeChange ? { onUrlRangeChange } : {}),
         ...(onUrlStateReset ? { onUrlStateReset } : {}),
@@ -59,6 +63,12 @@ export function useModuleUrlStateChange(): ((event: ModuleUrlStateEvent) => void
   const value = useContext(ModuleContext);
   if (!value) throw new Error('Module widgets must render inside ModuleProvider.');
   return value.onUrlStateChange;
+}
+
+export function useModuleEntityOpen(): ((event: ModuleUrlStateEvent) => void) | undefined {
+  const value = useContext(ModuleContext);
+  if (!value) throw new Error('Module widgets must render inside ModuleProvider.');
+  return value.onEntityOpen;
 }
 
 export function useModuleUrlStateChanges():

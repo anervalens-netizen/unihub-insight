@@ -1,3 +1,4 @@
+import type { ChartUrlStateEvent } from '../../components/charts/chart-spec';
 import { type GlobalSearch, parseStoreSelection, rangeBounds } from '../../lib/search';
 import type { ModuleId } from './schemas';
 import type { ModuleSubviewId } from './subviews';
@@ -59,4 +60,57 @@ export function retailContextUrl(
   if (stores.length > 1) url.searchParams.set('stores', stores.join(','));
   if (search.agent) url.searchParams.set('agent', search.agent);
   return url.toString();
+}
+
+export function retailEntityContextUrl(
+  baseUrl: string,
+  module: ModuleId,
+  subview: ModuleSubviewId,
+  search: GlobalSearch & { period: string },
+  event: ChartUrlStateEvent,
+): string {
+  const url = new URL(retailContextUrl(baseUrl, module, subview, search));
+  if (event.dimensionId === 'time') {
+    url.searchParams.set('period', event.value);
+    url.searchParams.set('range_start', event.value);
+    url.searchParams.set('range_end', event.value);
+  } else if (event.dimensionId === 'store') {
+    url.searchParams.delete('stores');
+    url.searchParams.set('magazin', event.value);
+  } else {
+    const parameter = {
+      firm: 'firma',
+      regional: 'rm',
+      asm: 'asm',
+      agent: 'agent',
+      team_leader: 'team_leader',
+      category: 'category',
+    }[event.dimensionId];
+    if (parameter) url.searchParams.set(parameter, event.value);
+  }
+  return url.toString();
+}
+
+const defaultDashboardSubview: Record<ModuleId, ModuleSubviewId> = {
+  sales: 'trend',
+  performance: 'rankings',
+  campaigns: 'focus',
+  workforce: 'productivity',
+  compensation: 'overview',
+  finance: 'overview',
+  planning: 'current',
+};
+
+export function retailDashboardEntityContextUrl(
+  baseUrl: string,
+  module: ModuleId,
+  search: GlobalSearch & { period: string },
+  event: ChartUrlStateEvent,
+): string {
+  return retailEntityContextUrl(baseUrl, module, defaultDashboardSubview[module], search, event);
+}
+
+export function openRetailContext(url: string): void {
+  const popup = window.open(url, '_blank', 'noopener,noreferrer');
+  if (popup) popup.opener = null;
 }

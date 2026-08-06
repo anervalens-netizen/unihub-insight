@@ -19,7 +19,7 @@ import {
   Sparkles,
   TriangleAlert,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { chartRangeEventToMonthRange } from '../../components/charts/chart-spec';
 import { EChart, type EChartEvent } from '../../components/charts/EChart';
@@ -27,12 +27,13 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { formatCurrency, formatInteger, formatPercent } from '../../lib/format';
 import {
   useModuleData,
+  useModuleEntityOpen,
   useModuleUrlRangeChange,
   useModuleUrlStateChange,
   useModuleUrlStateChanges,
   useModuleUrlStateReset,
 } from './context';
-import { moduleEntityDimension } from './interactions';
+import { moduleDistributionDimension, moduleEntityDimension } from './interactions';
 import type { BreakdownRow, ChartKind, ModuleKpi } from './schemas';
 
 const analyticalComparisonLabels: Record<string, string> = {
@@ -165,6 +166,7 @@ function ChartToggle<Kind extends ChartKind>({
 
 export function ModuleTrendWidget() {
   const data = useModuleData();
+  const onEntityOpen = useModuleEntityOpen();
   const onUrlStateChange = useModuleUrlStateChange();
   const onUrlRangeChange = useModuleUrlRangeChange();
   const onUrlStateReset = useModuleUrlStateReset();
@@ -283,6 +285,10 @@ export function ModuleTrendWidget() {
       onUrlStateChange?.({ dimensionId: 'time', value: point.key, label: point.label });
     }
   };
+  const openPoint = (event: EChartEvent) => {
+    const point = event.dataIndex === undefined ? undefined : data.trend[event.dataIndex];
+    if (point) onEntityOpen?.({ dimensionId: 'time', value: point.key, label: point.label });
+  };
   return (
     <div className="chart-widget">
       <ChartToggle options={choices} value={kind} onChange={setKind} />
@@ -333,7 +339,7 @@ export function ModuleTrendWidget() {
         ariaLabel={`Evoluție ${data.title}`}
         pngExport={{ filename: `${data.module}-${data.meta.period}-trend`, pixelRatio: 2 }}
         onEvent={handlePointEvent}
-        onDoubleEvent={handlePointEvent}
+        onDoubleEvent={openPoint}
         onRangeEvent={(event) => {
           const range = chartRangeEventToMonthRange(
             data.trend.map((point) => point.key),
@@ -349,6 +355,8 @@ export function ModuleTrendWidget() {
 
 export function ModuleDistributionWidget() {
   const data = useModuleData();
+  const onUrlStateChange = useModuleUrlStateChange();
+  const onEntityOpen = useModuleEntityOpen();
   const onUrlStateReset = useModuleUrlStateReset();
   const choices: Array<'donut' | 'bar'> = data.supported_charts.includes('donut')
     ? ['donut', 'bar']
@@ -393,6 +401,11 @@ export function ModuleDistributionWidget() {
   );
   if (data.distribution.length === 0)
     return <EmptyState message="Nu există distribuție pentru scope-ul curent." />;
+  const distributionEvent = (event: EChartEvent) => {
+    const item = event.dataIndex === undefined ? undefined : data.distribution[event.dataIndex];
+    const dimensionId = moduleDistributionDimension[data.module];
+    return item && dimensionId ? { dimensionId, value: item.id, label: item.label } : undefined;
+  };
   return (
     <div className="chart-widget">
       <ChartToggle options={choices} value={kind} onChange={setKind} />
@@ -401,6 +414,14 @@ export function ModuleDistributionWidget() {
         className="chart--fill"
         ariaLabel={`Distribuție ${data.title}`}
         pngExport={{ filename: `${data.module}-${data.meta.period}-distribution`, pixelRatio: 2 }}
+        onEvent={(event) => {
+          const interaction = distributionEvent(event);
+          if (interaction) onUrlStateChange?.(interaction);
+        }}
+        onDoubleEvent={(event) => {
+          const interaction = distributionEvent(event);
+          if (interaction) onEntityOpen?.(interaction);
+        }}
         {...(onUrlStateReset ? { onBlankReset: onUrlStateReset } : {})}
       />
     </div>
@@ -409,6 +430,7 @@ export function ModuleDistributionWidget() {
 
 export function ModuleMatrixWidget() {
   const data = useModuleData();
+  const onEntityOpen = useModuleEntityOpen();
   const onUrlStateChange = useModuleUrlStateChange();
   const onUrlStateChanges = useModuleUrlStateChanges();
   const onUrlStateReset = useModuleUrlStateReset();
@@ -486,6 +508,20 @@ export function ModuleMatrixWidget() {
       });
     }
   };
+  const openMatrixEntity = (event: EChartEvent) => {
+    const cell = event.dataIndex === undefined ? undefined : data.matrix[event.dataIndex];
+    if (!cell) return;
+    const entity = data.breakdown.find((item) => item.id === cell.y || item.label === cell.y);
+    if (entity) {
+      onEntityOpen?.({
+        dimensionId: moduleEntityDimension[data.module],
+        value: entity.id,
+        label: entity.label,
+      });
+    } else if (/^\d{4}-(0[1-9]|1[0-2])$/.test(cell.x)) {
+      onEntityOpen?.({ dimensionId: 'time', value: cell.x, label: cell.x });
+    }
+  };
   return (
     <EChart
       option={option}
@@ -493,7 +529,7 @@ export function ModuleMatrixWidget() {
       ariaLabel={`Matrice temporală ${data.title}`}
       pngExport={{ filename: `${data.module}-${data.meta.period}-matrix`, pixelRatio: 2 }}
       onEvent={handleMatrixEvent}
-      onDoubleEvent={handleMatrixEvent}
+      onDoubleEvent={openMatrixEntity}
       {...(onUrlStateReset ? { onBlankReset: onUrlStateReset } : {})}
     />
   );
@@ -507,6 +543,14 @@ function RiskBadge({ risk }: { risk: BreakdownRow['risk'] }) {
 export function ModuleBreakdownWidget() {
   const data = useModuleData();
   const onUrlStateChange = useModuleUrlStateChange();
+  const onEntityOpen = useModuleEntityOpen();
+  const entityClickTimer = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (entityClickTimer.current !== null) window.clearTimeout(entityClickTimer.current);
+    },
+    [],
+  );
   const [sorting, setSorting] = useState<SortingState>([{ id: 'primary', desc: true }]);
   const axes = data.axes;
   const columns = useMemo<ColumnDef<BreakdownRow>[]>(
@@ -520,13 +564,30 @@ export function ModuleBreakdownWidget() {
               <button
                 type="button"
                 className="table-sort"
-                onClick={() =>
-                  onUrlStateChange?.({
+                onClick={() => {
+                  if (entityClickTimer.current !== null) {
+                    window.clearTimeout(entityClickTimer.current);
+                  }
+                  entityClickTimer.current = window.setTimeout(() => {
+                    entityClickTimer.current = null;
+                    onUrlStateChange?.({
+                      dimensionId: moduleEntityDimension[data.module],
+                      value: row.original.id,
+                      label: row.original.label,
+                    });
+                  }, 250);
+                }}
+                onDoubleClick={() => {
+                  if (entityClickTimer.current !== null) {
+                    window.clearTimeout(entityClickTimer.current);
+                    entityClickTimer.current = null;
+                  }
+                  onEntityOpen?.({
                     dimensionId: moduleEntityDimension[data.module],
                     value: row.original.id,
                     label: row.original.label,
-                  })
-                }
+                  });
+                }}
               >
                 <strong>{row.original.label}</strong>
               </button>
@@ -563,7 +624,7 @@ export function ModuleBreakdownWidget() {
         cell: ({ getValue }) => <RiskBadge risk={getValue<BreakdownRow['risk']>()} />,
       },
     ],
-    [axes, data.module, onUrlStateChange],
+    [axes, data.module, onEntityOpen, onUrlStateChange],
   );
   const table = useReactTable({
     data: data.breakdown,

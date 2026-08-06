@@ -11,9 +11,11 @@ import {
   crossFilterRangePatch,
   resetCrossFilterPatch,
 } from '../../lib/cross-filter';
+import { environment } from '../../lib/environment';
 import { currentBusinessMonth } from '../../lib/search';
 import { useIdentity } from '../identity/context';
 import type { Capability } from '../identity/schemas';
+import { openRetailContext, retailDashboardEntityContextUrl } from '../modules/retail-link';
 import type { ModuleId } from '../modules/schemas';
 import { analyticsCatalogQuery } from '../query/api';
 import {
@@ -453,6 +455,16 @@ export function CustomDashboardsPage() {
                   onLayoutChange={canEdit ? applyLayout : () => undefined}
                   onUrlStateChange={(event) => {
                     updateSearch(crossFilterPatch(search.drill, event));
+                  }}
+                  onEntityOpen={(module, event) => {
+                    openRetailContext(
+                      retailDashboardEntityContextUrl(
+                        environment.retailBaseUrl,
+                        module,
+                        { ...search, period },
+                        event,
+                      ),
+                    );
                   }}
                   onUrlRangeChange={(event) => {
                     updateSearch(crossFilterRangePatch(search.drill, event));

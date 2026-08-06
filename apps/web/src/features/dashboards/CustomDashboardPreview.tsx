@@ -7,6 +7,7 @@ import type {
   DashboardWidgetDefinition,
 } from '../../components/dashboard/types';
 import type { GlobalSearch } from '../../lib/search';
+import type { ModuleId } from '../modules/schemas';
 import { analyticsCatalogQuery, queryBatchOptions } from '../query/api';
 import { ConfiguredWidget } from './ConfiguredWidget';
 import { dashboardBatchRequest, MAX_DASHBOARD_QUERY_WIDGETS } from './query-mapping';
@@ -23,6 +24,7 @@ export function CustomDashboardPreview({
   resetToken,
   onLayoutChange,
   onUrlStateChange,
+  onEntityOpen,
   onUrlRangeChange,
   onUrlStateReset,
 }: {
@@ -32,6 +34,7 @@ export function CustomDashboardPreview({
   resetToken: number;
   onLayoutChange: (items: DashboardLayoutItem[]) => void;
   onUrlStateChange?: (event: ChartUrlStateEvent) => void;
+  onEntityOpen?: (module: ModuleId, event: ChartUrlStateEvent) => void;
   onUrlRangeChange?: (event: ChartUrlRangeEvent) => void;
   onUrlStateReset?: () => void;
 }) {
@@ -79,6 +82,7 @@ export function CustomDashboardPreview({
         }
         onRetry={retry}
         {...(onUrlStateChange ? { onUrlStateChange } : {})}
+        {...(onEntityOpen ? { onEntityOpen: (event) => onEntityOpen(widget.module, event) } : {})}
         {...(onUrlRangeChange ? { onUrlRangeChange } : {})}
         {...(onUrlStateReset ? { onUrlStateReset } : {})}
       />

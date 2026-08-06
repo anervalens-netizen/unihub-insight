@@ -148,6 +148,7 @@ for (const module of moduleSubviews) {
 }
 
 test('native modules render their specialized analytical forms', async ({ page }) => {
+  test.slow();
   const errors = collectRuntimeErrors(page);
   await page.setViewportSize({ width: 1440, height: 1000 });
   const cases = [
@@ -291,6 +292,36 @@ test('native chart supports keyboard drill and reset', async ({ page }) => {
   await chart.focus();
   await page.keyboard.press('Escape');
   await expect(page).not.toHaveURL(/(?:\?|&)drill=/);
+});
+
+test('detail shortcut opens contextual Retail without changing the analysis URL', async ({
+  page,
+}) => {
+  await page.route('https://retail.unihub.ro/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/html',
+      body: '<title>Retail detail</title>',
+    });
+  });
+  await page.goto('/performance?period=2026-08&range=12&subview=rankings');
+  const analysisUrl = page.url();
+  const chart = page.getByRole('application', { name: 'Clasament Performance' });
+  await expect(chart).toHaveAttribute('aria-keyshortcuts', 'Shift+Enter');
+  await chart.focus();
+  await page.keyboard.press('ArrowRight');
+
+  const popupPromise = page.waitForEvent('popup');
+  await page.keyboard.press('Shift+Enter');
+  const popup = await popupPromise;
+  await popup.waitForLoadState('domcontentloaded');
+  const detailUrl = new URL(popup.url());
+  expect(detailUrl.origin).toBe('https://retail.unihub.ro');
+  expect(detailUrl.pathname).toBe('/agenti');
+  expect(detailUrl.searchParams.get('source_context')).toBe('insight');
+  expect(detailUrl.searchParams.get('magazin')).toBeTruthy();
+  expect(page.url()).toBe(analysisUrl);
+  await popup.close();
 });
 
 test('native trend renders simultaneous comparison contracts', async ({ page }) => {

@@ -147,6 +147,7 @@ function ConfiguredChart({
   metric,
   result,
   onUrlStateChange,
+  onEntityOpen,
   onUrlRangeChange,
   onUrlStateReset,
 }: {
@@ -155,6 +156,7 @@ function ConfiguredChart({
   metric: MetricDefinition;
   result: WidgetQueryResult;
   onUrlStateChange?: (event: ChartUrlStateEvent) => void;
+  onEntityOpen?: (event: ChartUrlStateEvent) => void;
   onUrlRangeChange?: (event: ChartUrlRangeEvent) => void;
   onUrlStateReset?: () => void;
 }) {
@@ -195,10 +197,14 @@ function ConfiguredChart({
           const interaction = chartEventToUrlState(presentedDataset, event);
           if (interaction) onUrlStateChange?.(interaction);
         }}
-        onDoubleEvent={(event) => {
-          const interaction = chartEventToUrlState(presentedDataset, event);
-          if (interaction) onUrlStateChange?.(interaction);
-        }}
+        {...(onEntityOpen
+          ? {
+              onDoubleEvent: (event: Parameters<typeof chartEventToUrlState>[1]) => {
+                const interaction = chartEventToUrlState(presentedDataset, event);
+                if (interaction) onEntityOpen(interaction);
+              },
+            }
+          : {})}
         onRangeEvent={(event) => {
           const range = chartRangeEventToUrlState(presentedDataset, event);
           if (range) onUrlRangeChange?.(range);
@@ -222,6 +228,7 @@ export function ConfiguredWidget({
   requestError,
   onRetry,
   onUrlStateChange,
+  onEntityOpen,
   onUrlRangeChange,
   onUrlStateReset,
 }: {
@@ -232,6 +239,7 @@ export function ConfiguredWidget({
   requestError?: unknown;
   onRetry?: () => void;
   onUrlStateChange?: (event: ChartUrlStateEvent) => void;
+  onEntityOpen?: (event: ChartUrlStateEvent) => void;
   onUrlRangeChange?: (event: ChartUrlRangeEvent) => void;
   onUrlStateReset?: () => void;
 }) {
@@ -325,6 +333,7 @@ export function ConfiguredWidget({
       metric={metric}
       result={result}
       {...(onUrlStateChange ? { onUrlStateChange } : {})}
+      {...(onEntityOpen ? { onEntityOpen } : {})}
       {...(onUrlRangeChange ? { onUrlRangeChange } : {})}
       {...(onUrlStateReset ? { onUrlStateReset } : {})}
     />

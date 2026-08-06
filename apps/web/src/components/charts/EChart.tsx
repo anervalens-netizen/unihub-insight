@@ -144,6 +144,7 @@ export function EChart({
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<EChartsType | null>(null);
+  const clickTimerRef = useRef<number | null>(null);
   const keyboardIndexRef = useRef(-1);
   const design = useChartDesign();
   const rawDataCount = useMemo(() => chartDataCount(option), [option]);
@@ -159,7 +160,7 @@ export function EChart({
       : designed;
   }, [design, option, rawDataCount]);
   const dataCount = useMemo(() => chartDataCount(designedOption), [designedOption]);
-  const interactive = Boolean(onEvent || onRangeEvent || onBlankReset);
+  const interactive = Boolean(onEvent || onDoubleEvent || onRangeEvent || onBlankReset);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -196,22 +197,45 @@ export function EChart({
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart || !onEvent) return;
-    const handleClick = (event: EChartEvent) => onEvent(event);
+    const handleClick = (event: EChartEvent) => {
+      if (!onDoubleEvent) {
+        onEvent(event);
+        return;
+      }
+      if (clickTimerRef.current !== null) window.clearTimeout(clickTimerRef.current);
+      clickTimerRef.current = window.setTimeout(() => {
+        clickTimerRef.current = null;
+        onEvent(event);
+      }, 250);
+    };
     chart.on('click', handleClick);
     return () => {
       if (!chart.isDisposed()) chart.off('click', handleClick);
     };
-  }, [onEvent]);
+  }, [onDoubleEvent, onEvent]);
 
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart || !onDoubleEvent) return;
-    const handleDoubleClick = (event: EChartEvent) => onDoubleEvent(event);
+    const handleDoubleClick = (event: EChartEvent) => {
+      if (clickTimerRef.current !== null) {
+        window.clearTimeout(clickTimerRef.current);
+        clickTimerRef.current = null;
+      }
+      onDoubleEvent(event);
+    };
     chart.on('dblclick', handleDoubleClick);
     return () => {
       if (!chart.isDisposed()) chart.off('dblclick', handleDoubleClick);
     };
   }, [onDoubleEvent]);
+
+  useEffect(
+    () => () => {
+      if (clickTimerRef.current !== null) window.clearTimeout(clickTimerRef.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -272,6 +296,13 @@ export function EChart({
       chart.dispatchAction({ type: 'showTip', seriesIndex: 0, dataIndex: current });
       return;
     }
+    if ((event.key === 'Enter' || event.key === ' ') && event.shiftKey && onDoubleEvent) {
+      event.preventDefault();
+      const current = keyboardIndexRef.current < 0 ? 0 : keyboardIndexRef.current;
+      keyboardIndexRef.current = current;
+      onDoubleEvent({ dataIndex: current });
+      return;
+    }
     if ((event.key === 'Enter' || event.key === ' ') && onEvent) {
       event.preventDefault();
       const current = keyboardIndexRef.current < 0 ? 0 : keyboardIndexRef.current;
@@ -287,6 +318,7 @@ export function EChart({
         onKeyDown: handleKeyboard,
         'aria-label': ariaLabel,
         'aria-roledescription': 'grafic interactiv',
+        ...(onDoubleEvent ? { 'aria-keyshortcuts': 'Shift+Enter' } : {}),
       }
     : {};
 

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { retailContextUrl } from '../src/features/modules/retail-link';
+import {
+  retailContextUrl,
+  retailDashboardEntityContextUrl,
+  retailEntityContextUrl,
+} from '../src/features/modules/retail-link';
 
 describe('Retail contextual deep links', () => {
   it('maps a single-store Sales interval to the Retail history surface', () => {
@@ -63,5 +67,43 @@ describe('Retail contextual deep links', () => {
     );
     expect(url.searchParams.has('magazin')).toBe(false);
     expect(url.searchParams.get('stores')).toBe('S001,S002');
+  });
+
+  it('opens one selected entity without retaining a conflicting multi-store scope', () => {
+    const url = new URL(
+      retailEntityContextUrl(
+        'https://retail.unihub.ro',
+        'performance',
+        'rankings',
+        {
+          period: '2026-08',
+          comparison: 'none',
+          stores: 'S001,S002',
+        },
+        { dimensionId: 'store', value: 'S003', label: 'Magazin 3' },
+      ),
+    );
+    expect(url.pathname).toBe('/agenti');
+    expect(url.searchParams.get('magazin')).toBe('S003');
+    expect(url.searchParams.has('stores')).toBe(false);
+  });
+
+  it('maps a custom dashboard time detail to the module default Retail surface', () => {
+    const url = new URL(
+      retailDashboardEntityContextUrl(
+        'https://retail.unihub.ro',
+        'sales',
+        { period: '2026-08', comparison: 'none', range: '12' },
+        { dimensionId: 'time', value: '2026-04', label: 'aprilie 2026' },
+      ),
+    );
+    expect(url.pathname).toBe('/hub');
+    expect(Object.fromEntries(url.searchParams)).toMatchObject({
+      source_context: 'insight',
+      section: 'history',
+      period: '2026-04',
+      range_start: '2026-04',
+      range_end: '2026-04',
+    });
   });
 });

@@ -23,7 +23,7 @@ import type { MetricDefinition, WidgetQuery } from '../query/schemas';
 import { moduleAnalyticsQuery } from './api';
 import { ModuleProvider } from './context';
 import { moduleDistributionDimension, moduleEntityDimension } from './interactions';
-import { retailContextUrl } from './retail-link';
+import { openRetailContext, retailContextUrl, retailEntityContextUrl } from './retail-link';
 import type { ModuleAnalytics, ModuleId } from './schemas';
 import { type ModuleSubview, moduleSubviewConfig, subviewForId, subviewStatus } from './subviews';
 import { moduleWidgetQuerySpec, moduleWidgets } from './widget-catalog';
@@ -302,10 +302,20 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
   const handleUrlState = (event: { dimensionId: string; value: string; label: string | null }) => {
     updateSearch(crossFilterPatch(search.drill, event));
   };
+  const handleEntityOpen = (event: {
+    dimensionId: string;
+    value: string;
+    label: string | null;
+  }) => {
+    openRetailContext(
+      retailEntityContextUrl(environment.retailBaseUrl, module, selectedSubview.id, input, event),
+    );
+  };
   return (
     <ModuleProvider
       data={displayData}
       onUrlStateChange={handleUrlState}
+      onEntityOpen={handleEntityOpen}
       onUrlStateChanges={(events) => updateSearch(crossFilterMultiPatch(search.drill, events))}
       onUrlRangeChange={(event) => updateSearch(crossFilterRangePatch(search.drill, event))}
       onUrlStateReset={() => updateSearch(resetCrossFilterPatch(search.drill))}

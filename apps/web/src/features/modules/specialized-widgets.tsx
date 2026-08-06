@@ -14,6 +14,7 @@ import { formatCurrency, formatPercent } from '../../lib/format';
 import type { MetricDefinition, QueryDataset } from '../query/schemas';
 import {
   useModuleData,
+  useModuleEntityOpen,
   useModuleUrlRangeChange,
   useModuleUrlStateChange,
   useModuleUrlStateReset,
@@ -65,6 +66,7 @@ export function ModulePaceWidget() {
 
 export function ModuleRankingWidget() {
   const data = useModuleData();
+  const onEntityOpen = useModuleEntityOpen();
   const onUrlStateChange = useModuleUrlStateChange();
   const onUrlStateReset = useModuleUrlStateReset();
   const rows = useMemo(() => {
@@ -125,6 +127,16 @@ export function ModuleRankingWidget() {
       });
     }
   };
+  const openRow = (event: EChartEvent) => {
+    const row = event.dataIndex === undefined ? undefined : rows[event.dataIndex];
+    if (row) {
+      onEntityOpen?.({
+        dimensionId: moduleEntityDimension[data.module],
+        value: row.id,
+        label: row.label,
+      });
+    }
+  };
   return (
     <EChart
       option={option}
@@ -132,7 +144,7 @@ export function ModuleRankingWidget() {
       ariaLabel={`Clasament ${data.title}`}
       pngExport={{ filename: `${data.module}-${data.meta.period}-ranking`, pixelRatio: 2 }}
       onEvent={handleRow}
-      onDoubleEvent={handleRow}
+      onDoubleEvent={openRow}
       {...(onUrlStateReset ? { onBlankReset: onUrlStateReset } : {})}
     />
   );
@@ -140,6 +152,7 @@ export function ModuleRankingWidget() {
 
 export function ModuleProductivityScatterWidget() {
   const data = useModuleData();
+  const onEntityOpen = useModuleEntityOpen();
   const onUrlStateChange = useModuleUrlStateChange();
   const onUrlStateReset = useModuleUrlStateReset();
   const rows = useMemo(
@@ -216,6 +229,16 @@ export function ModuleProductivityScatterWidget() {
       });
     }
   };
+  const openRow = (event: EChartEvent) => {
+    const row = event.dataIndex === undefined ? undefined : rows[event.dataIndex];
+    if (row) {
+      onEntityOpen?.({
+        dimensionId: moduleEntityDimension[data.module],
+        value: row.id,
+        label: row.label,
+      });
+    }
+  };
   return (
     <EChart
       option={option}
@@ -223,7 +246,7 @@ export function ModuleProductivityScatterWidget() {
       ariaLabel="Productivitate versus realizare target"
       pngExport={{ filename: `${data.module}-${data.meta.period}-productivity`, pixelRatio: 2 }}
       onEvent={handleRow}
-      onDoubleEvent={handleRow}
+      onDoubleEvent={openRow}
       {...(onUrlStateReset ? { onBlankReset: onUrlStateReset } : {})}
     />
   );
@@ -231,6 +254,7 @@ export function ModuleProductivityScatterWidget() {
 
 export function ModuleFocusRankingWidget() {
   const data = useModuleData();
+  const onEntityOpen = useModuleEntityOpen();
   const onUrlStateChange = useModuleUrlStateChange();
   const onUrlStateReset = useModuleUrlStateReset();
   const rows = useMemo(() => {
@@ -307,6 +331,10 @@ export function ModuleFocusRankingWidget() {
       onUrlStateChange?.({ dimensionId: 'store', value: row.id, label: row.label });
     }
   };
+  const openRow = (event: EChartEvent) => {
+    const row = event.dataIndex === undefined ? undefined : rows[event.dataIndex];
+    if (row) onEntityOpen?.({ dimensionId: 'store', value: row.id, label: row.label });
+  };
   return (
     <EChart
       option={option}
@@ -314,7 +342,7 @@ export function ModuleFocusRankingWidget() {
       ariaLabel="Top și Bottom magazine observate Focus"
       pngExport={{ filename: `campaigns-${data.meta.period}-focus-ranking`, pixelRatio: 2 }}
       onEvent={handleRow}
-      onDoubleEvent={handleRow}
+      onDoubleEvent={openRow}
       {...(onUrlStateReset ? { onBlankReset: onUrlStateReset } : {})}
     />
   );
@@ -322,6 +350,7 @@ export function ModuleFocusRankingWidget() {
 
 export function ModulePlanningAccuracyWidget() {
   const data = useModuleData();
+  const onEntityOpen = useModuleEntityOpen();
   const onUrlStateChange = useModuleUrlStateChange();
   const onUrlStateReset = useModuleUrlStateReset();
   const rows = useMemo(
@@ -408,6 +437,10 @@ export function ModulePlanningAccuracyWidget() {
     const row = event.dataIndex === undefined ? undefined : rows[event.dataIndex];
     if (row) onUrlStateChange?.({ dimensionId: 'store', value: row.id, label: row.label });
   };
+  const openRow = (event: EChartEvent) => {
+    const row = event.dataIndex === undefined ? undefined : rows[event.dataIndex];
+    if (row) onEntityOpen?.({ dimensionId: 'store', value: row.id, label: row.label });
+  };
   return (
     <EChart
       option={option}
@@ -415,7 +448,7 @@ export function ModulePlanningAccuracyWidget() {
       ariaLabel="Actual observat versus forecast pe magazin"
       pngExport={{ filename: `planning-${data.meta.period}-accuracy`, pixelRatio: 2 }}
       onEvent={handleRow}
-      onDoubleEvent={handleRow}
+      onDoubleEvent={openRow}
       {...(onUrlStateReset ? { onBlankReset: onUrlStateReset } : {})}
     />
   );
@@ -635,6 +668,7 @@ export function ModuleWaterfallWidget() {
 
 export function ModuleForecastWidget() {
   const data = useModuleData();
+  const onEntityOpen = useModuleEntityOpen();
   const onUrlStateChange = useModuleUrlStateChange();
   const onUrlRangeChange = useModuleUrlRangeChange();
   const onUrlStateReset = useModuleUrlStateReset();
@@ -718,6 +752,10 @@ export function ModuleForecastWidget() {
     const point = event.dataIndex === undefined ? undefined : data.trend[event.dataIndex];
     if (point) onUrlStateChange?.({ dimensionId: 'time', value: point.key, label: point.label });
   };
+  const openPoint = (event: EChartEvent) => {
+    const point = event.dataIndex === undefined ? undefined : data.trend[event.dataIndex];
+    if (point) onEntityOpen?.({ dimensionId: 'time', value: point.key, label: point.label });
+  };
   return (
     <EChart
       option={option}
@@ -725,7 +763,7 @@ export function ModuleForecastWidget() {
       ariaLabel="Forecast, actual și target"
       pngExport={{ filename: `${data.module}-${data.meta.period}-forecast`, pixelRatio: 2 }}
       onEvent={handlePoint}
-      onDoubleEvent={handlePoint}
+      onDoubleEvent={openPoint}
       onRangeEvent={(event) => {
         const range = chartRangeEventToMonthRange(
           data.trend.map((point) => point.key),
