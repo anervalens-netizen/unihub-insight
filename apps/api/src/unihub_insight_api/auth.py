@@ -19,6 +19,14 @@ ADMIN_CAPABILITIES = frozenset(
 )
 
 
+def trusted_proxy_subject(request: Request, settings: Settings) -> str | None:
+    supplied_secret = request.headers.get("x-unihub-proxy-secret", "")
+    expected_secret = settings.trusted_proxy_secret or ""
+    if not supplied_secret or not secrets.compare_digest(supplied_secret, expected_secret):
+        return None
+    return request.headers.get("x-authentik-uid", "").strip() or None
+
+
 def _groups(value: str | None) -> tuple[str, ...]:
     if not value:
         return ()
@@ -56,23 +64,16 @@ async def get_current_user(request: Request) -> UserContext:
             is_demo=True,
         )
 
-    supplied_secret = request.headers.get("x-unihub-proxy-secret", "")
-    expected_secret = settings.trusted_proxy_secret or ""
-    if not supplied_secret or not secrets.compare_digest(supplied_secret, expected_secret):
+    subject = trusted_proxy_subject(request, settings)
+    if subject is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Trusted identity boundary is missing or invalid.",
         )
 
-    subject = request.headers.get("x-authentik-uid", "").strip()
     email = request.headers.get("x-authentik-email", "").strip() or None
     name = request.headers.get("x-authentik-name", "").strip() or None
     groups = _groups(request.headers.get("x-authentik-groups"))
-    if not subject:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Verified subject is missing.",
-        )
     return UserContext(
         subject=subject,
         email=email,

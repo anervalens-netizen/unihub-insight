@@ -67,6 +67,16 @@ def test_metadata_backup_publishes_an_atomic_verified_offhost_copy() -> None:
     assert deploy.count("systemctl start unihub-insight-backup.service") == 2
 
 
+def test_isolated_restore_drill_is_fail_closed_and_dependency_complete() -> None:
+    script = (ROOT / "ops/scripts/verify-metadata-backup.sh").read_text(encoding="utf-8")
+
+    assert "--schema-only --exclude-schema=insight" in script
+    assert "pg_restore" in script and "--exit-on-error" in script
+    assert "refusing existing restore database" in script
+    assert "trap cleanup_restore EXIT" in script
+    assert "SELECT MAX(version) FROM insight.schema_migrations" in script
+
+
 def test_readiness_is_private_and_rollback_checks_migration_compatibility_first() -> None:
     caddy = (ROOT / "ops/caddy/unihub-insight.caddy.template").read_text(encoding="utf-8")
     rollback = (ROOT / "ops/scripts/rollback.sh").read_text(encoding="utf-8")

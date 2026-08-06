@@ -43,6 +43,40 @@ def test_proxy_identity_requires_trusted_boundary() -> None:
         }
 
 
+def test_proxy_metrics_count_only_verified_non_probe_subject_as_real() -> None:
+    settings = Settings(
+        environment="test",
+        data_mode="demo",
+        auth_mode="proxy",
+        trusted_proxy_secret="test-secret",
+    )
+    base_headers = {
+        "X-UniHub-Proxy-Secret": "test-secret",
+        "X-Authentik-Groups": "unihub-manager",
+    }
+    with TestClient(create_app(settings)) as proxy_client:
+        assert (
+            proxy_client.get(
+                "/api/v1/overview?period=2026-08",
+                headers={**base_headers, "X-Authentik-Uid": "andrei"},
+            ).status_code
+            == 200
+        )
+        assert (
+            proxy_client.get(
+                "/api/v1/overview?period=2026-08",
+                headers={**base_headers, "X-Authentik-Uid": "insight-load-gate"},
+            ).status_code
+            == 200
+        )
+        rendered = proxy_client.get("/metrics").text
+
+    assert 'traffic_class="real",surface="overview"' in rendered
+    assert 'traffic_class="synthetic",surface="overview"' in rendered
+    assert "andrei" not in rendered
+    assert "insight-load-gate" not in rendered
+
+
 def test_proxy_identity_parses_authentik_pipe_separated_groups() -> None:
     settings = Settings(
         environment="test",

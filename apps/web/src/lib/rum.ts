@@ -1,5 +1,18 @@
 import { environment } from './environment';
 
+export type RumSurface =
+  | 'overview'
+  | 'monthly-review'
+  | 'module-sales'
+  | 'module-performance'
+  | 'module-campaigns'
+  | 'module-workforce'
+  | 'module-compensation'
+  | 'module-finance'
+  | 'module-planning'
+  | 'custom-dashboards'
+  | 'other';
+
 interface WebVitalPayload {
   metric: 'LCP' | 'INP';
   value_ms: number;
@@ -12,6 +25,7 @@ interface WebVitalPayload {
     | 'prerender'
     | 'restore'
     | 'unknown';
+  surface: RumSurface;
 }
 
 interface InteractionTimingEntry extends PerformanceEntry {
@@ -45,7 +59,27 @@ function rating(metric: WebVitalPayload['metric'], value: number): WebVitalPaylo
   return 'poor';
 }
 
-function observeLcp(): void {
+export function rumSurface(pathname: string): RumSurface {
+  const route = pathname.replace(/\/+$/, '') || '/';
+  if (route === '/') return 'overview';
+  if (route === '/monthly-review') return 'monthly-review';
+  if (route === '/dashboards') return 'custom-dashboards';
+  const module = route.slice(1);
+  if (
+    module === 'sales' ||
+    module === 'performance' ||
+    module === 'campaigns' ||
+    module === 'workforce' ||
+    module === 'compensation' ||
+    module === 'finance' ||
+    module === 'planning'
+  ) {
+    return `module-${module}`;
+  }
+  return 'other';
+}
+
+function observeLcp(surface: RumSurface): void {
   let latest = 0;
   let flushed = false;
   const observer = new PerformanceObserver((list) => {
@@ -66,6 +100,7 @@ function observeLcp(): void {
         value_ms: latest,
         rating: rating('LCP', latest),
         navigation_type: navigationType(),
+        surface,
       });
       latest = 0;
     }
@@ -81,7 +116,7 @@ function observeLcp(): void {
   window.addEventListener('pagehide', flush, { once: true });
 }
 
-function observeInp(): void {
+function observeInp(surface: RumSurface): void {
   const interactions = new Map<number, number>();
   let flushed = false;
   const observer = new PerformanceObserver((list) => {
@@ -109,6 +144,7 @@ function observeInp(): void {
         value_ms: value,
         rating: rating('INP', value),
         navigation_type: navigationType(),
+        surface,
       });
     }
     observer.disconnect();
@@ -126,6 +162,7 @@ function observeInp(): void {
 export async function initializeRum(): Promise<void> {
   const { VITE_RUM_ENABLED } = import.meta.env;
   if (!import.meta.env.PROD || VITE_RUM_ENABLED === 'false') return;
-  observeLcp();
-  observeInp();
+  const surface = rumSurface(window.location.pathname);
+  observeLcp(surface);
+  observeInp(surface);
 }

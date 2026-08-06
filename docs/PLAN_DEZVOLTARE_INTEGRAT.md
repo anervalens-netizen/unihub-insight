@@ -227,7 +227,7 @@ Nu se mai creează pagini placeholder și nu se marchează un modul complet pent
 - rolurile DB păstrează granturi explicite numai pe read-model-urile aprobate;
 - p95: Overview sub 1 s, module ordinare sub 2 s, interacțiuni sub 200 ms; hard timeout și exporturile rămân bounded;
 - se măsoară înainte de index/materializare/cache; nu se introduce ClickHouse sau alt datastore fără bottleneck demonstrat;
-- Prometheus/RUM, alerte, backup/restore metadata, immutable release, rollback și exact-SHA rămân porți de release;
+- Prometheus/RUM etichetează finite exact SHA, suprafața și traficul `real/synthetic/system`; evaluatorul refuză verdictul înainte de șapte zile continue, 100 cereri reale pe suprafață și RUM real eligibil. Alertele, backup/restore metadata, immutable release, rollback și exact-SHA rămân porți de release;
 - identitatea versiunii se unifică în package, API, UI și `build-info.json`.
 
 **Acceptanță:** matricea reală de roluri, public boundary, performanța, backup/restore și rollback trec pe exact același SHA.

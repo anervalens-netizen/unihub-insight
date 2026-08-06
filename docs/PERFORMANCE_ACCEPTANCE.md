@@ -17,8 +17,8 @@ The gate requires seven clean days and at least 100 real requests per main route
 
 ## Measurement
 
-- API records route-template, method, status class and duration only.
-- Browser initializes production RUM once and reports only LCP and INP with finite rating/navigation labels; zero samples keep the temporal gate open.
+- API records exact release SHA, finite analytical surface, trusted traffic class, route-template, method, status class and duration only. User IDs are never metric labels.
+- Browser initializes production RUM once and reports only LCP and INP with finite surface/rating/navigation labels; zero real samples keep the temporal gate open.
 - Prometheus scrapes the local `/metrics` endpoint.
 - Query profiling uses `pg_stat_statements` and `EXPLAIN (ANALYZE, BUFFERS)` on a production-like copy when possible.
 - Request IDs correlate Caddy, API and database investigation without logging sensitive payloads.
@@ -67,11 +67,20 @@ set +a
 
 The probe covers Overview, every native module, one 10-widget mixed batch and concurrent inspect/CSV/XLSX traffic. Its JSON is explicitly marked `synthetic`; passing it closes only the bounded concurrency check, never the seven-day/100-real-request RUM and API SLI gate.
 
+Evaluate the temporal gate only from Prometheus, for the active exact SHA:
+
+```bash
+/opt/unihub-insight/current/apps/api/.venv/bin/python \
+  /opt/unihub-insight/current/ops/scripts/evaluate_sli.py
+```
+
+The evaluator returns `0` only after seven continuous days with no scrape gap above 90 seconds, at least 100 trusted `real` requests on every main surface, zero real 5xx, HTTP p95 inside the route budget and non-zero real LCP/INP samples with p75 inside budget. Exit `2` means evidence is still pending; exit `1` means a measured gate failed. Synthetic probe identities, demo calls, health checks and unauthenticated traffic never count. Historical metrics without these labels are not retroactively eligible, so the seven-day clock starts with the first deployed SHA that emits them.
+
 ### RC1 live evidence — 2026-08-06
 
 The production probe completed 220 bounded synthetic requests with every scenario inside budget: Overview p95 126.57 ms, ordinary modules at most 146.87 ms, the 10-widget batch p95 686.22 ms and concurrent inspect/CSV/XLSX at most 311.68 ms. The same candidate passed preflight, smoke and the N→N-1→N runtime switch; no Insight alert was firing and Prometheus had no 5xx series at the 04:46 EEST observation.
 
-This is not the 1.0 temporal verdict. At that observation the oldest continuous Insight scrape was about 8.3 hours old, browser RUM had zero samples and the API route totals included the synthetic reconciliation/load traffic. The seven clean days, at least 100 demonstrably real requests per main route and owner visual acceptance therefore remain open.
+This is not the 1.0 temporal verdict. At that observation the oldest continuous Insight scrape was about 8.3 hours old, browser RUM had zero samples and the API route totals predated trusted real/synthetic classification. Those historical totals are ineligible. The seven clean labeled days, at least 100 demonstrably real requests per main surface and owner visual acceptance therefore remain open.
 
 ## Failure criteria
 

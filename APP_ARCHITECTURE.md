@@ -77,7 +77,7 @@ The API exposes:
 - `/api/v1/exports/*` — XLSX pentru Overview, module și raport lunar;
 - `GET /api/v1/me` — identitate și capabilități verificate server-side.
 
-`/metrics` și ingestia RUM sunt suprafețe interne. API-ul public direct rămâne închis; traficul public intră prin Caddy/Authentik.
+`/metrics` și ingestia RUM sunt suprafețe interne. API-ul public direct rămâne închis; traficul public intră prin Caddy/Authentik. Metricile HTTP și RUM au numai etichete finite `source_sha`, `traffic_class` și `surface`: identitățile de load/smoke/E2E sunt `synthetic`, health-ul este `system`, iar numai un subject Authentik verificat și ne-rezervat intră în poarta `real`.
 
 ## Data path
 

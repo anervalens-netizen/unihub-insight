@@ -86,12 +86,17 @@ boundary. `smoke.sh` checks local
 liveness/readiness, public SPA reachability and public 404 responses for
 diagnostics.
 
-For a non-destructive restore drill, restore the latest custom-format dump
-into a disposable database. Seed only the empty `public.sales_transactions`
-contract required by `insight.monthly_review_item_month`, restore with
-`--exit-on-error --no-owner --no-privileges`, verify the migration registry and
-metadata relations, then drop the disposable database. Never use the production
-restore command for this drill.
+For a non-destructive restore drill, use the checked-in verifier. It creates a
+disposable database, copies only the structural non-Insight schemas required by
+the governed views, restores the custom-format dump with `--exit-on-error`,
+verifies the migration registry and always drops the disposable database:
+
+```bash
+sudo /opt/unihub-insight/current/ops/scripts/verify-metadata-backup.sh \
+  /var/backups/unihub-insight/insight_metadata_YYYYMMDDTHHMMSSZ.dump
+```
+
+Never use the production restore command for this drill.
 
 Rollback is code-only and keeps the database at its current schema. Before
 switching the symlink it verifies that the target contains every applied

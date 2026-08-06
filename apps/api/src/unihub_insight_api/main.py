@@ -19,9 +19,16 @@ from unihub_insight_api.api.routes import (
     query_router,
     telemetry_router,
 )
+from unihub_insight_api.auth import trusted_proxy_subject
 from unihub_insight_api.config import Settings, get_settings
 from unihub_insight_api.db import close_pool, create_metadata_pool, create_pool
-from unihub_insight_api.observability import configure_logging, metrics
+from unihub_insight_api.observability import (
+    configure_logging,
+    http_surface,
+    metrics,
+    release_source_sha,
+    traffic_class,
+)
 from unihub_insight_api.repositories.dashboards import (
     MemoryDashboardStore,
     PostgresDashboardStore,
@@ -49,6 +56,8 @@ def _route_label(request: Request) -> str:
 def create_app(settings: Settings | None = None) -> FastAPI:
     configure_logging()
     resolved_settings = settings or get_settings()
+    source_sha = release_source_sha()
+    metrics.register_build(source_sha)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -79,6 +88,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url="/openapi.json" if resolved_settings.environment != "production" else None,
     )
     app.state.settings = resolved_settings
+    app.state.source_sha = source_sha
 
     app.add_middleware(
         CORSMiddleware,
@@ -99,8 +109,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         started = time.perf_counter()
         response = await call_next(request)
         duration_ms = (time.perf_counter() - started) * 1000
+        route = _route_label(request)
+        surface = http_surface(route, request.path_params)
+        subject = trusted_proxy_subject(request, resolved_settings) if resolved_settings.auth_mode == "proxy" else None
         metrics.record_http(
-            route=_route_label(request),
+            source_sha=source_sha,
+            traffic_class=traffic_class(
+                subject=subject,
+                system=surface == "system",
+                demo=resolved_settings.auth_mode == "demo",
+            ),
+            surface=surface,
+            route=route,
             method=request.method,
             status_code=response.status_code,
             duration_seconds=duration_ms / 1000,

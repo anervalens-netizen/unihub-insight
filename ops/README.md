@@ -78,9 +78,20 @@ Run `backup-metadata.sh` before every migration and daily afterward. It enters
 the isolated schema owner through PostgreSQL's `--role` option, keeps 30 days
 by default, and never reads Retail business data. Production passes the NAS
 destination as the third argument, publishes through a `.partial` file and
-verifies identical SHA-256 bytes. `restore-metadata.sh`
+verifies identical SHA-256 bytes. `verify-metadata-backup.sh` performs the safe
+isolated drill against a disposable database after recreating only the
+structural non-Insight dependencies. `restore-metadata.sh`
 requires `--confirm`, stops the API, restores only schema `insight`, restarts
 and runs smoke checks.
+
+## Exact-SHA SLI gate
+
+HTTP and RUM metrics label the immutable `source_sha`, a finite analytical
+`surface` and `traffic_class`. Only a trusted non-probe Authentik subject is
+`real`; load/smoke/E2E identities are `synthetic`. Run `evaluate_sli.py` against
+the local Prometheus API. It returns `0` for a fully passed seven-day gate, `2`
+while duration/request/RUM evidence is incomplete and `1` for a measured
+budget or 5xx failure.
 
 ## Remaining server-only validation
 
