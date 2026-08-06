@@ -6,6 +6,7 @@ This directory contains the complete pre-deploy package. No script executes agai
 
 - `/opt/unihub-insight/releases/<SOURCE_SHA>` — immutable release directories;
 - `/opt/unihub-insight/current` — atomic active symlink;
+- `/opt/unihub-insight/schema-current` — forward-only migration-runner symlink;
 - `/etc/unihub-insight/insight.env` — root-only API runtime secrets, mode `0600`;
 - `/etc/unihub-insight/migration.env` — separate root-only migration
   credential, mode `0600`; never loaded into the API service;
@@ -57,6 +58,8 @@ switches the symlink atomically, applies immutable migrations and restores the
 previous application release if health checks fail. Primary needs no
 Node/npm/nginx. Metadata migrations are forward-only; application rollback is
 allowed only while the previous release accepts the current metadata schema.
+The migration unit follows `schema-current`, not the rolled-back application,
+so a reviewed N-1 remains restartable after an additive migration.
 
 ## Authentik boundary
 

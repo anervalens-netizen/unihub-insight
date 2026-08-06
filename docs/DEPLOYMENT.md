@@ -37,6 +37,11 @@ Docker container `unihub_postgres` published to host `127.0.0.1:5432`.
 Metadata backup/restore runs PostgreSQL 18's `pg_dump`/`pg_restore` inside that
 container, avoiding host-client version drift.
 
+`/opt/unihub-insight/current` selects the application release. The separate
+`/opt/unihub-insight/schema-current` pointer only advances on deploy and drives
+the migration unit. Code rollback never rewinds it, so N-1 can restart or
+survive a reboot after an explicitly approved additive migration.
+
 The live `/opt/Mobiup/infra/caddy/Caddyfile` includes the site represented by
 `ops/caddy/unihub-insight.caddy.template`. The `unihub-caddy` Compose service
 already has these read-only mounts:
@@ -95,6 +100,13 @@ mismatched migration refuses rollback without stopping the active release:
 ```bash
 sudo /opt/unihub-insight/current/ops/scripts/rollback.sh PREVIOUS_SOURCE_SHA
 ```
+
+The migration service continues to validate through `schema-current` after
+rollback. Reinstall the checked-in systemd units when upgrading an older host
+whose migration unit still points at `current`; `deploy-release.sh` refuses
+that unsafe topology. On that one-time upgrade, create `schema-current` as an
+atomic symlink to the active release before replacing the migration unit; the
+next successful deploy advances it.
 
 The database role/grant SQL and `migrate.py` remain Terra-owned and are not
 changed by this deployment lane.

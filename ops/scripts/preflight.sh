@@ -6,6 +6,7 @@ ENV_FILE="${1:-/etc/unihub-insight/insight.env}"
 MIGRATION_ENV_FILE="${2:-/etc/unihub-insight/migration.env}"
 BASE="${UNIHUB_INSIGHT_BASE:-/opt/unihub-insight}"
 RELEASE="${3:-$BASE/current}"
+SCHEMA_RELEASE="$BASE/schema-current"
 LOCAL_API_SOCKET="${UNIHUB_INSIGHT_LOCAL_API_SOCKET:-/run/unihub-insight/api.sock}"
 
 [[ $EUID -eq 0 ]] || {
@@ -25,7 +26,12 @@ done
   echo "missing active release symlink: $BASE/current" >&2
   exit 1
 }
+[[ -L "$SCHEMA_RELEASE" ]] || {
+  echo "missing forward schema release symlink: $SCHEMA_RELEASE" >&2
+  exit 1
+}
 RELEASE="$(readlink -f "$RELEASE")"
+SCHEMA_RELEASE="$(readlink -f "$SCHEMA_RELEASE")"
 [[ -d "$RELEASE" ]] || {
   echo "missing release: $RELEASE" >&2
   exit 1
@@ -36,6 +42,10 @@ RELEASE="$(readlink -f "$RELEASE")"
 }
 [[ -x "$RELEASE/apps/api/.venv/bin/python" ]] || {
   echo "release is missing the runtime Python environment" >&2
+  exit 1
+}
+[[ -x "$SCHEMA_RELEASE/apps/api/.venv/bin/python" ]] || {
+  echo "schema release is missing the runtime Python environment" >&2
   exit 1
 }
 
@@ -131,6 +141,10 @@ PY
 
 systemctl is-active --quiet docker.service
 systemctl is-active --quiet unihub-insight-api.service
+migrate_workdir="$(systemctl show --property=WorkingDirectory --value unihub-insight-migrate.service)"
+migrate_exec="$(systemctl show --property=ExecStart --value unihub-insight-migrate.service)"
+[[ "$migrate_workdir" == "$BASE/schema-current" ]]
+grep -Fq "$BASE/schema-current/apps/api/.venv/bin/python" <<<"$migrate_exec"
 systemctl is-active --quiet unihub-insight-backup.timer
 systemctl is-enabled --quiet unihub-insight-backup.timer
 docker inspect unihub_postgres --format '{{.State.Running}}' | grep -qx true
@@ -164,8 +178,8 @@ psql "$UNIHUB_INSIGHT_METADATA_DATABASE_URL" -Atqc \
   "SELECT has_table_privilege(current_user, 'insight.schema_migrations', 'UPDATE')" \
   | grep -qx f
 
-cd "$RELEASE"
-"$RELEASE/apps/api/.venv/bin/python" ops/scripts/migrate.py --check
+cd "$SCHEMA_RELEASE"
+"$SCHEMA_RELEASE/apps/api/.venv/bin/python" ops/scripts/migrate.py --check
 curl --fail --silent --show-error --max-time 5 --unix-socket "$LOCAL_API_SOCKET" \
   http://localhost/livez \
   | grep -q '"status":"ok"'

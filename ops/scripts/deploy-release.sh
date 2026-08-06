@@ -10,7 +10,9 @@ SOURCE_SHA="${2:?source SHA required}"
 BASE="${UNIHUB_INSIGHT_BASE:-/opt/unihub-insight}"
 RELEASE="$BASE/releases/$SOURCE_SHA"
 CURRENT="$BASE/current"
+SCHEMA_CURRENT="$BASE/schema-current"
 PREVIOUS=""
+SCHEMA_PREVIOUS=""
 if [[ -L "$CURRENT" ]]; then
   PREVIOUS="$(readlink -f "$CURRENT" 2>/dev/null || true)"
   [[ -n "$PREVIOUS" && -d "$PREVIOUS" && "$PREVIOUS" != "$CURRENT" ]] || {
@@ -19,6 +21,16 @@ if [[ -L "$CURRENT" ]]; then
   }
 elif [[ -e "$CURRENT" ]]; then
   echo "active release path is not a symlink: $CURRENT" >&2
+  exit 1
+fi
+if [[ -L "$SCHEMA_CURRENT" ]]; then
+  SCHEMA_PREVIOUS="$(readlink -f "$SCHEMA_CURRENT" 2>/dev/null || true)"
+  [[ -n "$SCHEMA_PREVIOUS" && -d "$SCHEMA_PREVIOUS" && "$SCHEMA_PREVIOUS" != "$SCHEMA_CURRENT" ]] || {
+    echo "schema release symlink is invalid: $SCHEMA_CURRENT" >&2
+    exit 1
+  }
+elif [[ -e "$SCHEMA_CURRENT" ]]; then
+  echo "schema release path is not a symlink: $SCHEMA_CURRENT" >&2
   exit 1
 fi
 
@@ -104,11 +116,40 @@ find "$RELEASE" -type f \( -path '*/bin/*' -o -name '*.sh' \) -exec chmod 0750 {
 docker exec unihub-caddy caddy validate \
   --config /etc/caddy/Caddyfile --adapter caddyfile
 
-ln -sfn "$RELEASE" "$BASE/current.next"
-mv -Tf "$BASE/current.next" "$CURRENT"
 systemctl daemon-reload
+migrate_workdir="$(systemctl show --property=WorkingDirectory --value unihub-insight-migrate.service)"
+migrate_exec="$(systemctl show --property=ExecStart --value unihub-insight-migrate.service)"
+[[ "$migrate_workdir" == "$SCHEMA_CURRENT" ]] || {
+  echo "migration unit must use the forward schema release: $SCHEMA_CURRENT" >&2
+  exit 1
+}
+grep -Fq "$SCHEMA_CURRENT/apps/api/.venv/bin/python" <<<"$migrate_exec"
+
+# Upgrade the legacy single-symlink topology before touching the database.
+if [[ -z "$SCHEMA_PREVIOUS" && -n "$PREVIOUS" ]]; then
+  ln -sfn "$PREVIOUS" "$BASE/schema-current.next"
+  mv -Tf "$BASE/schema-current.next" "$SCHEMA_CURRENT"
+  SCHEMA_PREVIOUS="$PREVIOUS"
+fi
+
+activate_candidate() {
+  ln -sfn "$RELEASE" "$BASE/schema-current.next"
+  mv -Tf "$BASE/schema-current.next" "$SCHEMA_CURRENT"
+  ln -sfn "$RELEASE" "$BASE/current.next"
+  mv -Tf "$BASE/current.next" "$CURRENT"
+}
+
+MIGRATION_MAY_HAVE_STARTED=false
 
 restore_previous() {
+  if [[ "$MIGRATION_MAY_HAVE_STARTED" == false ]]; then
+    if [[ -n "$SCHEMA_PREVIOUS" ]]; then
+      ln -sfn "$SCHEMA_PREVIOUS" "$BASE/schema-current.next"
+      mv -Tf "$BASE/schema-current.next" "$SCHEMA_CURRENT"
+    else
+      [[ ! -L "$SCHEMA_CURRENT" ]] || unlink "$SCHEMA_CURRENT"
+    fi
+  fi
   if [[ -n "$PREVIOUS" ]]; then
     if bash "$CURRENT/ops/scripts/check-release-migrations.sh" "$PREVIOUS"; then
       ln -sfn "$PREVIOUS" "$BASE/current.next"
@@ -126,6 +167,12 @@ restore_previous() {
   fi
 }
 
+# The backup must complete before the forward-only schema pointer advances.
+# A first installation needs an active path so its current-based backup unit
+# can run; a failed backup restores both pointers before any migration starts.
+if [[ -z "$PREVIOUS" ]]; then
+  activate_candidate
+fi
 if ! systemctl start unihub-insight-backup.service; then
   restore_previous
   exit 1
@@ -134,7 +181,11 @@ if ! systemctl enable --now unihub-insight-backup.timer; then
   restore_previous
   exit 1
 fi
+if [[ -n "$PREVIOUS" ]]; then
+  activate_candidate
+fi
 # Restarting the API starts and waits for its required ordered migration unit.
+MIGRATION_MAY_HAVE_STARTED=true
 if ! systemctl restart unihub-insight-api.service; then
   restore_previous
   exit 1

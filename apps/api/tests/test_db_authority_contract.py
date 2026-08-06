@@ -65,3 +65,17 @@ def test_rollback_compatibility_allowlist_pins_the_exact_additive_migration() ->
     assert f"004_query_audit_xlsx.sql|{checksum}|" in manifest
     assert 'compatible_checksum" == "$expected_checksum' in compatibility
     assert "target release accepts backward-compatible applied migration" in compatibility
+
+
+def test_forward_schema_runner_survives_code_rollback() -> None:
+    unit = (ROOT / "ops/systemd/unihub-insight-migrate.service").read_text(encoding="utf-8")
+    deploy = (ROOT / "ops/scripts/deploy-release.sh").read_text(encoding="utf-8")
+    preflight = (ROOT / "ops/scripts/preflight.sh").read_text(encoding="utf-8")
+    rollback = (ROOT / "ops/scripts/rollback.sh").read_text(encoding="utf-8")
+
+    assert "WorkingDirectory=/opt/unihub-insight/schema-current" in unit
+    assert "ExecStart=/opt/unihub-insight/schema-current/apps/api/.venv/bin/python" in unit
+    assert 'SCHEMA_CURRENT="$BASE/schema-current"' in deploy
+    assert deploy.index("unihub-insight-backup.service") < deploy.index("MIGRATION_MAY_HAVE_STARTED=true")
+    assert '"$SCHEMA_RELEASE/apps/api/.venv/bin/python" ops/scripts/migrate.py --check' in preflight
+    assert "schema-current" not in rollback
