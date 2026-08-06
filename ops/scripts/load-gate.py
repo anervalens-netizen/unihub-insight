@@ -38,6 +38,7 @@ def widget(
     visualization: str,
     dimensions: list[str],
 ) -> dict[str, Any]:
+    comparisons = ["previous-year"] if "time" in dimensions else []
     return {
         "widget_id": widget_id,
         "module": module,
@@ -47,7 +48,7 @@ def widget(
         "dimensions": dimensions,
         "time_grain": "month",
         "filters": {},
-        "comparisons": ["previous-year", "target"],
+        "comparisons": comparisons,
         "sort": [],
         "limit": 100,
         "visualization": visualization,

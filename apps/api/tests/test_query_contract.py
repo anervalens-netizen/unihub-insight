@@ -1,10 +1,14 @@
+import runpy
 from io import BytesIO
+from pathlib import Path
 from zipfile import ZipFile
 
 from fastapi.testclient import TestClient
 
 from unihub_insight_api.api.routes.query import _safe_csv_value
 from unihub_insight_api.domain import SourceStatus
+
+ROOT = Path(__file__).resolve().parents[3]
 
 
 def widget(
@@ -408,6 +412,21 @@ def test_batch_rejects_a_time_range_outside_the_common_snapshot(client: TestClie
 
     assert response.status_code == 200
     assert response.json()["results"][0]["error"]["code"] == "invalid-query"
+
+
+def test_production_load_fixture_stays_valid_against_the_metric_catalog(client: TestClient) -> None:
+    load_gate = runpy.run_path(str(ROOT / "ops/scripts/load-gate.py"))
+    payload = load_gate["mixed_dashboard"]()
+
+    response = client.post(
+        "/api/v1/query/batch",
+        params={"period": "2026-08"},
+        json=payload,
+    )
+
+    assert response.status_code == 200
+    errors = [result["error"] for result in response.json()["results"] if result["error"]]
+    assert all(error["code"] == "unavailable" for error in errors)
 
 
 def test_dashboard_ceiling_applies_to_widget_filter_overrides(client: TestClient) -> None:
