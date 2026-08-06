@@ -57,10 +57,17 @@ def decimal(value: Any) -> Decimal:
 
 
 def metric_value(items: list[Any], metric_id: str) -> Decimal:
+    value = optional_metric_value(items, metric_id)
+    if value is not None:
+        return value
+    raise RuntimeError(f"Missing metric {metric_id}")
+
+
+def optional_metric_value(items: list[Any], metric_id: str) -> Decimal | None:
     for item in items:
         if item.id == metric_id:
             return decimal(item.value)
-    raise RuntimeError(f"Missing metric {metric_id}")
+    return None
 
 
 async def control_totals(
@@ -192,7 +199,7 @@ async def specialized_differences(
     required_domains = {"campaigns", "workforce", "finance", "planning"}
     if not (scope.regional or scope.asm or scope.stores):
         required_domains.add("compensation")
-    unavailable_domains = tuple(sorted(required_domains - eligible_domains))
+    unavailable_domains = set(required_domains - eligible_domains)
     params: list[Any] = [scope.period]
     scope_clauses = append_reporting_scope(
         scope, alias="row", params=params, include_agent=False
@@ -278,12 +285,15 @@ async def specialized_differences(
             ("planning", ModuleId.PLANNING),
             ("compensation", ModuleId.COMPENSATION),
         )
-        if domain in eligible_domains and (domain != "compensation" or compensation is not None)
+        if domain in eligible_domains
+        and (domain != "compensation" or compensation is not None)
     ]
     responses = await asyncio.gather(
         *(repository.get_module(module, scope) for _, module in requested_modules)
     )
-    modules = {domain: response for (domain, _), response in zip(requested_modules, responses)}
+    modules = {
+        domain: response for (domain, _), response in zip(requested_modules, responses)
+    }
     differences: dict[str, Decimal] = {}
     campaigns = modules.get("campaigns")
     if campaigns is not None:
@@ -323,11 +333,20 @@ async def specialized_differences(
         )
     planning_module = modules.get("planning")
     if planning_module is not None:
-        differences["planning.forecast"] = metric_value(
+        planning_forecast = optional_metric_value(
             planning_module.kpis, "planning.forecast"
-        ) - decimal(planning["forecast"] if planning else None)
-    if planning_module is not None and planning and any(
-        item.id == "planning.target_gap" for item in planning_module.kpis
+        )
+        if planning_forecast is None:
+            unavailable_domains.add("planning")
+        else:
+            differences["planning.forecast"] = planning_forecast - decimal(
+                planning["forecast"] if planning else None
+            )
+    if (
+        planning_module is not None
+        and "planning" not in unavailable_domains
+        and planning
+        and any(item.id == "planning.target_gap" for item in planning_module.kpis)
     ):
         expected_gap = decimal(planning["forecast"]) - decimal(planning["target"])
         differences["planning.target_gap"] = (
@@ -351,7 +370,7 @@ async def specialized_differences(
                 - decimal(compensation["median_salary"]),
             }
         )
-    return differences, unavailable_domains
+    return differences, tuple(sorted(unavailable_domains))
 
 
 def explicit_scope(arguments: argparse.Namespace) -> AnalyticsScope:
