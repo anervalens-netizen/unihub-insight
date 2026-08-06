@@ -95,8 +95,23 @@
   display: grid;
   height: 100%;
   min-height: 0;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 6px;
+}
+
+.module-distribution-controls {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+}
+
+.module-distribution-controls .chart-type-selector {
+  position: static;
+}
+
+.module-distribution-note {
+  color: var(--text-muted);
+  font-size: 9px;
 }
 
 .module-distribution-stats {

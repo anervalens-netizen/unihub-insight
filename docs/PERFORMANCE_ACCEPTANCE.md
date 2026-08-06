@@ -50,9 +50,9 @@ Chart POC also measures ECharts bundle/chunk, first render, resize, frame time a
 
 The reproducible Chromium case in `apps/web/e2e/critical-surfaces.spec.ts` renders a 10-widget Regional Manager dashboard with a 3,600-cell heatmap and a 5,000-point scatter, then performs 20 width changes and three Configurare ↔ Vizualizare remount cycles. The gate is first render <8,000 ms, resize blocking p95 <200 ms and post-GC heap growth <64 MiB.
 
-Latest focused evidence on the specialization candidate: first render 7,366.7 ms, resize blocking p95 161.2 ms and heap growth 19,212,223 bytes after three remounts, all inside the 8,000 ms / 200 ms / 64 MiB gates. Canvas remains the supported renderer; this synthetic pass does not authorize SVG and does not count toward the production RUM gate.
+Latest focused evidence on the specialization candidate: first render 7,130.2 ms, resize blocking p95 158.0 ms and heap growth 16,853,453 bytes after three remounts, all inside the 8,000 ms / 200 ms / 64 MiB gates. Canvas remains the supported renderer; this synthetic pass does not authorize SVG and does not count toward the production RUM gate.
 
-Reproducible functional browser coverage runs with `npm run browser:qa`; the current candidate passes 49/49. It does not replace the production RUM/load gate or owner visual acceptance.
+Reproducible functional browser coverage runs with `npm run browser:qa`; the current candidate passes 50/50, including the histogram↔boxplot same-sample toggle. It does not replace the production RUM/load gate or owner visual acceptance.
 
 Run the bounded synthetic API/concurrency probe on the primary against the private UDS, after loading the root-only runtime environment without printing it:
 

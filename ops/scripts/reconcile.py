@@ -70,6 +70,34 @@ def optional_metric_value(items: list[Any], metric_id: str) -> Decimal | None:
     return None
 
 
+def visit_metric_differences(
+    control: dict[str, Any],
+    performance: Any,
+) -> dict[str, Decimal]:
+    visits = performance.visits
+    kpis = visits.kpis if visits is not None else []
+    expected_present = decimal(control["total_visits"]) > 0
+    actual_present = bool(kpis)
+    differences = {
+        "visits.presence": Decimal(int(actual_present)) - Decimal(int(expected_present))
+    }
+    if not actual_present:
+        return differences
+    differences.update(
+        {
+            "visits.total": metric_value(kpis, "visits.total")
+            - decimal(control["total_visits"]),
+            "visits.distinct_stores": metric_value(kpis, "visits.distinct_stores")
+            - decimal(control["distinct_stores"]),
+            "visits.avg_completion": metric_value(kpis, "visits.avg_completion")
+            - decimal(control["avg_completion"]),
+            "visits.checklist_score": metric_value(kpis, "visits.checklist_score")
+            - decimal(control["checklist_score"]),
+        }
+    )
+    return differences
+
+
 async def control_totals(
     pool: asyncpg.Pool,
     scope: AnalyticsScope,
@@ -196,7 +224,13 @@ async def specialized_differences(
         for domain, source in snapshot.sources.items()
         if source.status.value != "unavailable"
     }
-    required_domains = {"campaigns", "workforce", "finance", "planning"}
+    required_domains = {
+        "campaigns",
+        "workforce",
+        "finance",
+        "planning",
+        "visits",
+    }
     if not (scope.regional or scope.asm or scope.stores):
         required_domains.add("compensation")
     unavailable_domains = set(required_domains - eligible_domains)
@@ -244,6 +278,29 @@ async def specialized_differences(
             """,
             *params,
         )
+        visits = await connection.fetchrow(
+            f"""
+            SELECT COALESCE(SUM(row.total_visits), 0)::numeric AS total_visits,
+                   COUNT(DISTINCT row.site_code)::numeric AS distinct_stores,
+                   COALESCE(ROUND(
+                       SUM(row.avg_completion * row.total_visits)
+                           FILTER (WHERE row.avg_completion IS NOT NULL)
+                       / NULLIF(SUM(row.total_visits)
+                           FILTER (WHERE row.avg_completion IS NOT NULL), 0),
+                       2
+                   ), 0) AS avg_completion,
+                   COALESCE(ROUND(
+                       SUM(row.checklist_score * row.total_visits)
+                           FILTER (WHERE row.checklist_score IS NOT NULL)
+                       / NULLIF(SUM(row.total_visits)
+                           FILTER (WHERE row.checklist_score IS NOT NULL), 0),
+                       2
+                   ), 0) AS checklist_score
+            FROM reporting_visit_month_v2 row
+            WHERE row.period = $1 AND {scope_sql}
+            """,
+            *params,
+        )
         finance_rows = await connection.fetch(
             f"""
             SELECT row.category_code, COALESCE(SUM(row.amount), 0) AS amount
@@ -283,6 +340,7 @@ async def specialized_differences(
             ("workforce", ModuleId.WORKFORCE),
             ("finance", ModuleId.FINANCE),
             ("planning", ModuleId.PLANNING),
+            ("visits", ModuleId.PERFORMANCE),
             ("compensation", ModuleId.COMPENSATION),
         )
         if domain in eligible_domains
@@ -318,6 +376,9 @@ async def specialized_differences(
         differences["workforce.headcount"] = metric_value(
             workforce_module.kpis, "workforce.headcount"
         ) - decimal(workforce["headcount"] if workforce else None)
+    performance_module = modules.get("visits")
+    if performance_module is not None and visits is not None:
+        differences.update(visit_metric_differences(dict(visits), performance_module))
     finance_module = modules.get("finance")
     if finance_module is not None:
         finance_control = finance_metrics(

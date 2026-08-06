@@ -6,6 +6,7 @@ import type {
   MetricDefinition,
   QueryDataset,
 } from '../../features/query/schemas';
+import { buildHistogramBins, summarizeDistribution } from './distribution';
 
 export type ChartRenderer = 'canvas';
 
@@ -410,50 +411,33 @@ function histogramOption(
   const minimum = Math.min(...values);
   const maximum = Math.max(...values);
   if (minimum === maximum) return null;
-  const binCount = Math.min(20, Math.max(4, Math.ceil(Math.sqrt(values.length))));
-  const width = (maximum - minimum) / binCount;
-  const counts = Array.from({ length: binCount }, () => 0);
-  for (const value of values) {
-    const index = Math.min(binCount - 1, Math.floor((value - minimum) / width));
-    counts[index] = (counts[index] ?? 0) + 1;
-  }
-  const labels = counts.map((_count, index) => {
-    const start = minimum + index * width;
-    const end = start + width;
-    return `${start.toLocaleString('ro-RO', { maximumFractionDigits: 1 })}–${end.toLocaleString('ro-RO', { maximumFractionDigits: 1 })}`;
-  });
+  const bins = buildHistogramBins(values, { minimumBins: 4, maximumBins: 20 });
+  const labels = bins.map(
+    (bin) =>
+      `${bin.start.toLocaleString('ro-RO', { maximumFractionDigits: 1 })}–${bin.end.toLocaleString('ro-RO', { maximumFractionDigits: 1 })}`,
+  );
   return {
     aria: { enabled: true, decal: { show: true } },
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, confine: true },
     grid: { top: 22, right: 18, bottom: 58, left: 52, containLabel: true },
     xAxis: { type: 'category', data: labels, axisLabel: { rotate: 30 } },
     yAxis: { type: 'value', name: 'Frecvență', minInterval: 1 },
-    series: [{ type: 'bar', name: metric.display_name, data: counts, barCategoryGap: '4%' }],
+    series: [
+      {
+        type: 'bar',
+        name: metric.display_name,
+        data: bins.map((bin) => bin.count),
+        barCategoryGap: '4%',
+      },
+    ],
   } as EChartsCoreOption;
 }
 
-function quantile(sorted: readonly number[], fraction: number): number {
-  const index = (sorted.length - 1) * fraction;
-  const lower = Math.floor(index);
-  const upper = Math.ceil(index);
-  const lowerValue = sorted[lower] ?? 0;
-  const upperValue = sorted[upper] ?? lowerValue;
-  return lowerValue + (upperValue - lowerValue) * (index - lower);
-}
-
 function boxplotOption(dataset: QueryDataset, metric: MetricDefinition): EChartsCoreOption | null {
-  const values = finiteValues(dataset).sort((left, right) => left - right);
+  const values = finiteValues(dataset);
   if (values.length < 5) return null;
-  const q1 = quantile(values, 0.25);
-  const median = quantile(values, 0.5);
-  const q3 = quantile(values, 0.75);
-  const iqr = q3 - q1;
-  const lowFence = q1 - 1.5 * iqr;
-  const highFence = q3 + 1.5 * iqr;
-  const whiskerLow = values.find((value) => value >= lowFence) ?? values[0] ?? 0;
-  const whiskerHigh =
-    [...values].reverse().find((value) => value <= highFence) ?? values.at(-1) ?? 0;
-  const outliers = values.filter((value) => value < whiskerLow || value > whiskerHigh);
+  const summary = summarizeDistribution(values);
+  if (!summary) return null;
   return {
     aria: { enabled: true, decal: { show: true } },
     tooltip: { trigger: 'item', confine: true },
@@ -464,9 +448,13 @@ function boxplotOption(dataset: QueryDataset, metric: MetricDefinition): ECharts
       {
         type: 'boxplot',
         name: metric.display_name,
-        data: [[whiskerLow, q1, median, q3, whiskerHigh]],
+        data: [[summary.whiskerLow, summary.q1, summary.median, summary.q3, summary.whiskerHigh]],
       },
-      { type: 'scatter', name: 'Outliers', data: outliers.map((value) => [0, value]) },
+      {
+        type: 'scatter',
+        name: 'Outliers',
+        data: summary.outliers.map((value) => [0, value]),
+      },
     ],
   } as EChartsCoreOption;
 }

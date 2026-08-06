@@ -173,6 +173,27 @@ test('native modules render their specialized analytical forms', async ({ page }
   expect(errors).toEqual([]);
 });
 
+test('distribution reuses one eligible sample for histogram and box plot', async ({ page }) => {
+  const errors = collectRuntimeErrors(page);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('/performance?period=2026-08&range=12&subview=consistency');
+
+  const widget = page.locator('[gs-id="histogram"]');
+  const statistics = widget.locator('.module-distribution-stats');
+  const statisticsText = await statistics.textContent();
+  const histogram = widget.getByRole('button', { name: 'Histogramă', exact: true });
+  const boxplot = widget.getByRole('button', { name: 'Box plot', exact: true });
+  await expect(histogram).toHaveAttribute('aria-pressed', 'true');
+  await expect(boxplot).toBeVisible();
+  await boxplot.click();
+
+  await expect(boxplot).toHaveAttribute('aria-pressed', 'true');
+  await expect(widget.getByRole('img', { name: /Box plot Realizare target/ })).toBeVisible();
+  expect(await statistics.textContent()).toBe(statisticsText);
+  await page.goto('about:blank');
+  expect(errors).toEqual([]);
+});
+
 for (const width of [1180, 1440, 1920, 2560]) {
   for (const theme of ['light', 'dark'] as const) {
     for (const density of ['comfortable', 'compact'] as const) {

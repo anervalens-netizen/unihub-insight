@@ -18,7 +18,7 @@ Finance and Planning do not accept agent scope. Compensation is visible only wit
 - **Planning** — actual, forecast, target gap and forecast accuracy.
 - **Custom** — personal and shared dashboards assembled from governed metrics.
 
-În RC1, Sales–Planning au sub-view-uri și rețete distincte. Pace, ranking, scatter, histogramă, waterfall reconciliat, forecast și Calendar au forme native; fiecare folosește același contract pentru inspect/export. Fiecare tab afișează `LIVE`, `PARTIAL` sau `UNAVAILABLE` din metadata sursei; un mecanism fără contract nu este înlocuit cu altă metrică. Click-ul pe entități actualizează drill-ul din URL și reload-ul reproduce selecția.
+În RC1, Sales–Planning au sub-view-uri și rețete distincte. Pace, ranking, scatter, histogramă/boxplot, waterfall reconciliat, forecast și Calendar au forme native; fiecare folosește același contract pentru inspect/export. Distribuția comută între histogramă și boxplot fără alt fetch sau alt eșantion; sub cinci agregate eligibile rămâne numai histograma. Fiecare tab afișează `LIVE`, `PARTIAL` sau `UNAVAILABLE` din metadata sursei; un mecanism fără contract nu este înlocuit cu altă metrică. Click-ul pe entități actualizează drill-ul din URL și reload-ul reproduce selecția.
 
 ## Dashboard interaction
 

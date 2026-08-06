@@ -1,7 +1,13 @@
 import type { EChartsCoreOption } from 'echarts/core';
-import { useMemo } from 'react';
-
+import { useMemo, useState } from 'react';
+import { ChartTypeSelector } from '../../components/charts/ChartTypeSelector';
 import { chartRangeEventToMonthRange, resolveChartSpec } from '../../components/charts/chart-spec';
+import {
+  BOXPLOT_MIN_SAMPLE_SIZE,
+  buildHistogramBins,
+  finiteSortedValues,
+  summarizeDistribution,
+} from '../../components/charts/distribution';
 import { EChart, type EChartEvent } from '../../components/charts/EChart';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { formatCurrency, formatPercent } from '../../lib/format';
@@ -13,16 +19,6 @@ import {
   useModuleUrlStateReset,
 } from './context';
 import { moduleEntityDimension } from './interactions';
-
-function quantile(sortedValues: readonly number[], percentile: number): number {
-  if (sortedValues.length === 0) return 0;
-  const position = (sortedValues.length - 1) * percentile;
-  const lowerIndex = Math.floor(position);
-  const upperIndex = Math.ceil(position);
-  const lower = sortedValues[lowerIndex] ?? 0;
-  const upper = sortedValues[upperIndex] ?? lower;
-  return lower + (upper - lower) * (position - lowerIndex);
-}
 
 export function ModulePaceWidget() {
   const data = useModuleData();
@@ -427,6 +423,7 @@ export function ModulePlanningAccuracyWidget() {
 
 export function ModuleHistogramWidget() {
   const data = useModuleData();
+  const [requestedType, setRequestedType] = useState<'histogram' | 'boxplot'>('histogram');
   const profile =
     data.module === 'performance'
       ? {
@@ -439,54 +436,53 @@ export function ModuleHistogramWidget() {
           unit: 'currency' as const,
           values: data.breakdown.map((row) => row.secondary),
         };
-  const values = useMemo(
-    () =>
-      profile.values
-        .filter(
-          (value): value is number =>
-            value !== null && value !== undefined && Number.isFinite(value),
-        )
-        .sort((left, right) => left - right),
-    [profile.values],
-  );
-  const statistics = useMemo(() => {
-    const q1 = quantile(values, 0.25);
-    const median = quantile(values, 0.5);
-    const q3 = quantile(values, 0.75);
-    const iqr = q3 - q1;
-    const lowerFence = q1 - iqr * 1.5;
-    const upperFence = q3 + iqr * 1.5;
-    return {
-      q1,
-      median,
-      q3,
-      outliers: values.filter((value) => value < lowerFence || value > upperFence).length,
-    };
-  }, [values]);
-  const bins = useMemo(() => {
-    if (values.length === 0) return [];
-    const minimum = Math.min(...values);
-    const maximum = Math.max(...values);
-    const count = Math.min(8, Math.max(1, Math.ceil(Math.sqrt(values.length))));
-    if (minimum === maximum) {
-      return [{ start: minimum, end: maximum, count: values.length }];
-    }
-    const width = (maximum - minimum) / count;
-    const result = Array.from({ length: count }, (_, index) => ({
-      start: minimum + width * index,
-      end: index === count - 1 ? maximum : minimum + width * (index + 1),
-      count: 0,
-    }));
-    for (const value of values) {
-      const index = Math.min(count - 1, Math.floor((value - minimum) / width));
-      const bin = result[index];
-      if (bin) bin.count += 1;
-    }
-    return result;
-  }, [values]);
+  const values = useMemo(() => finiteSortedValues(profile.values), [profile.values]);
+  const statistics = useMemo(() => summarizeDistribution(values), [values]);
+  const bins = useMemo(() => buildHistogramBins(values), [values]);
+  const canRenderBoxplot = values.length >= BOXPLOT_MIN_SAMPLE_SIZE;
+  const activeType = requestedType === 'boxplot' && canRenderBoxplot ? 'boxplot' : 'histogram';
   const option = useMemo<EChartsCoreOption>(() => {
-    const formatBin = (value: number): string =>
+    const formatValue = (value: number): string =>
       profile.unit === 'percent' ? formatPercent(value) : formatCurrency(value, true);
+    if (activeType === 'boxplot' && statistics) {
+      return {
+        animationDuration: 220,
+        aria: {
+          enabled: true,
+          description: `Box plot ${profile.label}, calculat pe același set de agregate ca histograma.`,
+        },
+        grid: { top: 18, right: 18, bottom: 40, left: 64, containLabel: true },
+        tooltip: { trigger: 'item', confine: true },
+        xAxis: { type: 'category', data: [profile.label] },
+        yAxis: {
+          type: 'value',
+          axisLabel: { color: '#64748b', fontSize: 9, formatter: formatValue },
+          splitLine: { lineStyle: { color: '#e7edf5', type: 'dashed' } },
+        },
+        series: [
+          {
+            type: 'boxplot',
+            name: profile.label,
+            data: [
+              [
+                statistics.whiskerLow,
+                statistics.q1,
+                statistics.median,
+                statistics.q3,
+                statistics.whiskerHigh,
+              ],
+            ],
+            itemStyle: { color: '#c7d2fe', borderColor: '#4f46e5', borderWidth: 2 },
+          },
+          {
+            type: 'scatter',
+            name: 'Outlieri IQR',
+            data: statistics.outliers.map((value) => [0, value]),
+            itemStyle: { color: '#e11d48' },
+          },
+        ],
+      };
+    }
     return {
       animationDuration: 220,
       aria: {
@@ -502,8 +498,8 @@ export function ModuleHistogramWidget() {
         nameGap: 31,
         data: bins.map((bin) =>
           bin.start === bin.end
-            ? formatBin(bin.start)
-            : `${formatBin(bin.start)}–${formatBin(bin.end)}`,
+            ? formatValue(bin.start)
+            : `${formatValue(bin.start)}–${formatValue(bin.end)}`,
         ),
         axisLabel: { color: '#64748b', fontSize: 8, rotate: bins.length > 5 ? 24 : 0 },
       },
@@ -522,14 +518,28 @@ export function ModuleHistogramWidget() {
         },
       ],
     };
-  }, [bins, profile.label, profile.unit]);
+  }, [activeType, bins, profile.label, profile.unit, statistics]);
   if (bins.length === 0) {
     return <EmptyState message="Nu există suficiente agregate eligibile pentru distribuție." />;
   }
+  if (!statistics) return null;
   const formatStatistic = (value: number): string =>
     profile.unit === 'percent' ? formatPercent(value) : formatCurrency(value, true);
   return (
     <div className="module-distribution-widget">
+      <div className="module-distribution-controls">
+        <ChartTypeSelector
+          value={activeType}
+          options={canRenderBoxplot ? ['histogram', 'boxplot'] : ['histogram']}
+          onChange={setRequestedType}
+          label="Vizualizare distribuție"
+        />
+        {!canRenderBoxplot ? (
+          <span className="module-distribution-note" role="status">
+            Box plot disponibil de la {BOXPLOT_MIN_SAMPLE_SIZE} agregate eligibile.
+          </span>
+        ) : null}
+      </div>
       <dl className="module-distribution-stats" aria-label="Statistici distribuție">
         <div>
           <dt>n</dt>
@@ -547,14 +557,14 @@ export function ModuleHistogramWidget() {
         </div>
         <div>
           <dt>Outlieri IQR</dt>
-          <dd>{statistics.outliers}</dd>
+          <dd>{statistics.outliers.length}</dd>
         </div>
       </dl>
       <EChart
         option={option}
         className="chart--fill"
-        ariaLabel={`Histogramă ${profile.label}`}
-        pngExport={{ filename: `${data.module}-${data.meta.period}-histogram`, pixelRatio: 2 }}
+        ariaLabel={`${activeType === 'boxplot' ? 'Box plot' : 'Histogramă'} ${profile.label}`}
+        pngExport={{ filename: `${data.module}-${data.meta.period}-${activeType}`, pixelRatio: 2 }}
       />
     </div>
   );
