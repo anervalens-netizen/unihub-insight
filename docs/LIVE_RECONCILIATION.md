@@ -26,9 +26,9 @@ mechanism totals.
 | Promo `promotie-actuala-mihai` / network | 190,544.58 | 1,090 | 42 | 76 | discount 21,991.08 |
 | Promo / Mobiup | 98,880.60 | 526 | 40 | 36 | discount 11,664.26 |
 | Promo / MobiCell | 91,663.98 | 564 | 37 | 40 | discount 10,326.82 |
-| Incentive campaign `5` / network | 2,803,358.98 | 29,107 | 877 | 76 | reward 76,367.50 |
-| Incentive / Mobiup | 1,371,590.36 | 14,006 | 838 | 36 | reward 33,105.00 |
-| Incentive / MobiCell | 1,431,768.62 | 15,101 | 809 | 40 | reward 43,262.50 |
+| Incentive campaign `5` / network | 2,803,358.98 | 29,107 | 877 | 40 | reward 76,367.50 |
+| Incentive / Mobiup | 1,371,590.36 | 14,006 | 838 | 18 | reward 33,105.00 |
+| Incentive / MobiCell | 1,431,768.62 | 15,101 | 809 | 22 | reward 43,262.50 |
 
 Promo discounted units are 646 network / 302 Mobiup / 344 MobiCell.
 Incentive eligible quantity is 27,549 and qualified quantity is 17,792;
