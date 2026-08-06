@@ -42,6 +42,19 @@ def test_metadata_backup_and_restore_enter_only_the_insight_schema_owner() -> No
         assert "--role=unihub_insight_schema_owner" in script
 
 
+def test_metadata_backup_publishes_an_atomic_verified_offhost_copy() -> None:
+    script = (ROOT / "ops/scripts/backup-metadata.sh").read_text(encoding="utf-8")
+    unit = (ROOT / "ops/systemd/unihub-insight-backup.service").read_text(encoding="utf-8")
+    deploy = (ROOT / "ops/scripts/deploy-release.sh").read_text(encoding="utf-8")
+
+    assert "OFFHOST_PARTIAL" in script
+    assert 'mv -f "$OFFHOST_PARTIAL" "$OFFHOST_FILE"' in script
+    assert "off-host backup checksum mismatch" in script
+    assert "RequiresMountsFor=/mnt/nas" in unit
+    assert "/mnt/nas/backups/server-68/unihub-insight" in unit
+    assert deploy.count("systemctl start unihub-insight-backup.service") == 2
+
+
 def test_readiness_is_private_and_rollback_checks_migration_compatibility_first() -> None:
     caddy = (ROOT / "ops/caddy/unihub-insight.caddy.template").read_text(encoding="utf-8")
     rollback = (ROOT / "ops/scripts/rollback.sh").read_text(encoding="utf-8")

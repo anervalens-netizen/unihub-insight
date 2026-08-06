@@ -35,7 +35,11 @@ The API unit loads only the first; migrations and backups use only the second.
 The API listens only on `/run/unihub-insight/api.sock`; PostgreSQL is the
 Docker container `unihub_postgres` published to host `127.0.0.1:5432`.
 Metadata backup/restore runs PostgreSQL 18's `pg_dump`/`pg_restore` inside that
-container, avoiding host-client version drift.
+container, avoiding host-client version drift. The backup unit writes locally
+and then atomically publishes the same verified bytes under
+`/mnt/nas/backups/server-68/unihub-insight`; provision that directory before
+installing the unit. Deploy runs one backup before migration and another after
+the active release passes smoke.
 
 `/opt/unihub-insight/current` selects the application release. The separate
 `/opt/unihub-insight/schema-current` pointer only advances on deploy and drives

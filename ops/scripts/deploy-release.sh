@@ -195,6 +195,12 @@ if ! bash "$CURRENT/ops/scripts/smoke.sh"; then
   restore_previous
   exit 1
 fi
+# The first backup protects the pre-migration state. This second run proves
+# that the active release can produce its own local and off-host metadata copy.
+if ! systemctl start unihub-insight-backup.service; then
+  restore_previous
+  exit 1
+fi
 
 while IFS= read -r old_release; do
   [[ "$old_release" == "$BASE/releases/"* ]] || {

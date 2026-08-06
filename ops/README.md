@@ -76,7 +76,9 @@ migration service.
 
 Run `backup-metadata.sh` before every migration and daily afterward. It enters
 the isolated schema owner through PostgreSQL's `--role` option, keeps 30 days
-by default, and never reads Retail business data. `restore-metadata.sh`
+by default, and never reads Retail business data. Production passes the NAS
+destination as the third argument, publishes through a `.partial` file and
+verifies identical SHA-256 bytes. `restore-metadata.sh`
 requires `--confirm`, stops the API, restores only schema `insight`, restarts
 and runs smoke checks.
 
