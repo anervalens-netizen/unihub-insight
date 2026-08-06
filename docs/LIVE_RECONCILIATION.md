@@ -4,6 +4,17 @@
 
 Prove that UniHub Insight presents the same business truth as UniHub Retail for identical period and scope. Visual similarity is not acceptance; control totals must match.
 
+## Latest production evidence — 2026-08-06
+
+The bounded representative matrix passes 30/30 scopes: 15 for the closed
+month 2026-07 and 15 for the current month 2026-08. Every Sales, Target,
+Campaigns, Workforce and eligible Visits control difference is zero, including
+the official weighted Visits completion/checklist grain. Compensation, Finance
+and Planning remain explicitly unavailable where Retail has no eligible
+approved generation or head; reconciliation does not convert that absence to
+zero. The exact deployed SHA remains independently bound by public
+`build-info.json`, release evidence, preflight and the SLI evaluator.
+
 ## Required samples
 
 Use one finalized month and the current open month. For each, test:
