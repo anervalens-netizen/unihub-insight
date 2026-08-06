@@ -19,7 +19,7 @@ import {
   Sparkles,
   TriangleAlert,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { chartRangeEventToMonthRange } from '../../components/charts/chart-spec';
 import { EChart, type EChartEvent } from '../../components/charts/EChart';
@@ -175,6 +175,14 @@ export function ModuleTrendWidget() {
   const [kind, setKind] = useState<'line' | 'area' | 'bar'>(choices[0] ?? 'line');
   const primaryAxis = data.axes[0];
   const requestedComparisons = data.meta.requested_comparisons ?? [];
+  const firstTrendKey = data.trend[0]?.key ?? '';
+  const lastTrendKey = data.trend.at(-1)?.key ?? '';
+  const [rangeStart, setRangeStart] = useState(firstTrendKey);
+  const [rangeEnd, setRangeEnd] = useState(lastTrendKey);
+  useEffect(() => {
+    setRangeStart(firstTrendKey);
+    setRangeEnd(lastTrendKey);
+  }, [firstTrendKey, lastTrendKey]);
   const option = useMemo<EChartsCoreOption>(() => {
     const axisFormatter = (value: string | number): string =>
       formatValue(Number(value), primaryAxis?.unit ?? 'decimal', true);
@@ -285,6 +293,39 @@ export function ModuleTrendWidget() {
             .map((comparison) => analyticalComparisonLabels[comparison] ?? comparison)
             .join(' · ')}
         </span>
+      ) : null}
+      {data.trend.length > 1 ? (
+        <fieldset className="chart-range-controls">
+          <legend className="sr-only">Selecție interval grafic</legend>
+          <label>
+            De la
+            <select value={rangeStart} onChange={(event) => setRangeStart(event.target.value)}>
+              {data.trend.map((point) => (
+                <option key={`start-${point.key}`} value={point.key}>
+                  {point.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Până la
+            <select value={rangeEnd} onChange={(event) => setRangeEnd(event.target.value)}>
+              {data.trend.map((point) => (
+                <option key={`end-${point.key}`} value={point.key}>
+                  {point.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="button button--ghost"
+            disabled={!rangeStart || !rangeEnd}
+            onClick={() => onUrlRangeChange?.({ start: rangeStart, end: rangeEnd })}
+          >
+            Aplică intervalul
+          </button>
+        </fieldset>
       ) : null}
       <EChart
         option={option}

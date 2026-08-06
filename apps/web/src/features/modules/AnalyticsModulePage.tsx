@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Lock, RefreshCw, RotateCcw, Unlock } from 'lucide-react';
+import { ExternalLink, Lock, RefreshCw, RotateCcw, Unlock } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 
 import { useGlobalSearch, useUpdateGlobalSearch } from '../../app/search-hooks';
@@ -14,6 +14,7 @@ import {
   resetCrossFilterPatch,
 } from '../../lib/cross-filter';
 import { analyticsSearchParams } from '../../lib/download';
+import { environment } from '../../lib/environment';
 import { formatDate, formatMonth } from '../../lib/format';
 import { currentBusinessMonth, parseComparisons, rangeBounds } from '../../lib/search';
 import { useIdentity } from '../identity/context';
@@ -22,6 +23,7 @@ import type { MetricDefinition, WidgetQuery } from '../query/schemas';
 import { moduleAnalyticsQuery } from './api';
 import { ModuleProvider } from './context';
 import { moduleDistributionDimension, moduleEntityDimension } from './interactions';
+import { retailContextUrl } from './retail-link';
 import type { ModuleAnalytics, ModuleId } from './schemas';
 import { type ModuleSubview, moduleSubviewConfig, subviewForId, subviewStatus } from './subviews';
 import { moduleWidgetQuerySpec, moduleWidgets } from './widget-catalog';
@@ -266,6 +268,7 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
   });
   const inspectedQuery = inspectWidget ? widgetQueries.get(inspectWidget) : undefined;
   const inspectedMetric = inspectedQuery ? catalogMetrics.get(inspectedQuery.metric_id) : undefined;
+  const retailUrl = retailContextUrl(environment.retailBaseUrl, module, selectedSubview.id, input);
   const handleUrlState = (event: { dimensionId: string; value: string; label: string | null }) => {
     updateSearch(crossFilterPatch(search.drill, event));
   };
@@ -313,6 +316,16 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
           <span className="meta-chip">Sursă: {data.meta.source}</span>
         </div>
         <div className="overview-actions">
+          <a
+            className="button button--secondary"
+            href={retailUrl}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={`Deschide ${selectedSubview.label} în UniHub Retail cu contextul curent`}
+          >
+            <ExternalLink size={15} />
+            Deschide în Retail
+          </a>
           <ExcelExportButton
             path={`/exports/modules/${module}.xlsx`}
             params={moduleExportParams(input, data.meta.analytical_snapshot_id)}

@@ -265,6 +265,60 @@ test('native trend renders simultaneous comparison contracts', async ({ page }) 
   );
 });
 
+test('native trend applies an exact custom range and survives reload', async ({ page }) => {
+  await page.goto('/sales?period=2026-08&range=12&subview=trend');
+  const controls = page.getByRole('group', { name: 'Selecție interval grafic' });
+  const start = controls.getByLabel('De la');
+  const end = controls.getByLabel('Până la');
+  await expect(start).toBeVisible();
+  await expect.poll(() => start.locator('option').count()).toBeGreaterThan(3);
+  const startValues = await start
+    .locator('option')
+    .evaluateAll((options) => options.map((option) => (option as HTMLOptionElement).value));
+  expect(startValues.length).toBeGreaterThan(3);
+  const selectedStart = startValues[1];
+  const selectedEnd = startValues.at(-2);
+  if (!selectedStart || !selectedEnd)
+    throw new Error('Trendul nu oferă intervalul minim pentru QA.');
+  await start.selectOption(selectedStart);
+  await end.selectOption(selectedEnd);
+  await controls.getByRole('button', { name: 'Aplică intervalul' }).click();
+  await expect.poll(() => new URL(page.url()).searchParams.get('range')).toBe('custom');
+  expect(new URL(page.url()).searchParams.get('start')).toBe(selectedStart);
+  expect(new URL(page.url()).searchParams.get('end')).toBe(selectedEnd);
+  expect(new URL(page.url()).searchParams.get('period')).toBe(selectedEnd);
+  await page.reload();
+  await expect(
+    page.getByRole('group', { name: 'Selecție interval grafic' }).getByLabel('De la'),
+  ).toHaveValue(selectedStart);
+  await expect(page.getByRole('navigation', { name: 'Traseu drill-down' })).toContainText(
+    `${selectedStart} → ${selectedEnd}`,
+  );
+});
+
+test('module contextual Retail link preserves the operational scope', async ({ page }) => {
+  await page.goto(
+    '/sales?period=2026-08&range=custom&start=2026-03&end=2026-08&subview=trend&firm=Mobicell&regional=Nord&stores=S001&agent=Agent%20Test',
+  );
+  const link = page.getByRole('link', { name: /Deschide Trend în UniHub Retail/ });
+  const linkHref = await link.getAttribute('href');
+  if (!linkHref) throw new Error('Deep-link-ul Retail nu are href.');
+  const href = new URL(linkHref);
+  expect(href.origin).toBe('https://retail.unihub.ro');
+  expect(href.pathname).toBe('/hub');
+  expect(Object.fromEntries(href.searchParams)).toMatchObject({
+    source_context: 'insight',
+    section: 'history',
+    period: '2026-08',
+    range_start: '2026-03',
+    range_end: '2026-08',
+    firma: 'Mobicell',
+    rm: 'Nord',
+    magazin: 'S001',
+    agent: 'Agent Test',
+  });
+});
+
 test('drill breadcrumb survives reload and resets URL state', async ({ page }) => {
   await page.goto(
     '/sales?period=2026-08&range=12&comparison=previous-year&stores=S001&drill=store%3AS001%3AMagazin%25201',

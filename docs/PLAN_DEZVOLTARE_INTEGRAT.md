@@ -33,7 +33,7 @@ La 2026-08-05, Retail SHA `a335348c7a2c1bfd27ab587c2ddfb5242c515e51` a publicat 
 | Sales, Performance, Campaigns, Workforce, Compensation, Finance, Planning | PARȚIAL | date live și câte o pagină, dar predominant același șablon generic cu 4 KPI, trend, distribuție, matrice și tabel |
 | Custom Dashboards | PARȚIAL | CRUD în DB, template-uri, layout, metrică/vizualizare și filtre locale; lipsesc configurarea completă, ACL țintit, preseturi, clone și toate interacțiunile |
 | Inspect/export | PARȚIAL | query/inspect/CSV/XLSX server-side unificat pe widgeturi native/custom și PNG sigur; lipsește reconcilierea tuturor surselor oficiale și browser QA complet |
-| Interacțiuni analitice | PARȚIAL | fullscreen/focus trap, keyboard drill/reset, breadcrumb/reload, click semantic pe timp și ierarhia completă, selecție temporală dataZoom și comparații simultane allowlist-uite; lipsește deep-link-ul contextual Retail și browser QA dedicat selecției temporale |
+| Interacțiuni analitice | RC1 | fullscreen/focus trap, keyboard drill/reset, breadcrumb/reload, click semantic pe timp și ierarhia completă, selecție temporală dataZoom/control accesibil, comparații simultane allowlist-uite și deep-link contextual consumat de Retail |
 | Identitate versiune | PARȚIAL | UI indică `v0.5`, în timp ce metadatele pachetelor/API au versiuni mai vechi; versiunea produsului trebuie unificată |
 
 O rută care se încarcă sau un canvas care desenează un grafic nu înseamnă că modulul de business este complet.
@@ -137,7 +137,7 @@ Rendererul implicit rămâne Canvas pentru graficele mari. SVG se acceptă numai
 
 `connectNulls` este `false` implicit: lipsa, zilele viitoare și coverage incomplet nu sunt unite vizual. Pentru scene mari animația se reduce/oprește, iar orice opțiune venită din dashboard este whitelist-uită; nu se acceptă formatter HTML, URL, regex sau funcție arbitrară.
 
-**POC-uri și stare:** browser QA reproductibil acoperă cele 10 rute, 1180/1440/1920/ultrawide, light/dark, Compact/Comfortable, inspector, URL drill/reload/reset și 403; trendurile lungi activează zoom, iar bundle-ul are buget verificat. POC-ul Canvas din 2026-08-06 trece pe 10 widgeturi, heatmap 100×36, scatter 5.000 puncte, first render 5.608,9 ms, resize blocking p95 166,8 ms și heap post-GC fără creștere după trei remount-uri. SVG rămâne neautorizat fără un caz de business distinct. PNG rămâne non-persistent și cu pixel ratio controlat. Poarta rămâne interacțiune p95 sub 200 ms.
+**POC-uri și stare:** browser QA reproductibil 48/48 acoperă cele 10 rute, 1180/1440/1920/ultrawide, light/dark, Compact/Comfortable, inspector, URL drill/reload/reset, selecție temporală, deep-link Retail și 403; trendurile lungi activează zoom, iar bundle-ul are buget verificat. POC-ul Canvas din 2026-08-06 trece pe 10 widgeturi, heatmap 100×36, scatter 5.000 puncte, first render 6.252,2 ms, resize blocking p95 133,3 ms și heap post-GC −13.026.049 bytes după trei remount-uri. SVG rămâne neautorizat fără un caz de business distinct. PNG rămâne non-persistent și cu pixel ratio controlat. Poarta rămâne interacțiune p95 sub 200 ms.
 
 ### Contract analitic comun
 

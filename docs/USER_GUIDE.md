@@ -51,4 +51,4 @@ Orice stare non-inherited este vizibilă pe card. Share-ul este țintit per subj
 
 ## Operational actions
 
-Insight is analytical and read-only. Use **Open Retail** for imports, configurations, month-closing operations or any business mutation. Authorization is evaluated independently by Retail.
+Insight is analytical and read-only. Use **Deschide în Retail** din modul pentru a transfera perioada, suprafața operațională și scope-ul curent către Retail; o selecție multi-store nu este redusă arbitrar la un singur magazin. Folosește Retail pentru importuri, configurări, închiderea lunii sau orice mutație business. Autorizarea este evaluată independent de Retail.
