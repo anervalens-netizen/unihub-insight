@@ -105,6 +105,11 @@ distinct published product codes, participating stores and canonical
 discount/reward from `reporting_campaign_month_v2`. Promo, Incentive and Concurs
 remain separate metrics and are not merged into Focus.
 
+Focus `active_products` is the distinct union of products with Focus results in
+`reporting_focus_item_month`, never the largest per-store count and never the
+configured campaign catalog. In 2026-06 the network control is 44 distinct
+result products; the previous maximum-store projection returned 28.
+
 Concurs has two Retail mechanisms in 2026-06 but no eligible official
 head/read-model for Insight, so it is unavailable rather than zero or partial
 reconciliation evidence. The current Retail `promo_bonuri` aggregate sums

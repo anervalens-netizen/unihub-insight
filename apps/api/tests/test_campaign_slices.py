@@ -1,4 +1,5 @@
 from decimal import Decimal
+from inspect import getsource
 
 from unihub_insight_api.repositories.postgres_modules import PostgresInsightRepository
 
@@ -51,6 +52,14 @@ def campaign_row(
 
 def kpi_values(slice_: object) -> dict[str, Decimal]:
     return {item.id: item.value for item in slice_.kpis}  # type: ignore[attr-defined]
+
+
+def test_focus_active_products_uses_scope_union_not_largest_store() -> None:
+    query_source = getsource(PostgresInsightRepository._campaign_rows)
+    response_source = getsource(PostgresInsightRepository._campaigns)
+
+    assert "COUNT(DISTINCT source.item_code)::INT AS scope_active_products" in query_source
+    assert 'row["scope_active_products"]' in response_source
 
 
 def test_promo_and_incentive_slices_preserve_reconciled_mechanism_values() -> None:

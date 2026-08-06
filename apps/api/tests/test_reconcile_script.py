@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import inspect
 import sys
 from decimal import Decimal
 from pathlib import Path
@@ -138,6 +139,14 @@ def test_sales_portfolio_reconciliation_fails_when_a_dimension_is_missing() -> N
     assert differences == {
         f"sales.portfolio.{dimension}.presence": Decimal("-1") for dimension in reconcile.PORTFOLIO_DIMENSIONS
     }
+
+
+def test_focus_product_control_counts_result_items_not_largest_store_or_campaign_catalog() -> None:
+    reconcile = load_reconcile_module()
+    source = inspect.getsource(reconcile.specialized_differences)
+
+    assert "COUNT(DISTINCT row.item_code)::numeric" in source
+    assert "decimal(focus_active_products)" in source
 
 
 def test_authoritative_acceptance_refuses_partial_or_unavailable_sources() -> None:

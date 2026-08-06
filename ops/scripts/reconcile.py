@@ -130,9 +130,7 @@ def portfolio_metric_differences(
         expected = control[dimension]
         differences.update(
             {
-                f"{prefix}.sales": metric_value(
-                    metrics, "sales.portfolio_sales"
-                )
+                f"{prefix}.sales": metric_value(metrics, "sales.portfolio_sales")
                 - expected["sales"],
                 f"{prefix}.net_quantity": metric_value(
                     metrics, "sales.portfolio_net_quantity"
@@ -143,13 +141,15 @@ def portfolio_metric_differences(
             }
         )
         if dimension in {"brand", "product"}:
-            differences[f"{prefix}.return_quantity"] = metric_value(
-                metrics, "sales.portfolio_return_quantity"
-            ) - expected["return_quantity"]
+            differences[f"{prefix}.return_quantity"] = (
+                metric_value(metrics, "sales.portfolio_return_quantity")
+                - expected["return_quantity"]
+            )
         if dimension == "product":
-            differences[f"{prefix}.receipt_incidence"] = metric_value(
-                metrics, "sales.portfolio_receipt_incidence"
-            ) - expected["receipt_incidence"]
+            differences[f"{prefix}.receipt_incidence"] = (
+                metric_value(metrics, "sales.portfolio_receipt_incidence")
+                - expected["receipt_incidence"]
+            )
     return differences
 
 
@@ -485,6 +485,14 @@ async def specialized_differences(
             """,
             *params,
         )
+        focus_active_products = await connection.fetchval(
+            f"""
+            SELECT COUNT(DISTINCT row.item_code)::numeric
+            FROM reporting_focus_item_month row
+            WHERE row.import_month = $1 AND {scope_sql}
+            """,
+            *params,
+        )
         workforce = await connection.fetchrow(
             f"""
             SELECT COUNT(DISTINCT row.agent)::numeric AS headcount
@@ -570,9 +578,7 @@ async def specialized_differences(
     differences: dict[str, Decimal] = {}
     campaigns = modules.get("campaigns")
     if campaigns is not None:
-        campaign_controls = {
-            str(row["mechanism"]): row for row in campaign_rows
-        }
+        campaign_controls = {str(row["mechanism"]): row for row in campaign_rows}
         focus_control = campaign_controls.get("focus")
         differences.update(
             {
@@ -587,7 +593,7 @@ async def specialized_differences(
                 "campaigns.active_products": metric_value(
                     campaigns.kpis, "campaigns.active_products"
                 )
-                - decimal(focus_control["products"] if focus_control else None),
+                - decimal(focus_active_products),
             }
         )
         for mechanism, reward_field, qualifying_field, eligible_field in (
@@ -614,28 +620,35 @@ async def specialized_differences(
                 {
                     f"{prefix}_sales": metric_value(
                         campaign_slice.kpis, f"{prefix}_sales"
-                    ) - decimal(control["sales"]),
+                    )
+                    - decimal(control["sales"]),
                     f"{prefix}_quantity": metric_value(
                         campaign_slice.kpis, f"{prefix}_quantity"
-                    ) - decimal(control["quantity"]),
+                    )
+                    - decimal(control["quantity"]),
                     f"{prefix}_{'discount' if mechanism == 'promo' else 'reward'}": metric_value(
                         campaign_slice.kpis,
                         f"{prefix}_{'discount' if mechanism == 'promo' else 'reward'}",
-                    ) - decimal(control[reward_field]),
+                    )
+                    - decimal(control[reward_field]),
                     f"{prefix}_active_stores": metric_value(
                         campaign_slice.kpis, f"{prefix}_active_stores"
-                    ) - decimal(control["stores"]),
+                    )
+                    - decimal(control["stores"]),
                     f"{prefix}_active_products": metric_value(
                         campaign_slice.kpis, f"{prefix}_active_products"
-                    ) - decimal(control["products"]),
+                    )
+                    - decimal(control["products"]),
                     f"{prefix}_{'qualifying_receipts' if mechanism == 'promo' else 'qualified_quantity'}": metric_value(
                         campaign_slice.kpis,
                         f"{prefix}_{'qualifying_receipts' if mechanism == 'promo' else 'qualified_quantity'}",
-                    ) - decimal(control[qualifying_field]),
+                    )
+                    - decimal(control[qualifying_field]),
                     f"{prefix}_{'discounted_units' if mechanism == 'promo' else 'eligible_quantity'}": metric_value(
                         campaign_slice.kpis,
                         f"{prefix}_{'discounted_units' if mechanism == 'promo' else 'eligible_quantity'}",
-                    ) - decimal(control[eligible_field]),
+                    )
+                    - decimal(control[eligible_field]),
                 }
             )
     workforce_module = modules.get("workforce")

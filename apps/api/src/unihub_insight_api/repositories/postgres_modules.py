@@ -1247,18 +1247,26 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         async with self.pool.acquire() as connection:
             return await connection.fetch(
                 f"""
-                WITH focus AS (
-                    SELECT focus.import_month, focus.site_code,
-                           MAX(focus.locatie) AS locatie,
-                           MAX(focus.firma) AS firma,
-                           MAX(focus.regional) AS regional,
-                           MAX(focus.asm) AS asm,
-                           SUM(focus.total_sales) AS focus_sales,
-                           SUM(focus.total_quantity)::INT AS focus_qty,
-                           COUNT(DISTINCT focus.item_code)::INT AS active_products
+                WITH focus_source AS MATERIALIZED (
+                    SELECT focus.*
                     FROM reporting_focus_item_month focus
                     WHERE {" AND ".join(focus_clauses)}
-                    GROUP BY focus.import_month, focus.site_code
+                ), focus AS (
+                    SELECT source.import_month, source.site_code,
+                           MAX(source.locatie) AS locatie,
+                           MAX(source.firma) AS firma,
+                           MAX(source.regional) AS regional,
+                           MAX(source.asm) AS asm,
+                           SUM(source.total_sales) AS focus_sales,
+                           SUM(source.total_quantity)::INT AS focus_qty,
+                           COUNT(DISTINCT source.item_code)::INT AS active_products
+                    FROM focus_source source
+                    GROUP BY source.import_month, source.site_code
+                ), focus_products AS (
+                    SELECT source.import_month,
+                           COUNT(DISTINCT source.item_code)::INT AS scope_active_products
+                    FROM focus_source source
+                    GROUP BY source.import_month
                 ), totals AS (
                     SELECT tot.import_month, tot.site_code,
                            SUM(tot.total_quantity)::INT AS total_qty
@@ -1266,8 +1274,10 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                     WHERE {" AND ".join(total_clauses)}
                     GROUP BY tot.import_month, tot.site_code
                 )
-                SELECT focus.*, COALESCE(totals.total_qty, 0)::INT AS total_qty
+                SELECT focus.*, focus_products.scope_active_products,
+                       COALESCE(totals.total_qty, 0)::INT AS total_qty
                 FROM focus
+                JOIN focus_products USING (import_month)
                 LEFT JOIN totals USING (import_month, site_code)
                 ORDER BY focus.import_month, focus.site_code
                 """,
@@ -1578,7 +1588,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         focus_sales = sum((_money(row["focus_sales"]) for row in current), Decimal(0))
         focus_qty = sum((Decimal(int(row["focus_qty"] or 0)) for row in current), Decimal(0))
         total_qty = sum((Decimal(int(row["total_qty"] or 0)) for row in current), Decimal(0))
-        active_products = max((int(row["active_products"] or 0) for row in current), default=0)
+        active_products = max((int(row["scope_active_products"] or 0) for row in current), default=0)
         monthly: dict[str, dict[str, Decimal]] = defaultdict(
             lambda: {"sales": Decimal(0), "focus": Decimal(0), "total": Decimal(0)}
         )
