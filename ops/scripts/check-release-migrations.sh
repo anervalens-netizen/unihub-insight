@@ -3,6 +3,8 @@ set -euo pipefail
 
 TARGET_RELEASE="${1:?usage: check-release-migrations.sh TARGET_RELEASE [ENV_FILE]}"
 ENV_FILE="${2:-/etc/unihub-insight/migration.env}"
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+COMPATIBILITY_FILE="$SCRIPT_ROOT/rollback-compatible-migrations.txt"
 
 [[ -d "$TARGET_RELEASE/apps/api/migrations" ]] || {
   echo "target release has no migration catalog: $TARGET_RELEASE" >&2
@@ -28,6 +30,14 @@ while IFS='|' read -r version expected_checksum; do
   [[ -n "$version" ]] || continue
   migration="$TARGET_RELEASE/apps/api/migrations/$version"
   [[ -f "$migration" ]] || {
+    compatible_checksum=""
+    if [[ -f "$COMPATIBILITY_FILE" ]]; then
+      compatible_checksum="$(awk -F'|' -v version="$version" '$1 == version { print $2; exit }' "$COMPATIBILITY_FILE")"
+    fi
+    if [[ -n "$compatible_checksum" && "$compatible_checksum" == "$expected_checksum" ]]; then
+      echo "target release accepts backward-compatible applied migration: $version"
+      continue
+    fi
     echo "target release is missing applied migration: $version" >&2
     exit 1
   }

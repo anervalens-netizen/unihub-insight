@@ -86,8 +86,11 @@ restore command for this drill.
 
 Rollback is code-only and keeps the database at its current schema. Before
 switching the symlink it verifies that the target contains every applied
-migration with the recorded checksum; an incompatible target is refused
-without stopping the active release:
+migration with the recorded checksum. A migration absent from N-1 is accepted
+only when the active release declares its exact version and checksum in
+`ops/rollback-compatible-migrations.txt`; this allowlist is reserved for
+reviewed additive changes that N-1 can read safely. Any undeclared or checksum-
+mismatched migration refuses rollback without stopping the active release:
 
 ```bash
 sudo /opt/unihub-insight/current/ops/scripts/rollback.sh PREVIOUS_SOURCE_SHA

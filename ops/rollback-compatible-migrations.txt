@@ -1,0 +1,2 @@
+# version|sha256|reason
+004_query_audit_xlsx.sql|91acbe3f48186d9f5c5d8ae9cb5f7c541254a5c0d8869a89d80fc5c1d231c804|Adds accepted audit action values without changing columns read by N-1.

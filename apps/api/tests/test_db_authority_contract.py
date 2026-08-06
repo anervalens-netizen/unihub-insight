@@ -1,3 +1,4 @@
+import hashlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -53,3 +54,14 @@ def test_readiness_is_private_and_rollback_checks_migration_compatibility_first(
     assert "SET ROLE unihub_insight_schema_owner" in compatibility
     assert "--quiet --tuples-only --no-align" in compatibility
     assert "previous release is incompatible with applied metadata migrations" in deploy
+
+
+def test_rollback_compatibility_allowlist_pins_the_exact_additive_migration() -> None:
+    migration = ROOT / "apps/api/migrations/004_query_audit_xlsx.sql"
+    manifest = (ROOT / "ops/rollback-compatible-migrations.txt").read_text(encoding="utf-8")
+    compatibility = (ROOT / "ops/scripts/check-release-migrations.sh").read_text(encoding="utf-8")
+    checksum = hashlib.sha256(migration.read_bytes()).hexdigest()
+
+    assert f"004_query_audit_xlsx.sql|{checksum}|" in manifest
+    assert 'compatible_checksum" == "$expected_checksum' in compatibility
+    assert "target release accepts backward-compatible applied migration" in compatibility
