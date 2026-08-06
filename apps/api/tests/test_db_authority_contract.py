@@ -114,3 +114,13 @@ def test_forward_schema_runner_survives_code_rollback() -> None:
     assert deploy.index("unihub-insight-backup.service") < deploy.index("MIGRATION_MAY_HAVE_STARTED=true")
     assert '"$SCHEMA_RELEASE/apps/api/.venv/bin/python" ops/scripts/migrate.py --check' in preflight
     assert "schema-current" not in rollback
+
+
+def test_prepared_release_digest_uses_the_verifiers_deterministic_order() -> None:
+    prepare = (ROOT / "ops/scripts/prepare-release.sh").read_text(encoding="utf-8")
+    deploy = (ROOT / "ops/scripts/deploy-release.sh").read_text(encoding="utf-8")
+    preflight = (ROOT / "ops/scripts/preflight.sh").read_text(encoding="utf-8")
+
+    assert "LC_ALL=C sort -z" in prepare
+    assert "for path in sorted(" in deploy
+    assert "for path in sorted(" in preflight

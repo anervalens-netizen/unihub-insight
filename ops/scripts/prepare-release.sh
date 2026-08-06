@@ -80,7 +80,7 @@ for dependency_path in node_modules apps/web/node_modules apps/api/.venv; do
 		find "$dependency_path" -depth -delete
 	fi
 done
-DIST_SHA256="$(find apps/web/dist -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}')"
+DIST_SHA256="$(find apps/web/dist -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}')"
 printf '{\n  "source_sha": "%s",\n  "prepared_host": "%s",\n  "verified": true,\n  "build": true,\n  "dist_sha256": "%s"\n}\n' \
 	"$SOURCE_SHA" "$(hostname -s)" "$DIST_SHA256" > release-evidence.json
 
