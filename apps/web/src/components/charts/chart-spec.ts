@@ -30,6 +30,16 @@ export interface TableFallbackSpec {
 
 export type ResolvedChartSpec = BuiltChartSpec | TableFallbackSpec;
 
+export interface WidgetChartOptions {
+  show_legend?: boolean | undefined;
+  show_labels?: boolean | undefined;
+  top_n?: number | undefined;
+  renderer?: 'canvas' | undefined;
+  smooth?: boolean | undefined;
+  stacked?: boolean | undefined;
+  pixel_ratio?: 1 | 2 | undefined;
+}
+
 export interface ChartUrlStateEvent {
   readonly dimensionId: string;
   readonly value: string;
@@ -65,6 +75,45 @@ const chartSpecRegistry: Partial<Record<ChartKind, ChartSpec>> = {
 };
 
 export { chartSpecRegistry };
+
+export function applyWidgetChartOptions(
+  option: EChartsCoreOption,
+  shape: ChartKind,
+  options: WidgetChartOptions,
+): EChartsCoreOption {
+  const record = isRecord(option) ? option : {};
+  const legend = isRecord(record['legend']) ? record['legend'] : {};
+  const series = Array.isArray(record['series'])
+    ? record['series'].map((entry) => {
+        if (!isRecord(entry)) return entry;
+        const next = { ...entry };
+        if (typeof options.show_labels === 'boolean') {
+          next['label'] = {
+            ...(isRecord(entry['label']) ? entry['label'] : {}),
+            show: options.show_labels,
+          };
+        }
+        if (
+          typeof options.smooth === 'boolean' &&
+          (shape === 'line' || shape === 'area') &&
+          entry['type'] === 'line'
+        ) {
+          next['smooth'] = options.smooth;
+        }
+        if (typeof options.stacked === 'boolean' && shape === 'bar' && entry['type'] === 'bar') {
+          next['stack'] = options.stacked ? 'value' : undefined;
+        }
+        return next;
+      })
+    : record['series'];
+  return {
+    ...record,
+    ...(typeof options.show_legend === 'boolean'
+      ? { legend: { ...legend, show: options.show_legend } }
+      : {}),
+    ...(series ? { series } : {}),
+  } as EChartsCoreOption;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -116,7 +165,7 @@ function lineOption(
   const category = categoryDimension(dataset);
   const value = valueDimension(dataset);
   if (!category || !value) return null;
-  const comparison = dimensionByRole(dataset, 'comparison');
+  const comparisons = dataset.dimensions.filter((dimension) => dimension.role === 'comparison');
   const target = dimensionByRole(dataset, 'target');
   const type = shape === 'bar' || shape === 'stacked-bar' ? 'bar' : 'line';
   const series: Array<Record<string, unknown>> = [
@@ -129,10 +178,10 @@ function lineOption(
       ...(shape === 'stacked-bar' ? { stack: 'value' } : {}),
     },
   ];
-  if (comparison) {
+  for (const comparison of comparisons) {
     series.push({
       type: 'line',
-      name: 'Comparație',
+      name: comparison.label,
       encode: { x: category.id, y: comparison.id, tooltip: [category.id, comparison.id] },
       connectNulls: false,
       showSymbol: false,
@@ -207,6 +256,8 @@ function heatmapOption(dataset: QueryDataset): EChartsCoreOption | null {
       {
         type: 'heatmap',
         encode: { x: x.id, y: y.id, value: value.id, tooltip: [x.id, y.id, value.id] },
+        progressive: 1000,
+        progressiveThreshold: 2000,
       },
     ],
   } as EChartsCoreOption;
@@ -232,6 +283,10 @@ function scatterOption(dataset: QueryDataset, metric: MetricDefinition): ECharts
         type: 'scatter',
         name: metric.display_name,
         symbolSize: 10,
+        large: dataset.rows.length > 2000,
+        largeThreshold: 2000,
+        progressive: 1000,
+        progressiveThreshold: 2000,
         encode: {
           x: x.id,
           y: y.id,

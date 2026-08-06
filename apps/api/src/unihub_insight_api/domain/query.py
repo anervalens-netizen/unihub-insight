@@ -116,6 +116,7 @@ class QueryExecutionMeta(BaseModel):
     scope_label: str
     snapshot_id: str
     source: SourceMetadata
+    sources: dict[str, SourceMetadata] = Field(default_factory=dict)
     metric_id: str
     metric_version: int
     query_contract_version: int

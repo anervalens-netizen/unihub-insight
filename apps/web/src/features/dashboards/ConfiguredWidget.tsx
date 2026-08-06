@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { ChartUrlStateEvent } from '../../components/charts/chart-spec';
 import {
+  applyWidgetChartOptions,
   buildSafePngExport,
   chartEventToUrlState,
   resolveChartSpec,
@@ -62,6 +63,7 @@ function QueryMetadata({
   metric: MetricDefinition;
 }) {
   const source = result.meta?.source;
+  const sources = Object.values(result.meta?.sources ?? {});
   return (
     <details className="query-metadata">
       <summary>
@@ -78,6 +80,13 @@ function QueryMetadata({
         <span>
           Cutoff: {source?.cutoff ?? '—'} · authority: {source?.authority ?? '—'}
         </span>
+        {sources.length > 1
+          ? sources.map((item) => (
+              <span key={item.domain}>
+                {item.domain}: {item.status} · cutoff {item.cutoff ?? '—'} · {item.authority}
+              </span>
+            ))
+          : null}
         {source?.warnings.length ? <span>Warnings: {source.warnings.join(' · ')}</span> : null}
       </div>
     </details>
@@ -135,9 +144,16 @@ function ConfiguredChart({
   onUrlStateChange?: (event: ChartUrlStateEvent) => void;
   onUrlStateReset?: () => void;
 }) {
+  const presentedDataset = useMemo(
+    () =>
+      widget.options.top_n
+        ? { ...dataset, rows: dataset.rows.slice(0, widget.options.top_n) }
+        : dataset,
+    [dataset, widget.options.top_n],
+  );
   const resolved = useMemo(
-    () => resolveChartSpec(metric, widget.visualization, dataset),
-    [dataset, metric, widget.visualization],
+    () => resolveChartSpec(metric, widget.visualization, presentedDataset),
+    [metric, presentedDataset, widget.visualization],
   );
   if (resolved.kind === 'table') {
     return (
@@ -147,20 +163,26 @@ function ConfiguredChart({
       </div>
     );
   }
+  const option = applyWidgetChartOptions(resolved.option, widget.visualization, widget.options);
+  const pngExport = buildSafePngExport(resolved, widget.title);
+  const pixelRatio = widget.options.pixel_ratio;
   return (
     <div className="configured-chart">
       <span className="widget-filter-mode">{widgetFilterLabel(widget)}</span>
       <EChart
-        option={resolved.option}
+        option={option}
         className="chart--fill"
         ariaLabel={widget.title}
-        pngExport={buildSafePngExport(resolved, widget.title)}
+        pngExport={{
+          ...pngExport,
+          pixelRatio: pixelRatio === 1 ? 1 : 2,
+        }}
         onEvent={(event) => {
-          const interaction = chartEventToUrlState(dataset, event);
+          const interaction = chartEventToUrlState(presentedDataset, event);
           if (interaction) onUrlStateChange?.(interaction);
         }}
         onDoubleEvent={(event) => {
-          const interaction = chartEventToUrlState(dataset, event);
+          const interaction = chartEventToUrlState(presentedDataset, event);
           if (interaction) onUrlStateChange?.(interaction);
         }}
         {...(onUrlStateReset ? { onBlankReset: onUrlStateReset } : {})}

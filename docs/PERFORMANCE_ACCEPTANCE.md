@@ -46,6 +46,12 @@ Measure at minimum:
 
 Chart POC also measures ECharts bundle/chunk, first render, resize, frame time and browser memory at 1180/1440/1920/ultrawide, including a 100×36 heatmap and scatter up to the documented Canvas threshold. Canvas/SVG is selected from evidence.
 
+### Canvas POC — 2026-08-06
+
+The reproducible Chromium case in `apps/web/e2e/critical-surfaces.spec.ts` renders a 10-widget Regional Manager dashboard with a 3,600-cell heatmap and a 5,000-point scatter, then performs 20 width changes and three Configurare ↔ Vizualizare remount cycles. The gate is first render <8,000 ms, resize blocking p95 <200 ms and post-GC heap growth <64 MiB.
+
+Final focused evidence: first render 5,608.9 ms, resize blocking p95 166.8 ms, heap 110,365,609 → 106,961,052 bytes (−3,404,557 bytes). Canvas remains the supported renderer; this synthetic pass does not authorize SVG and does not count toward the production RUM gate.
+
 Reproducible functional browser coverage runs with `npm run browser:qa`. It does not replace the production RUM/load gate or owner visual acceptance.
 
 Run the bounded synthetic API/concurrency probe on the primary against the private UDS, after loading the root-only runtime environment without printing it:

@@ -12,7 +12,17 @@ const dashboardAclEntrySchema = z.object({
   permission: z.enum(dashboardPermissions),
 });
 
-const optionValue = z.union([z.string(), z.number(), z.boolean()]);
+const dashboardWidgetOptionsSchema = z
+  .object({
+    show_legend: z.boolean().optional(),
+    show_labels: z.boolean().optional(),
+    top_n: z.number().int().positive().optional(),
+    renderer: z.literal('canvas').optional(),
+    smooth: z.boolean().optional(),
+    stacked: z.boolean().optional(),
+    pixel_ratio: z.union([z.literal(1), z.literal(2)]).optional(),
+  })
+  .strict();
 export const dashboardWidgetSchema = z.object({
   id: z.string(),
   module: z.enum(moduleIds),
@@ -22,13 +32,14 @@ export const dashboardWidgetSchema = z.object({
   query_contract_version: z.number().int().default(1),
   visualization: z.enum(chartKinds),
   dimension: z.string().nullable().optional(),
+  dimensions: z.array(z.string()).max(2).default([]),
   time_grain: z.string().default('month'),
   comparisons: z.array(z.string()).default([]),
   sort: z.array(z.string()).default([]),
   limit: z.number().int().default(30),
   filter_mode: z.enum(filterModes).default('inherit'),
   filters: z.record(z.string(), z.string()).default({}),
-  options: z.record(z.string(), optionValue).default({}),
+  options: dashboardWidgetOptionsSchema.default({}),
   layout: z.object({
     x: z.number().int(),
     y: z.number().int(),
@@ -88,6 +99,11 @@ export type DashboardAclEntry = z.infer<typeof dashboardAclEntrySchema>;
 export type FilterPreset = z.infer<typeof filterPresetSchema>;
 export type FilterPresetInput = Pick<FilterPreset, 'name' | 'filters' | 'shared'>;
 export type FilterPresetUpdateInput = FilterPresetInput & { version: number };
+
+export function dashboardWidgetDimensions(widget: DashboardWidget): string[] {
+  if (widget.dimensions.length > 0) return widget.dimensions;
+  return widget.dimension ? [widget.dimension] : [];
+}
 export type DashboardCreateInput = Pick<
   DashboardDocument,
   'name' | 'description' | 'visibility' | 'widgets'

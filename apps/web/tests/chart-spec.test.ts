@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  applyWidgetChartOptions,
   buildSafePngExport,
   chartEventToUrlState,
   resolveChartSpec,
@@ -108,5 +109,23 @@ describe('ChartSpec registry', () => {
         pixelRatio: 2,
       });
     }
+  });
+
+  it('applies only whitelisted presentation options without mutating the contract', () => {
+    const resolved = resolveChartSpec(metric, 'line', dataset);
+    if (resolved.kind !== 'chart') return;
+    const options = {
+      show_legend: false,
+      show_labels: true,
+      smooth: true,
+      ignored: 'unsafe',
+    };
+    const configured = applyWidgetChartOptions(resolved.option, 'line', options) as {
+      legend?: { show?: boolean };
+      series?: Array<{ label?: { show?: boolean }; smooth?: boolean }>;
+    };
+    expect(configured.legend?.show).toBe(false);
+    expect(configured.series?.[0]).toMatchObject({ label: { show: true }, smooth: true });
+    expect(configured).not.toHaveProperty('ignored');
   });
 });

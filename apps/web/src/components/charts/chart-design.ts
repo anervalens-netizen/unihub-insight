@@ -214,7 +214,7 @@ function labelStyle(existing: PlainRecord, design: ChartDesign): PlainRecord {
     color: design.muted,
     fontSize: design.preferences.density === 'compact' ? 9 : 10,
     ...existing,
-    show: design.preferences.showLabels || existing['show'] === true,
+    show: typeof existing['show'] === 'boolean' ? existing['show'] : design.preferences.showLabels,
   };
 }
 
@@ -236,7 +236,12 @@ function styleSeries(value: unknown, design: ChartDesign): unknown {
   };
 
   if (type === 'line') {
-    base['smooth'] = design.preferences.smoothLines ? (value['smooth'] ?? 0.16) : false;
+    base['smooth'] =
+      typeof value['smooth'] === 'boolean' || typeof value['smooth'] === 'number'
+        ? value['smooth']
+        : design.preferences.smoothLines
+          ? 0.16
+          : false;
     base['showSymbol'] = value['showSymbol'] ?? false;
     base['symbol'] = value['symbol'] ?? 'circle';
     base['symbolSize'] = value['symbolSize'] ?? 6;
@@ -262,7 +267,10 @@ function styleSeries(value: unknown, design: ChartDesign): unknown {
       color: design.text,
       fontSize: design.preferences.density === 'compact' ? 9 : 10,
       ...existingLabel,
-      show: design.preferences.showLabels || existingLabel['show'] === true,
+      show:
+        typeof existingLabel['show'] === 'boolean'
+          ? existingLabel['show']
+          : design.preferences.showLabels,
     };
   }
   if (type === 'scatter') {
@@ -280,7 +288,10 @@ function styleSeries(value: unknown, design: ChartDesign): unknown {
       color: design.text,
       fontSize: design.preferences.density === 'compact' ? 8 : 9,
       ...existingLabel,
-      show: design.preferences.showLabels || existingLabel['show'] === true,
+      show:
+        typeof existingLabel['show'] === 'boolean'
+          ? existingLabel['show']
+          : design.preferences.showLabels,
     };
   }
   return base;
@@ -324,9 +335,11 @@ export function applyChartDesign(
     ...record,
     color: design.palette,
     backgroundColor: 'transparent',
-    animation: design.preferences.animate,
-    animationDuration: design.preferences.animate ? 280 : 0,
-    animationDurationUpdate: design.preferences.animate ? 360 : 0,
+    animation:
+      typeof record['animation'] === 'boolean' ? record['animation'] : design.preferences.animate,
+    animationDuration: record['animation'] === false ? 0 : design.preferences.animate ? 280 : 0,
+    animationDurationUpdate:
+      record['animation'] === false ? 0 : design.preferences.animate ? 360 : 0,
     animationEasing: 'cubicOut',
     animationEasingUpdate: 'cubicInOut',
     textStyle: {

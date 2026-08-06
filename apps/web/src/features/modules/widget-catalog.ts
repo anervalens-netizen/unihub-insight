@@ -21,6 +21,11 @@ interface Recipe {
   subtitle?: string;
 }
 
+export interface ModuleWidgetQuerySpec {
+  kind: Exclude<RecipeKind, 'alerts'>;
+  metricId: string;
+}
+
 const metricSlots: Record<ModuleId, Record<MetricSlot, string>> = {
   sales: {
     primary: 'sales.total',
@@ -65,6 +70,45 @@ const metricSlots: Record<ModuleId, Record<MetricSlot, string>> = {
     quaternary: 'planning.actual',
   },
 };
+
+const distributionMetrics: Partial<Record<ModuleId, string>> = {
+  sales: 'sales.total',
+  campaigns: 'campaigns.focus_sales',
+  workforce: 'workforce.headcount',
+  compensation: 'compensation.payroll',
+  finance: 'finance.operating_costs',
+};
+
+const matrixMetrics: Partial<Record<ModuleId, string>> = {
+  sales: 'target.progress_pct',
+  performance: 'performance.average',
+  campaigns: 'campaigns.focus_share',
+  workforce: 'workforce.productivity',
+  compensation: 'compensation.payroll',
+  finance: 'finance.ebit_margin',
+};
+
+export function moduleWidgetQuerySpec(
+  module: ModuleId,
+  widgetId: string,
+): ModuleWidgetQuerySpec | null {
+  if (widgetId.startsWith('kpi:')) {
+    return { kind: 'kpi', metricId: widgetId.slice(4) };
+  }
+  if (widgetId === 'alerts') return null;
+  if (widgetId === 'distribution') {
+    const metricId = distributionMetrics[module];
+    return metricId ? { kind: 'distribution', metricId } : null;
+  }
+  if (widgetId === 'matrix') {
+    const metricId = matrixMetrics[module];
+    return metricId ? { kind: 'matrix', metricId } : null;
+  }
+  if (widgetId === 'trend' || widgetId === 'breakdown') {
+    return { kind: widgetId, metricId: metricSlots[module].primary };
+  }
+  return null;
+}
 
 const recipes: Partial<Record<ModuleSubviewId, readonly Recipe[]>> = {
   pace: [

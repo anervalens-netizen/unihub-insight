@@ -68,7 +68,7 @@ export function inspectQuery(
 
 export function buildInspectRequest(
   snapshotId: string,
-  dashboardId: string,
+  dashboardId: string | null,
   query: InspectRequest['query'],
 ): InspectRequest {
   return { snapshot_id: snapshotId, dashboard_id: dashboardId, query, page: 1, page_size: 100 };
@@ -76,7 +76,7 @@ export function buildInspectRequest(
 
 export function buildExportRequest(
   snapshotId: string,
-  dashboardId: string,
+  dashboardId: string | null,
   query: InspectRequest['query'],
 ): InspectRequest {
   return buildInspectRequest(snapshotId, dashboardId, query);

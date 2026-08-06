@@ -57,3 +57,57 @@ def test_ignore_mode_cannot_hide_embedded_filters(client: TestClient) -> None:
     widget = {**BASE_WIDGET, "filter_mode": "ignore", "filters": {"firm": "MOBIUP"}}
     response = client.post("/api/v1/dashboards", json=payload(widget))
     assert response.status_code == 422
+
+
+def test_dashboard_accepts_two_ordered_dimensions_and_keeps_legacy_alias(client: TestClient) -> None:
+    widget = {
+        **BASE_WIDGET,
+        "module": "performance",
+        "metric_id": "performance.average",
+        "visualization": "heatmap",
+        "dimension": "store",
+        "dimensions": ["store", "time"],
+    }
+    response = client.post("/api/v1/dashboards", json=payload(widget))
+
+    assert response.status_code == 201
+    saved = response.json()["widgets"][0]
+    assert saved["dimension"] == "store"
+    assert saved["dimensions"] == ["store", "time"]
+
+
+def test_dashboard_rejects_a_divergent_legacy_dimension_alias(client: TestClient) -> None:
+    widget = {
+        **BASE_WIDGET,
+        "module": "performance",
+        "metric_id": "performance.average",
+        "visualization": "heatmap",
+        "dimension": "asm",
+        "dimensions": ["store", "time"],
+    }
+    response = client.post("/api/v1/dashboards", json=payload(widget))
+
+    assert response.status_code == 422
+    assert any("legacy alias" in item for item in response.json()["detail"]["errors"])
+
+
+def test_dashboard_validates_presentation_option_types_and_bounds(client: TestClient) -> None:
+    invalid = {
+        **BASE_WIDGET,
+        "limit": 10,
+        "options": {"show_labels": "yes", "top_n": 11, "pixel_ratio": True},
+    }
+    response = client.post("/api/v1/dashboards", json=payload(invalid))
+
+    assert response.status_code == 422
+    errors = response.json()["detail"]["errors"]
+    assert any("requires booleans" in item for item in errors)
+    assert any("top_n" in item for item in errors)
+    assert any("pixel_ratio" in item for item in errors)
+
+    valid = {
+        **BASE_WIDGET,
+        "limit": 10,
+        "options": {"show_labels": True, "top_n": 5, "pixel_ratio": 2},
+    }
+    assert client.post("/api/v1/dashboards", json=payload(valid)).status_code == 201

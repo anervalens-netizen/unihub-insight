@@ -27,6 +27,14 @@ import { formatCurrency, formatInteger, formatPercent } from '../../lib/format';
 import { useModuleData, useModuleUrlStateChange, useModuleUrlStateReset } from './context';
 import type { BreakdownRow, ChartKind, ModuleKpi } from './schemas';
 
+const analyticalComparisonLabels: Record<string, string> = {
+  'previous-period': 'Perioada precedentă',
+  'previous-year': 'Anul trecut',
+  'recent-average': 'Media ultimelor 3 perioade',
+  forecast: 'Forecast',
+  target: 'Target',
+};
+
 function formatValue(value: number | null | undefined, unit: string, compact = false): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return '—';
   if (unit === 'currency') return formatCurrency(value, compact);
@@ -157,6 +165,7 @@ export function ModuleTrendWidget() {
   const choices: Array<'line' | 'area' | 'bar'> = supported.length > 0 ? supported : ['line'];
   const [kind, setKind] = useState<'line' | 'area' | 'bar'>(choices[0] ?? 'line');
   const primaryAxis = data.axes[0];
+  const requestedComparisons = data.meta.requested_comparisons ?? [];
   const option = useMemo<EChartsCoreOption>(() => {
     const axisFormatter = (value: string | number): string =>
       formatValue(Number(value), primaryAxis?.unit ?? 'decimal', true);
@@ -178,6 +187,42 @@ export function ModuleTrendWidget() {
             itemStyle: { color: '#4f46e5' },
             ...(kind === 'area' ? { areaStyle: { color: 'rgba(79,70,229,0.12)' } } : {}),
           };
+    const comparisonLabels: Record<string, string> = {
+      legacy: data.meta.comparison === 'previous-year' ? 'Anul trecut' : 'Perioada precedentă',
+      ...analyticalComparisonLabels,
+    };
+    const comparisonKeys =
+      requestedComparisons.length > 0
+        ? requestedComparisons.filter((comparison) => comparison !== 'target')
+        : ['legacy'];
+    const comparisonColors = ['#94a3b8', '#d97706', '#7c3aed', '#0891b2'];
+    const comparisonSeries = comparisonKeys.map((comparison, index) => ({
+      type: 'line' as const,
+      name: comparisonLabels[comparison] ?? comparison,
+      data: data.trend.map((point) =>
+        comparison === 'legacy'
+          ? (point.comparison ?? null)
+          : (point.comparisons[comparison] ?? null),
+      ),
+      showSymbol: false,
+      connectNulls: false,
+      lineStyle: { width: 1.5, color: comparisonColors[index % comparisonColors.length] },
+      itemStyle: { color: comparisonColors[index % comparisonColors.length] },
+    }));
+    const targetSeries =
+      requestedComparisons.length === 0 || requestedComparisons.includes('target')
+        ? [
+            {
+              type: 'line' as const,
+              name: 'Target',
+              data: data.trend.map((point) => point.target ?? null),
+              showSymbol: false,
+              connectNulls: false,
+              lineStyle: { width: 2, type: 'dashed' as const, color: '#0f766e' },
+              itemStyle: { color: '#0f766e' },
+            },
+          ]
+        : [];
     return {
       animationDuration: 260,
       aria: { enabled: true, description: `Evoluție ${data.title} pentru ${data.meta.period}.` },
@@ -195,29 +240,9 @@ export function ModuleTrendWidget() {
         axisLabel: { color: '#64748b', fontSize: 10, formatter: axisFormatter },
         splitLine: { lineStyle: { color: '#e7edf5', type: 'dashed' } },
       },
-      series: [
-        mainSeries,
-        {
-          type: 'line',
-          name: 'Reper / actual',
-          data: data.trend.map((point) => point.comparison ?? null),
-          showSymbol: false,
-          connectNulls: false,
-          lineStyle: { width: 1.5, color: '#94a3b8' },
-          itemStyle: { color: '#94a3b8' },
-        },
-        {
-          type: 'line',
-          name: 'Target',
-          data: data.trend.map((point) => point.target ?? null),
-          showSymbol: false,
-          connectNulls: false,
-          lineStyle: { width: 2, type: 'dashed', color: '#0f766e' },
-          itemStyle: { color: '#0f766e' },
-        },
-      ],
+      series: [mainSeries, ...comparisonSeries, ...targetSeries],
     };
-  }, [data, kind, primaryAxis]);
+  }, [data, kind, primaryAxis, requestedComparisons]);
   if (data.trend.length === 0)
     return <EmptyState message="Nu există serie temporală pentru scope-ul curent." />;
   const handlePointEvent = (event: EChartEvent) => {
@@ -229,6 +254,14 @@ export function ModuleTrendWidget() {
   return (
     <div className="chart-widget">
       <ChartToggle options={choices} value={kind} onChange={setKind} />
+      {requestedComparisons.length > 0 ? (
+        <span className="widget-filter-mode">
+          Repere:{' '}
+          {requestedComparisons
+            .map((comparison) => analyticalComparisonLabels[comparison] ?? comparison)
+            .join(' · ')}
+        </span>
+      ) : null}
       <EChart
         option={option}
         className="chart--fill"

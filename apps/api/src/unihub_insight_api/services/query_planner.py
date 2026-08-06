@@ -16,12 +16,14 @@ from unihub_insight_api.domain import (
     ModuleId,
     QueryBatchRequest,
     QueryBatchResponse,
+    QueryComparison,
     QueryDataset,
     QueryError,
     QueryErrorCode,
     QueryExecutionMeta,
     QuerySort,
     SourceDomain,
+    SourceStatus,
     UserContext,
     WidgetQuery,
     WidgetQueryResult,
@@ -68,6 +70,15 @@ MODULE_SOURCE_DOMAINS: dict[ModuleId, SourceDomain] = {
     ModuleId.FINANCE: SourceDomain.FINANCE,
     ModuleId.PLANNING: SourceDomain.PLANNING,
 }
+
+
+def required_source_domains(query: WidgetQuery) -> tuple[SourceDomain, ...]:
+    primary = MODULE_SOURCE_DOMAINS[query.module]
+    if query.metric_id in {"compensation.sales_ratio", "planning.actual"}:
+        return (primary, SourceDomain.SALES)
+    return (primary,)
+
+
 MODULE_CAPABILITIES: dict[ModuleId, Capability] = {
     ModuleId.SALES: Capability.ANALYTICS,
     ModuleId.PERFORMANCE: Capability.ANALYTICS,
@@ -175,21 +186,28 @@ def resolve_query_scope(base: AnalyticsScope, query: WidgetQuery) -> AnalyticsSc
         stores = tuple(dict.fromkeys(item.strip() for item in stores_value.split(",") if item.strip()))
     else:
         stores = tuple(stores_value)
-    comparison = base.comparison
-    if "previous-year" in query.comparisons:
-        comparison = ComparisonMode.PREVIOUS_YEAR
-    elif "previous-period" in query.comparisons:
-        comparison = ComparisonMode.PREVIOUS_MONTH
     period = query.time_range.end if query.time_range else base.period
     return AnalyticsScope(
         period=period,
-        comparison=comparison,
+        comparison=base.comparison,
         firm=_filter_text(filters.get("firm", base.firm)),
         regional=_filter_text(filters.get("regional", base.regional)),
         asm=_filter_text(filters.get("asm", base.asm)),
         stores=stores,
         agent=_filter_text(filters.get("agent", base.agent)),
     )
+
+
+def comparison_scopes(scope: AnalyticsScope, query: WidgetQuery) -> dict[QueryComparison, AnalyticsScope]:
+    modes = {
+        QueryComparison.PREVIOUS_PERIOD: ComparisonMode.PREVIOUS_MONTH,
+        QueryComparison.PREVIOUS_YEAR: ComparisonMode.PREVIOUS_YEAR,
+    }
+    return {
+        comparison: scope.model_copy(update={"comparison": modes[comparison]})
+        for comparison in query.comparisons
+        if comparison in modes
+    }
 
 
 def _sorted_rows(
@@ -242,7 +260,11 @@ def _decimal_or_none(value: object) -> Decimal | int | str | bool | None:
     return Decimal(str(value))
 
 
-def _dataset(query: WidgetQuery, response: ModuleAnalyticsResponse) -> QueryDataset:
+def _dataset(
+    query: WidgetQuery,
+    response: ModuleAnalyticsResponse,
+    comparison_responses: dict[QueryComparison, ModuleAnalyticsResponse] | None = None,
+) -> QueryDataset:
     metric = next((item for item in response.kpis if item.id == query.metric_id), None)
     if query.visualization is ChartKind.KPI or not query.dimensions:
         return QueryDataset(
@@ -319,8 +341,11 @@ def _dataset(query: WidgetQuery, response: ModuleAnalyticsResponse) -> QueryData
         field = _field_for(query.module, query.metric_id)
         trend_rows: list[dict[str, str | Decimal | int | bool | None]] = []
         points = response.trend
-        if query.time_range is not None:
-            points = [point for point in points if query.time_range.start <= point.key <= query.time_range.end]
+        comparison_points = {
+            comparison: {point.key: point for point in comparison_response.trend}
+            for comparison, comparison_response in (comparison_responses or {}).items()
+        }
+        primary_values: list[Decimal | None] = []
         for point in points:
             value = getattr(point, field, None)
             if query.metric_id == "target.progress_pct":
@@ -331,25 +356,58 @@ def _dataset(query: WidgetQuery, response: ModuleAnalyticsResponse) -> QueryData
                 )
             if query.metric_id == "planning.target_gap":
                 value = point.primary - point.target if point.primary is not None and point.target is not None else None
-            trend_rows.append(
-                {
-                    "key": point.key,
-                    "label": point.label,
-                    "value": _decimal_or_none(value),
-                    "comparison": point.comparison,
-                    "target": point.target,
-                    "is_estimate": point.is_estimate,
-                }
-            )
+            primary_values.append(Decimal(str(value)) if value is not None else None)
+            trend_row: dict[str, str | Decimal | int | bool | None] = {
+                "key": point.key,
+                "label": point.label,
+                "value": _decimal_or_none(value),
+                "is_estimate": point.is_estimate,
+            }
+            if QueryComparison.TARGET in query.comparisons:
+                trend_row["target"] = point.target
+            for comparison, dimension_id in (
+                (QueryComparison.PREVIOUS_PERIOD, "previous_period"),
+                (QueryComparison.PREVIOUS_YEAR, "previous_year"),
+            ):
+                if comparison in query.comparisons:
+                    reference_point = comparison_points.get(comparison, {}).get(point.key)
+                    trend_row[dimension_id] = reference_point.comparison if reference_point else None
+            if QueryComparison.FORECAST in query.comparisons:
+                trend_row["forecast"] = (
+                    point.primary
+                    if query.module is ModuleId.PLANNING and query.metric_id == "planning.actual"
+                    else None
+                )
+            trend_rows.append(trend_row)
+        if QueryComparison.RECENT_AVERAGE in query.comparisons:
+            for index, trend_row in enumerate(trend_rows):
+                window = [value for value in primary_values[max(0, index - 3) : index] if value is not None]
+                trend_row["recent_average"] = sum(window, Decimal(0)) / Decimal(len(window)) if window else None
+        if query.time_range is not None:
+            trend_rows = [
+                row for row in trend_rows if query.time_range.start <= str(row["key"]) <= query.time_range.end
+            ]
+        dimensions = [
+            DatasetDimension(id="key", label="Cheie", kind="string", role="key"),
+            DatasetDimension(id="label", label="Perioadă", kind="string", role="label"),
+            DatasetDimension(id="value", label=query.metric_id, kind="number"),
+        ]
+        comparison_dimensions = {
+            QueryComparison.PREVIOUS_PERIOD: ("previous_period", "Perioada precedentă"),
+            QueryComparison.PREVIOUS_YEAR: ("previous_year", "Anul trecut"),
+            QueryComparison.RECENT_AVERAGE: ("recent_average", "Media ultimelor 3 perioade"),
+            QueryComparison.FORECAST: ("forecast", "Forecast"),
+        }
+        dimensions.extend(
+            DatasetDimension(id=identifier, label=label, kind="number", role="comparison")
+            for comparison, (identifier, label) in comparison_dimensions.items()
+            if comparison in query.comparisons
+        )
+        if QueryComparison.TARGET in query.comparisons:
+            dimensions.append(DatasetDimension(id="target", label="Target", kind="number", role="target"))
+        dimensions.append(DatasetDimension(id="is_estimate", label="Estimat", kind="boolean", role="metadata"))
         return QueryDataset(
-            dimensions=[
-                DatasetDimension(id="key", label="Cheie", kind="string", role="key"),
-                DatasetDimension(id="label", label="Perioadă", kind="string", role="label"),
-                DatasetDimension(id="value", label=query.metric_id, kind="number"),
-                DatasetDimension(id="comparison", label="Comparație", kind="number", role="comparison"),
-                DatasetDimension(id="target", label="Target", kind="number", role="target"),
-                DatasetDimension(id="is_estimate", label="Estimat", kind="boolean", role="metadata"),
-            ],
+            dimensions=dimensions,
             rows=_sorted_rows(trend_rows, query.sort, query.limit),
         )
 
@@ -441,6 +499,18 @@ async def execute_query_batch(
             if query.time_range is not None and query.time_range.end != base_scope.period:
                 raise QueryValidationFailure("time_range.end trebuie să fie perioada snapshotului comun.")
             query_scope = resolve_query_scope(base_scope, query)
+            unavailable_domains = [
+                domain.value
+                for domain in required_source_domains(query)
+                if (source := snapshot.sources.get(domain.value)) is None or source.status is SourceStatus.UNAVAILABLE
+            ]
+            if unavailable_domains:
+                results[query.widget_id] = _error_result(
+                    query,
+                    QueryErrorCode.UNAVAILABLE,
+                    f"Sursele {', '.join(unavailable_domains)} nu sunt disponibile în snapshot.",
+                )
+                continue
             valid[query.widget_id] = (query, metric, query_scope)
         except PermissionError as exc:
             results[query.widget_id] = _error_result(query, QueryErrorCode.UNAUTHORIZED, str(exc))
@@ -448,9 +518,17 @@ async def execute_query_batch(
             results[query.widget_id] = _error_result(query, QueryErrorCode.INVALID_QUERY, exc.message)
 
     fetches: dict[tuple[ModuleId, str], asyncio.Task[ModuleAnalyticsResponse]] = {}
+    comparison_keys: dict[str, dict[QueryComparison, tuple[ModuleId, str]]] = {}
     for query, _metric, query_scope in valid.values():
         key = (query.module, query_scope.model_dump_json())
-        fetches.setdefault(key, asyncio.create_task(repository.get_module(query.module, query_scope)))
+        if key not in fetches:
+            fetches[key] = asyncio.create_task(repository.get_module(query.module, query_scope))
+        comparison_keys[query.widget_id] = {}
+        for comparison, comparison_scope in comparison_scopes(query_scope, query).items():
+            comparison_key = (query.module, comparison_scope.model_dump_json())
+            if comparison_key not in fetches:
+                fetches[comparison_key] = asyncio.create_task(repository.get_module(query.module, comparison_scope))
+            comparison_keys[query.widget_id][comparison] = comparison_key
 
     elapsed_ms = int((time.monotonic() - started) * 1000)
     remaining = max((deadline_ms - elapsed_ms) / 1000, 0)
@@ -466,7 +544,10 @@ async def execute_query_batch(
     task_by_key = {key: task for key, task in fetches.items()}
     for widget_id, (query, metric, query_scope) in valid.items():
         task = task_by_key[(query.module, query_scope.model_dump_json())]
-        if task not in done:
+        widget_comparison_tasks = {
+            comparison: task_by_key[key] for comparison, key in comparison_keys[widget_id].items()
+        }
+        if task not in done or any(item not in done for item in widget_comparison_tasks.values()):
             results[widget_id] = _error_result(
                 query,
                 QueryErrorCode.DEADLINE_EXCEEDED,
@@ -476,16 +557,19 @@ async def execute_query_batch(
             continue
         try:
             response = task.result()
+            comparison_responses = {
+                comparison: comparison_task.result() for comparison, comparison_task in widget_comparison_tasks.items()
+            }
             domain = MODULE_SOURCE_DOMAINS[query.module]
             source = snapshot.sources.get(domain.value)
-            if source is None:
-                results[widget_id] = _error_result(
-                    query,
-                    QueryErrorCode.UNAVAILABLE,
-                    f"Sursa {domain.value} nu este publicată în snapshot.",
-                )
-                continue
-            dataset = _dataset(query, response)
+            if source is None or source.status is SourceStatus.UNAVAILABLE:
+                raise RuntimeError("Source eligibility changed inside one immutable snapshot.")
+            dataset = _dataset(query, response, comparison_responses)
+            sources = {
+                source_domain.value: source_metadata
+                for source_domain in required_source_domains(query)
+                if (source_metadata := snapshot.sources.get(source_domain.value)) is not None
+            }
             results[widget_id] = WidgetQueryResult(
                 widget_id=widget_id,
                 query=query,
@@ -495,6 +579,7 @@ async def execute_query_batch(
                     scope_label=scope_label(query_scope),
                     snapshot_id=snapshot.id,
                     source=source,
+                    sources=sources,
                     metric_id=metric.id,
                     metric_version=metric.version,
                     query_contract_version=query.query_contract_version,

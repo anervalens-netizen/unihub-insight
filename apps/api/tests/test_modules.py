@@ -38,13 +38,13 @@ def test_module_response_is_deterministic(client: TestClient) -> None:
     assert first.json()["trend"] == second.json()["trend"]
 
 
-def test_module_range_is_applied_and_unsupported_comparisons_are_explicit(client: TestClient) -> None:
+def test_module_range_and_simultaneous_comparisons_are_applied(client: TestClient) -> None:
     response = client.get(
         "/api/v1/modules/sales",
         params={
             "period": "2026-08",
             "range": "3",
-            "comparisons": "target,recent-average",
+            "comparisons": "target,previous-period,previous-year,recent-average",
         },
     )
 
@@ -53,8 +53,17 @@ def test_module_range_is_applied_and_unsupported_comparisons_are_explicit(client
     assert [item["key"] for item in payload["trend"]] == ["2026-06", "2026-07", "2026-08"]
     assert payload["meta"]["range_start"] == "2026-06"
     assert payload["meta"]["range_end"] == "2026-08"
-    assert payload["meta"]["requested_comparisons"] == ["target", "recent-average"]
-    assert "recent-average" in payload["meta"]["warnings"][0]
+    assert payload["meta"]["requested_comparisons"] == [
+        "target",
+        "previous-period",
+        "previous-year",
+        "recent-average",
+    ]
+    assert not payload["meta"]["warnings"]
+    assert all(
+        comparison in payload["trend"][-1]["comparisons"]
+        for comparison in ("previous-period", "previous-year", "recent-average")
+    )
 
 
 def test_custom_range_must_end_at_the_common_period(client: TestClient) -> None:

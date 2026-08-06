@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Lock, RefreshCw, RotateCcw, Unlock } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 
 import { useGlobalSearch, useUpdateGlobalSearch } from '../../app/search-hooks';
 import { DashboardCanvas } from '../../components/dashboard/DashboardCanvas';
@@ -9,14 +9,98 @@ import { ExcelExportButton } from '../../components/ui/ExcelExportButton';
 import { LoadingState } from '../../components/ui/LoadingState';
 import { analyticsSearchParams } from '../../lib/download';
 import { formatDate, formatMonth } from '../../lib/format';
-import { currentBusinessMonth, updateDrillPath } from '../../lib/search';
+import {
+  currentBusinessMonth,
+  parseComparisons,
+  rangeBounds,
+  updateDrillPath,
+} from '../../lib/search';
 import { useIdentity } from '../identity/context';
+import { analyticsCatalogQuery } from '../query/api';
+import type { MetricDefinition, WidgetQuery } from '../query/schemas';
 import { moduleAnalyticsQuery } from './api';
 import { ModuleProvider } from './context';
-import { DataInspector } from './DataInspector';
 import type { ModuleAnalytics, ModuleId } from './schemas';
 import { type ModuleSubview, moduleSubviewConfig, subviewForId, subviewStatus } from './subviews';
-import { moduleWidgets } from './widget-catalog';
+import { moduleWidgetQuerySpec, moduleWidgets } from './widget-catalog';
+
+const QueryInspector = lazy(() =>
+  import('../query/QueryInspector').then((module) => ({ default: module.QueryInspector })),
+);
+
+const businessFilterKeys = ['firm', 'regional', 'asm', 'stores', 'agent'] as const;
+const entityDimension: Record<ModuleId, string> = {
+  sales: 'store',
+  performance: 'store',
+  campaigns: 'store',
+  workforce: 'store',
+  compensation: 'firm',
+  finance: 'store',
+  planning: 'store',
+};
+const distributionDimension: Partial<Record<ModuleId, string>> = {
+  sales: 'category',
+  campaigns: 'category',
+  workforce: 'tenure',
+  compensation: 'firm',
+  finance: 'category',
+};
+
+function nativeWidgetQuery(
+  module: ModuleId,
+  widgetId: string,
+  search: ReturnType<typeof useGlobalSearch> & { period: string },
+  metric: MetricDefinition | undefined,
+): WidgetQuery | null {
+  const spec = moduleWidgetQuerySpec(module, widgetId);
+  if (!spec || !metric || metric.id !== spec.metricId) return null;
+  let visualization: WidgetQuery['visualization'];
+  let dimensions: string[];
+  if (spec.kind === 'kpi') {
+    visualization = 'kpi';
+    dimensions = [];
+  } else if (spec.kind === 'trend') {
+    visualization = 'line';
+    dimensions = ['time'];
+  } else if (spec.kind === 'distribution') {
+    visualization = 'donut';
+    const dimension = distributionDimension[module];
+    if (!dimension) return null;
+    dimensions = [dimension];
+  } else if (spec.kind === 'matrix') {
+    visualization = 'heatmap';
+    dimensions = [entityDimension[module], 'time'];
+  } else {
+    visualization = 'table';
+    dimensions = [entityDimension[module]];
+  }
+  if (
+    !metric.allowed_shapes.includes(visualization) ||
+    dimensions.some((dimension) => !metric.allowed_dimensions.includes(dimension))
+  ) {
+    return null;
+  }
+  const filters: WidgetQuery['filters'] = {};
+  for (const key of businessFilterKeys) {
+    const value = search[key];
+    if (value) filters[key] = value;
+  }
+  return {
+    widget_id: widgetId,
+    module,
+    metric_id: metric.id,
+    metric_version: metric.version,
+    query_contract_version: metric.query_contract_version,
+    dimensions,
+    time_range: rangeBounds(search),
+    time_grain: 'month',
+    filters,
+    comparisons: spec.kind === 'trend' ? parseComparisons(search) : [],
+    sort: [],
+    limit: spec.kind === 'matrix' ? 5000 : spec.kind === 'breakdown' ? 500 : 100,
+    visualization,
+  };
+}
 
 function SubviewNavigation({
   views,
@@ -66,8 +150,11 @@ function SourceMetadataStrip({ data }: { data: ModuleAnalytics }) {
       </h3>
       {data.meta.range_start && data.meta.range_end ? (
         <span className="meta-chip">
-          Interval: {data.meta.range_start} → {data.meta.range_end}
+          Fereastră serie: {data.meta.range_start} → {data.meta.range_end}
         </span>
+      ) : null}
+      {data.meta.range_start && data.meta.range_start !== data.meta.period ? (
+        <span className="meta-chip">KPI/mix/ranking: {data.meta.period}</span>
       ) : null}
       {data.meta.warnings?.map((warning) => (
         <span className="meta-chip meta-chip--warning" key={warning}>
@@ -118,6 +205,7 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
     ...moduleAnalyticsQuery(module, input),
     enabled: !incompatibleAgent,
   });
+  const catalogQuery = useQuery(analyticsCatalogQuery());
   const [editMode, setEditMode] = useState(false);
   const [resetToken, setResetToken] = useState(0);
   const [inspectWidget, setInspectWidget] = useState<string | null>(null);
@@ -152,8 +240,26 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
   }
   const statuses = new Map(views.map((view) => [view.id, subviewStatus(data, view)]));
   const status = statuses.get(selectedSubview.id);
-  const widgets =
-    status?.availability === 'unavailable' ? [] : moduleWidgets(data, selectedSubview.id);
+  const catalogMetrics = new Map(
+    (catalogQuery.data?.metrics ?? []).map((metric) => [metric.id, metric]),
+  );
+  const widgetQueries = new Map<string, WidgetQuery>();
+  const snapshotId = data.meta.analytical_snapshot_id;
+  const widgets = (
+    status?.availability === 'unavailable' ? [] : moduleWidgets(data, selectedSubview.id)
+  ).map((widget) => {
+    const spec = moduleWidgetQuerySpec(module, widget.id);
+    const widgetQuery = nativeWidgetQuery(
+      module,
+      widget.id,
+      input,
+      spec ? catalogMetrics.get(spec.metricId) : undefined,
+    );
+    if (widgetQuery) widgetQueries.set(widget.id, widgetQuery);
+    return { ...widget, inspectable: Boolean(snapshotId && widgetQuery) };
+  });
+  const inspectedQuery = inspectWidget ? widgetQueries.get(inspectWidget) : undefined;
+  const inspectedMetric = inspectedQuery ? catalogMetrics.get(inspectedQuery.metric_id) : undefined;
   const handleUrlState = (event: { dimensionId: string; value: string; label: string | null }) => {
     updateSearch({
       drill: updateDrillPath(search.drill, {
@@ -263,14 +369,20 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
           resetToken={resetToken}
           storageKey={`unihub-insight:${module}-${selectedSubview.id}-layout:v2`}
           onInspect={setInspectWidget}
+          onExport={setInspectWidget}
         />
       )}
-      {inspectWidget ? (
-        <DataInspector
-          widgetId={inspectWidget}
-          data={data}
-          onClose={() => setInspectWidget(null)}
-        />
+      {inspectWidget && inspectedQuery && inspectedMetric && snapshotId ? (
+        <Suspense fallback={null}>
+          <QueryInspector
+            dashboardId={null}
+            snapshotId={snapshotId}
+            search={input}
+            result={{ widget_id: inspectWidget, query: inspectedQuery, meta: null }}
+            metric={inspectedMetric}
+            onClose={() => setInspectWidget(null)}
+          />
+        </Suspense>
       ) : null}
     </ModuleProvider>
   );

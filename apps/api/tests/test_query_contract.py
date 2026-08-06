@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from unihub_insight_api.api.routes.query import _safe_csv_value
+from unihub_insight_api.domain import SourceStatus
 
 
 def widget(
@@ -95,6 +96,31 @@ def test_scatter_uses_explicit_business_axes(client: TestClient) -> None:
     assert result["dataset"]["rows"]
 
 
+def test_trend_returns_all_requested_comparisons_in_one_dataset(client: TestClient) -> None:
+    query = widget("sales-comparisons")
+    query["comparisons"] = ["target", "previous-period", "previous-year", "recent-average"]
+    response = client.post(
+        "/api/v1/query/batch",
+        params={"period": "2026-08"},
+        json={"widgets": [query]},
+    )
+
+    assert response.status_code == 200
+    result = response.json()["results"][0]
+    assert result["error"] is None
+    dimensions = {item["id"]: item["role"] for item in result["dataset"]["dimensions"]}
+    assert {
+        "previous_period": "comparison",
+        "previous_year": "comparison",
+        "recent_average": "comparison",
+        "target": "target",
+    }.items() <= dimensions.items()
+    assert any(
+        row["previous_period"] is not None and row["previous_year"] is not None and row["recent_average"] is not None
+        for row in result["dataset"]["rows"]
+    )
+
+
 def test_waterfall_dataset_carries_reconciliation_roles(client: TestClient) -> None:
     response = client.post(
         "/api/v1/query/batch",
@@ -151,6 +177,45 @@ def test_batch_is_bounded_to_twelve_widgets(client: TestClient) -> None:
     assert response.status_code == 422
 
 
+def test_batch_does_not_query_an_unavailable_source(client: TestClient) -> None:
+    repository = client.app.state.analytics_repository
+    original_resolve = repository.resolve_snapshot
+    original_get_module = repository.get_module
+    finance_fetches = 0
+
+    async def unavailable_finance(scope):
+        snapshot = await original_resolve(scope)
+        finance = snapshot.sources["finance"].model_copy(update={"status": SourceStatus.UNAVAILABLE})
+        return snapshot.model_copy(update={"sources": {**snapshot.sources, "finance": finance}})
+
+    async def counted_get_module(module, scope):
+        nonlocal finance_fetches
+        if module.value == "finance":
+            finance_fetches += 1
+        return await original_get_module(module, scope)
+
+    repository.resolve_snapshot = unavailable_finance
+    repository.get_module = counted_get_module
+    response = client.post(
+        "/api/v1/query/batch",
+        params={"period": "2026-08"},
+        json={
+            "widgets": [
+                widget(
+                    "finance",
+                    module="finance",
+                    metric_id="finance.ebit",
+                    visualization="line",
+                )
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["results"][0]["error"]["code"] == "unavailable"
+    assert finance_fetches == 0
+
+
 def test_inspect_requires_and_reuses_the_same_snapshot(client: TestClient) -> None:
     batch = client.post(
         "/api/v1/query/batch",
@@ -193,6 +258,25 @@ def test_compensation_rejects_differentiating_filter(client: TestClient) -> None
 
     assert response.status_code == 200
     assert response.json()["results"][0]["error"]["code"] == "invalid-query"
+
+
+def test_cross_domain_metrics_publish_all_source_provenance(client: TestClient) -> None:
+    query = widget(
+        "sales-ratio",
+        module="compensation",
+        metric_id="compensation.sales_ratio",
+        visualization="kpi",
+    )
+    query["dimensions"] = []
+    response = client.post(
+        "/api/v1/query/batch",
+        params={"period": "2026-08"},
+        json={"widgets": [query]},
+    )
+
+    assert response.status_code == 200
+    meta = response.json()["results"][0]["meta"]
+    assert set(meta["sources"]) == {"compensation", "sales"}
 
 
 def test_csv_export_reuses_snapshot_carries_metadata_and_is_audited(client: TestClient) -> None:

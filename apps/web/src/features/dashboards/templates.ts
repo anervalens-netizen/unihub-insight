@@ -31,6 +31,7 @@ function widget(
     query_contract_version: 1,
     visualization,
     dimension,
+    dimensions: dimension ? [dimension] : [],
     time_grain: 'month',
     filter_mode: 'inherit',
     filters: {},

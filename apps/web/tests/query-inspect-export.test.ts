@@ -27,4 +27,12 @@ describe('custom widget inspect/export request construction', () => {
     expect(exportRequest).toEqual(inspect);
     expect(exportRequest.query).toBe(query);
   });
+
+  it('supports native widgets without a saved dashboard identity', () => {
+    expect(buildInspectRequest('snapshot-42', null, query)).toMatchObject({
+      snapshot_id: 'snapshot-42',
+      dashboard_id: null,
+      query,
+    });
+  });
 });

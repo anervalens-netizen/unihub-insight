@@ -147,8 +147,12 @@ export function DashboardCanvas({
       {widgets.map((widget) => {
         const position = layoutById.get(widget.id) ?? widget;
         const Widget = widget.component;
-        const inspectProps = onInspect ? { onInspect: () => onInspect(widget.id) } : {};
-        const exportProps = onExport ? { onExport: () => onExport(widget.id) } : {};
+        const inspectProps =
+          onInspect && widget.inspectable !== false
+            ? { onInspect: () => onInspect(widget.id) }
+            : {};
+        const exportProps =
+          onExport && widget.inspectable !== false ? { onExport: () => onExport(widget.id) } : {};
         return (
           <div
             key={widget.id}

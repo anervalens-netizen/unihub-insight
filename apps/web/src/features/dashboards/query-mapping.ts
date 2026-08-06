@@ -2,7 +2,7 @@ import type { GlobalSearch } from '../../lib/search';
 import { parseComparisons, rangeBounds } from '../../lib/search';
 import type { QueryBatchRequest, WidgetQuery } from '../query/schemas';
 import { resolveWidgetSearch } from './filter-resolution';
-import type { DashboardDocument, DashboardWidget } from './schemas';
+import { type DashboardDocument, type DashboardWidget, dashboardWidgetDimensions } from './schemas';
 
 export const MAX_DASHBOARD_QUERY_WIDGETS = 12;
 const businessFilterKeys = ['firm', 'regional', 'asm', 'stores', 'agent'] as const;
@@ -56,7 +56,7 @@ export function toWidgetQuery(
     metric_id: widget.metric_id,
     metric_version: widget.metric_version,
     query_contract_version: widget.query_contract_version,
-    dimensions: widget.dimension ? [widget.dimension] : [],
+    dimensions: dashboardWidgetDimensions(widget),
     time_range: bounds,
     time_grain: supportedTimeGrains.includes(
       widget.time_grain as (typeof supportedTimeGrains)[number],

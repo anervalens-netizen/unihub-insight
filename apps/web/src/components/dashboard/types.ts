@@ -14,4 +14,5 @@ export interface DashboardWidgetDefinition extends DashboardLayoutItem {
   title: string;
   subtitle?: string;
   component: ComponentType;
+  inspectable?: boolean;
 }

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -9,6 +10,7 @@ from unihub_insight_api.auth import require_capability
 from unihub_insight_api.domain import (
     AnalyticsCatalogResponse,
     Capability,
+    ComparisonMode,
     FilterOptionsResponse,
     MetricDefinition,
     ModuleAnalyticsResponse,
@@ -77,7 +79,34 @@ async def module_analytics(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Filtrul Agent nu este compatibil cu modulul {module.value}.",
         )
-    return apply_module_window(await repository.get_module(module, scope), window)
+    base_task = asyncio.create_task(repository.get_module(module, scope))
+    temporal_tasks = {
+        comparison: asyncio.create_task(
+            repository.get_module(
+                module,
+                scope.model_copy(
+                    update={
+                        "comparison": (
+                            ComparisonMode.PREVIOUS_MONTH
+                            if comparison == "previous-period"
+                            else ComparisonMode.PREVIOUS_YEAR
+                        )
+                    }
+                ),
+            )
+        )
+        for comparison in window.requested_comparisons
+        if comparison in {"previous-period", "previous-year"}
+    }
+    data, *comparison_responses = await asyncio.gather(base_task, *temporal_tasks.values())
+    comparison_data = dict(zip(temporal_tasks, comparison_responses, strict=True))
+    snapshot_id = data.meta.analytical_snapshot_id
+    if snapshot_id and any(response.meta.analytical_snapshot_id != snapshot_id for response in comparison_responses):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Snapshot is no longer eligible.",
+        )
+    return apply_module_window(data, window, comparison_data)
 
 
 @router.get("/catalog/metrics", response_model=list[MetricDefinition])

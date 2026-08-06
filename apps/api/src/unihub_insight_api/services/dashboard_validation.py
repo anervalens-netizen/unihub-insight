@@ -182,6 +182,12 @@ SCALAR_ONLY_METRICS = frozenset(
 )
 
 
+def widget_dimensions(widget: object) -> tuple[str, ...]:
+    configured = tuple(getattr(widget, "dimensions", ()))
+    legacy = getattr(widget, "dimension", None)
+    return configured or (() if legacy is None else (legacy,))
+
+
 @dataclass(frozen=True)
 class DashboardValidationError(ValueError):
     errors: tuple[str, ...]
@@ -254,7 +260,7 @@ def validate_batch_for_dashboard(document: DashboardDocument, request: QueryBatc
             or query.query_contract_version != widget.query_contract_version
             or query.visualization is not widget.visualization
             or query.time_grain != widget.time_grain
-            or query.dimensions != (() if widget.dimension is None else (widget.dimension,))
+            or query.dimensions != widget_dimensions(widget)
             or query.limit != widget.limit
         ):
             raise ValueError(f"Widget {query.widget_id} query differs from its saved contract.")
@@ -280,18 +286,23 @@ def validate_dashboard(request: DashboardCreateRequest, user: UserContext) -> No
         if widget.metric_id not in MODULE_METRICS[widget.module]:
             errors.append(f"{prefix}.metric_id is not registered for {widget.module.value}")
         metric = CATALOG_METRICS.get(widget.metric_id)
+        dimensions = widget_dimensions(widget)
+        if len(set(dimensions)) != len(dimensions):
+            errors.append(f"{prefix}.dimensions contains duplicates")
+        if widget.dimensions and widget.dimension not in {None, widget.dimensions[0]}:
+            errors.append(f"{prefix}.dimension legacy alias differs from dimensions[0]")
         if metric is None:
             errors.append(f"{prefix}.metric_id is missing from the metric catalog")
         elif widget.visualization not in metric.allowed_shapes:
             errors.append(f"{prefix}.visualization is incompatible with {widget.metric_id}")
-        elif widget.dimension is not None and widget.dimension not in metric.allowed_dimensions:
-            errors.append(f"{prefix}.dimension is incompatible with {widget.metric_id}")
+        elif any(dimension not in metric.allowed_dimensions for dimension in dimensions):
+            errors.append(f"{prefix}.dimensions are incompatible with {widget.metric_id}")
         elif widget.time_grain not in metric.allowed_grains:
             errors.append(f"{prefix}.time_grain is incompatible with {widget.metric_id}")
-        if widget.metric_id in SCALAR_ONLY_METRICS and widget.dimension is not None:
+        if widget.metric_id in SCALAR_ONLY_METRICS and dimensions:
             errors.append(f"{prefix}.metric_id supports only an aggregate without dimension")
-        if widget.visualization in {ChartKind.LINE, ChartKind.AREA} and widget.dimension != "time":
-            errors.append(f"{prefix}.visualization requires dimension=time")
+        if widget.visualization in {ChartKind.LINE, ChartKind.AREA} and dimensions != ("time",):
+            errors.append(f"{prefix}.visualization requires dimensions=[time]")
         mix_dimensions = {
             "sales.total": "category",
             "campaigns.focus_sales": "category",
@@ -299,20 +310,19 @@ def validate_dashboard(request: DashboardCreateRequest, user: UserContext) -> No
             "compensation.payroll": "firm",
             "finance.operating_costs": "category",
         }
-        if widget.visualization in {ChartKind.DONUT, ChartKind.TREEMAP} and widget.dimension != mix_dimensions.get(
-            widget.metric_id
+        if widget.visualization in {ChartKind.DONUT, ChartKind.TREEMAP} and dimensions != (
+            mix_dimensions.get(widget.metric_id),
         ):
             errors.append(f"{prefix}.visualization requires the approved aggregate dimension")
         if widget.visualization is ChartKind.WATERFALL and (
-            widget.metric_id != "finance.ebit" or widget.dimension != "category"
+            widget.metric_id != "finance.ebit" or dimensions != ("category",)
         ):
             errors.append(f"{prefix}.waterfall requires finance.ebit × category")
-        if widget.visualization is ChartKind.HEATMAP and widget.dimension != "time":
-            errors.append(f"{prefix}.heatmap requires dimension=time")
-        if widget.visualization in {ChartKind.HISTOGRAM, ChartKind.BOXPLOT, ChartKind.SCATTER} and widget.dimension in {
-            None,
-            "time",
-        }:
+        if widget.visualization is ChartKind.HEATMAP and "time" not in dimensions:
+            errors.append(f"{prefix}.heatmap requires a time dimension")
+        if widget.visualization in {ChartKind.HISTOGRAM, ChartKind.BOXPLOT, ChartKind.SCATTER} and (
+            not dimensions or "time" in dimensions
+        ):
             errors.append(f"{prefix}.visualization requires an entity dimension")
         if widget.visualization not in MODULE_CHARTS[widget.module]:
             errors.append(f"{prefix}.visualization is incompatible with {widget.module.value}")
@@ -324,9 +334,21 @@ def validate_dashboard(request: DashboardCreateRequest, user: UserContext) -> No
         unknown_options = set(widget.options) - ALLOWED_OPTION_KEYS
         if unknown_options:
             errors.append(f"{prefix}.options contains unsupported keys: {', '.join(sorted(unknown_options))}")
+        boolean_options = {"show_legend", "show_labels", "smooth", "stacked"}
+        invalid_boolean_options = sorted(
+            key for key in boolean_options if key in widget.options and not isinstance(widget.options[key], bool)
+        )
+        if invalid_boolean_options:
+            errors.append(f"{prefix}.options requires booleans for: {', '.join(invalid_boolean_options)}")
+        top_n = widget.options.get("top_n")
+        if top_n is not None and (
+            isinstance(top_n, bool) or not isinstance(top_n, int) or not 1 <= top_n <= widget.limit
+        ):
+            errors.append(f"{prefix}.options.top_n must be an integer between 1 and limit")
         if widget.options.get("renderer", "canvas") != "canvas":
             errors.append(f"{prefix}.options.renderer supports only canvas")
-        if widget.options.get("pixel_ratio", 2) not in {1, 2}:
+        pixel_ratio = widget.options.get("pixel_ratio", 2)
+        if isinstance(pixel_ratio, bool) or pixel_ratio not in {1, 2}:
             errors.append(f"{prefix}.options.pixel_ratio must be 1 or 2")
         if widget.metric_version != 1 or widget.query_contract_version != 1:
             errors.append(f"{prefix} references an unsupported contract version")

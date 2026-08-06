@@ -23,7 +23,7 @@ import type { EChartsCoreOption, EChartsType } from 'echarts/core';
 import * as echarts from 'echarts/core';
 import { UniversalTransition } from 'echarts/features';
 import { CanvasRenderer } from 'echarts/renderers';
-import { useEffect, useMemo, useRef } from 'react';
+import { type KeyboardEvent, useEffect, useMemo, useRef } from 'react';
 import { applyChartDesign, useChartDesign } from './chart-design';
 import type { ChartPngExportConfig } from './chart-spec';
 
@@ -65,6 +65,23 @@ function safeFilename(value: string): string {
   return `${normalized || 'chart'}.png`;
 }
 
+function chartDataCount(option: EChartsCoreOption): number {
+  const record = typeof option === 'object' && option !== null ? option : {};
+  const datasetValue = (record as Record<string, unknown>)['dataset'];
+  const dataset = Array.isArray(datasetValue) ? datasetValue[0] : datasetValue;
+  if (typeof dataset === 'object' && dataset !== null) {
+    const source = (dataset as Record<string, unknown>)['source'];
+    if (Array.isArray(source)) return source.length;
+  }
+  const series = (record as Record<string, unknown>)['series'];
+  const firstSeries = Array.isArray(series) ? series[0] : series;
+  if (typeof firstSeries === 'object' && firstSeries !== null) {
+    const data = (firstSeries as Record<string, unknown>)['data'];
+    if (Array.isArray(data)) return data.length;
+  }
+  return 0;
+}
+
 function downloadChartPng(chart: EChartsType, exportConfig: ChartPngExportConfig): void {
   const url = chart.getDataURL({
     type: 'png',
@@ -96,8 +113,22 @@ export function EChart({
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<EChartsType | null>(null);
+  const keyboardIndexRef = useRef(-1);
   const design = useChartDesign();
-  const designedOption = useMemo(() => applyChartDesign(option, design), [design, option]);
+  const rawDataCount = useMemo(() => chartDataCount(option), [option]);
+  const designedOption = useMemo(() => {
+    const designed = applyChartDesign(option, design);
+    return rawDataCount > 2000
+      ? ({
+          ...designed,
+          animation: false,
+          animationDuration: 0,
+          animationDurationUpdate: 0,
+        } as EChartsCoreOption)
+      : designed;
+  }, [design, option, rawDataCount]);
+  const dataCount = useMemo(() => chartDataCount(designedOption), [designedOption]);
+  const interactive = Boolean(onEvent || onBlankReset);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -111,12 +142,22 @@ export function EChart({
       locale: 'EN',
     });
     chartRef.current = chart;
+    let resizeFrame = 0;
+    let resizeTimer = 0;
     const resizeObserver = new ResizeObserver(() => {
-      if (!chart.isDisposed()) chart.resize({ animation: { duration: 120 } });
+      window.clearTimeout(resizeTimer);
+      cancelAnimationFrame(resizeFrame);
+      resizeTimer = window.setTimeout(() => {
+        resizeFrame = requestAnimationFrame(() => {
+          if (!chart.isDisposed()) chart.resize({ animation: { duration: 0 } });
+        });
+      }, 120);
     });
     resizeObserver.observe(host);
     return () => {
       resizeObserver.disconnect();
+      window.clearTimeout(resizeTimer);
+      cancelAnimationFrame(resizeFrame);
       chart.dispose();
       chartRef.current = null;
     };
@@ -163,10 +204,51 @@ export function EChart({
       lazyUpdate: true,
       silent: false,
     });
+    keyboardIndexRef.current = -1;
   }, [designedOption]);
 
+  const handleKeyboard = (event: KeyboardEvent<HTMLDivElement>): void => {
+    const chart = chartRef.current;
+    if (!chart || chart.isDisposed()) return;
+    if (event.key === 'Escape' && onBlankReset) {
+      event.preventDefault();
+      onBlankReset();
+      return;
+    }
+    const count = dataCount;
+    if (count === 0) return;
+    if (['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown'].includes(event.key)) {
+      event.preventDefault();
+      const direction = event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1;
+      const previous = keyboardIndexRef.current;
+      const current = previous < 0 ? 0 : (previous + direction + count) % count;
+      if (previous >= 0)
+        chart.dispatchAction({ type: 'downplay', seriesIndex: 0, dataIndex: previous });
+      keyboardIndexRef.current = current;
+      chart.dispatchAction({ type: 'highlight', seriesIndex: 0, dataIndex: current });
+      chart.dispatchAction({ type: 'showTip', seriesIndex: 0, dataIndex: current });
+      return;
+    }
+    if ((event.key === 'Enter' || event.key === ' ') && onEvent) {
+      event.preventDefault();
+      const current = keyboardIndexRef.current < 0 ? 0 : keyboardIndexRef.current;
+      keyboardIndexRef.current = current;
+      onEvent({ dataIndex: current });
+    }
+  };
+
+  const interactionProps = interactive
+    ? {
+        role: 'application' as const,
+        tabIndex: 0,
+        onKeyDown: handleKeyboard,
+        'aria-label': ariaLabel,
+        'aria-roledescription': 'grafic interactiv',
+      }
+    : {};
+
   return (
-    <div className="chart-host">
+    <div className="chart-host" {...interactionProps}>
       <div
         ref={hostRef}
         className={`chart ${className}`}

@@ -127,6 +127,7 @@ export const queryExecutionMetaSchema = z.object({
   scope_label: z.string(),
   snapshot_id: z.string(),
   source: sourceMetadataSchema,
+  sources: z.record(z.string(), sourceMetadataSchema).default({}),
   metric_id: z.string(),
   metric_version: z.number().int(),
   query_contract_version: z.number().int(),

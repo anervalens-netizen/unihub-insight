@@ -10,6 +10,7 @@ const widget = (id: string) => ({
   metric_id: 'sales.total',
   visualization: 'line' as const,
   dimension: 'store',
+  dimensions: ['store', 'time'],
   time_grain: 'month',
   filter_mode: 'augment' as const,
   filters: { stores: 'S001' },
@@ -41,7 +42,7 @@ describe('custom dashboard batch mapping', () => {
     expect(request.widgets[0]).toMatchObject({
       metric_version: 1,
       query_contract_version: 1,
-      dimensions: ['store'],
+      dimensions: ['store', 'time'],
       time_range: { start: '2026-08', end: '2026-08' },
       filters: { firm: 'MOBIUP', stores: 'S001' },
       comparisons: ['previous-year'],

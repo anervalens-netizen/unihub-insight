@@ -2,7 +2,7 @@
 
 ## Response metadata
 
-Every analytical response includes period/range, comparisons, scope, `analytical_snapshot_id`, data mode, currency and generated time. Source metadata is domain-specific and includes cutoff, final/open state, coverage numerator/denominator, source generation, authority/head, rule/metric version, status and warnings. `as_of` is the last covered business date, not response time; Sales cutoff is never reused implicitly for Finance, HR or Forecast.
+Every analytical response includes period/range, comparisons, scope, `analytical_snapshot_id`, data mode, currency and generated time. Source metadata is domain-specific and includes cutoff, final/open state, coverage numerator/denominator, source generation, authority/head, rule/metric version, status and warnings. Queries that combine domains expose every required source, not only the primary module source. `as_of` is the last covered business date, not response time; Sales cutoff is never reused implicitly for Finance, HR or Forecast.
 
 One dashboard render resolves one eligible snapshot from `completed/promoted` generations. All widget queries, inspect and export reuse it. Consumer compatibility is additive N/N-1 across Retail publisher and Insight consumer.
 
@@ -28,9 +28,15 @@ The linear forecast is explicitly labeled run-rate; it is not the persisted AI f
 
 ## Comparison semantics
 
-- `previous-month`: same scope against the immediately preceding calendar month.
+- `previous-period`: same scope against the immediately preceding calendar period.
 - `previous-year`: same calendar month one year earlier.
-- `none`: comparison fields are null.
+- `recent-average`: arithmetic mean of the previous three available primary points; the current point is excluded and missing points are not replaced with zero.
+- `target`: the approved target carried by the same analytical row.
+- `forecast`: the approved Planning forecast and only for catalog combinations that expose it; it is never synthesized from a missing authority.
+
+The five tokens may be requested simultaneously where the metric catalog permits them. Each becomes a separate typed dataset dimension/series; one token never overwrites another. Temporal references execute with the same scope and eligible snapshot as the primary query. A source that is missing or `unavailable` is classified before repository fetch and remains unavailable.
+
+For a wider range, the range bounds the time-series and matrix rows. Current KPI, mix and ranking cards remain explicitly labeled for the selected end period; they are not presented as range aggregates unless their metric contract defines that aggregation.
 
 For an open current period, future actual points are null, never repeated last values.
 

@@ -203,9 +203,9 @@ test('native inspector traps focus, exports safe source rows and restores focus'
   const inspect = page.getByRole('button', { name: /Inspectează datele/ }).first();
   await inspect.click();
 
-  const dialog = page.getByRole('dialog', { name: /Sales Intelligence/ });
+  const dialog = page.getByRole('dialog', { name: /Vânzări/ });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole('button', { name: 'CSV' })).toBeEnabled();
+  await expect(dialog.getByRole('button', { name: 'CSV server-side' })).toBeEnabled();
   await expect(dialog.locator('tbody tr')).not.toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
@@ -218,18 +218,51 @@ test('native chart toggles, fullscreen, PNG and XLSX actions are operational', a
   await chartCard.getByRole('button', { name: 'Arie' }).click();
   await expect(chartCard.getByRole('button', { name: 'Arie' })).toHaveClass(/is-active/);
 
-  await chartCard.getByRole('button', { name: /Extinde/ }).click();
+  const expand = chartCard.getByRole('button', { name: /Extinde/ });
+  await expand.click();
   const expanded = page.getByRole('dialog');
   await expect(expanded).toBeVisible();
   const png = page.waitForEvent('download');
   await expanded.getByRole('button', { name: /Descarcă PNG/ }).click();
   await expect((await png).suggestedFilename()).toMatch(/\.png$/);
-  await expanded.getByRole('button', { name: 'Închide' }).click();
+  await page.keyboard.press('Escape');
   await expect(expanded).toBeHidden();
+  await expect(expand).toBeFocused();
 
   const xlsx = page.waitForEvent('download');
   await page.getByRole('button', { name: /Excel/ }).click();
   await expect((await xlsx).suggestedFilename()).toMatch(/\.xlsx$/);
+});
+
+test('native chart supports keyboard drill and reset', async ({ page }) => {
+  await page.goto('/sales?period=2026-08&range=12&subview=trend');
+  const chart = page.getByRole('application', { name: /Evoluție Sales Intelligence/ });
+  await chart.focus();
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/(?:\?|&)drill=period%3A/);
+  await chart.focus();
+  await page.keyboard.press('Escape');
+  await expect(page).not.toHaveURL(/(?:\?|&)drill=/);
+});
+
+test('native trend renders simultaneous comparison contracts', async ({ page }) => {
+  const responsePromise = page.waitForResponse(
+    (response) => response.url().includes('/api/v1/modules/sales') && response.status() === 200,
+  );
+  await page.goto(
+    '/sales?period=2026-08&range=12&subview=trend&comparisons=target%2Cprevious-period%2Cprevious-year%2Crecent-average',
+  );
+  const response = await responsePromise;
+  const body = (await response.json()) as {
+    trend: Array<{ comparisons: Record<string, number | null> }>;
+  };
+  expect(Object.keys(body.trend.at(-1)?.comparisons ?? {})).toEqual(
+    expect.arrayContaining(['previous-period', 'previous-year', 'recent-average']),
+  );
+  await expect(page.locator('.chart-widget .widget-filter-mode')).toContainText(
+    'Target · Perioada precedentă · Anul trecut · Media ultimelor 3 perioade',
+  );
 });
 
 test('drill breadcrumb survives reload and resets URL state', async ({ page }) => {
@@ -313,6 +346,14 @@ test('custom dashboard blank, widget duplication, versioning and clone lifecycle
   await page.getByRole('button', { name: 'Configurare' }).click();
   await page.locator('.widget-editor-header select').selectOption('sales');
   await expect(page.locator('.widget-editor-card')).toHaveCount(1);
+  const firstEditor = page.locator('.widget-editor-card').first();
+  await firstEditor.getByLabel('Modul').selectOption('performance');
+  await firstEditor.getByLabel('Vizualizare').selectOption('heatmap');
+  await firstEditor.getByRole('listbox', { name: 'Dimensiuni' }).selectOption(['store', 'time']);
+  await firstEditor.getByLabel('Legendă').uncheck();
+  await firstEditor.getByLabel('Etichete').check();
+  await firstEditor.getByLabel('Top N prezentat').fill('5');
+  await firstEditor.getByLabel('Rezoluție PNG').selectOption('1');
   await page.getByRole('button', { name: 'Duplică cardul' }).click();
   await expect(page.locator('.widget-editor-card')).toHaveCount(2);
   await page
@@ -323,6 +364,7 @@ test('custom dashboard blank, widget duplication, versioning and clone lifecycle
   await page.getByRole('button', { name: 'Salvează configurația' }).click();
   await expect(page.locator('.save-message')).toContainText('Dashboard salvat');
   await expect(page.locator('.dashboard-version-picker select')).toHaveValue('2');
+  await expect(firstEditor.getByLabel('Top N prezentat')).toHaveValue('5');
 
   await page.getByRole('button', { name: 'Clonează' }).click();
   await expect(page.locator('.dashboard-name-input')).toHaveValue('Dashboard nou (copie)');
@@ -366,7 +408,193 @@ test('custom dashboard template executes batch and exports inspected rows', asyn
   const csv = page.waitForEvent('download');
   await dialog.getByRole('button', { name: 'CSV' }).click();
   await expect((await csv).suggestedFilename()).toMatch(/\.csv$/);
-  await dialog.getByRole('button', { name: 'Închide' }).click();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(inspect).toBeFocused();
+
+  await page.getByRole('button', { name: 'Configurare' }).click();
+  page.once('dialog', (confirmation) => confirmation.accept());
+  await page.getByRole('button', { name: 'Șterge dashboard' }).click();
+  await expect(
+    page.locator('.dashboard-list-item').filter({ hasText: 'Regional Manager' }),
+  ).toHaveCount(0);
+});
+
+test('canvas POC bounds 10 widgets, heatmap 100x36, scatter 5000 and repeated navigation', async ({
+  context,
+  page,
+}, testInfo) => {
+  testInfo.setTimeout(90_000);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('/dashboards?period=2026-08&range=12');
+  await page
+    .locator('.dashboard-templates')
+    .getByRole('button', { name: /Regional Manager/ })
+    .click();
+  await page.getByRole('button', { name: 'Configurare' }).click();
+  const editors = page.locator('.widget-editor-card');
+  const matrix = editors.nth(3);
+  await matrix.getByRole('listbox', { name: 'Dimensiuni' }).selectOption(['store', 'time']);
+  await matrix.getByLabel('Limită rânduri').fill('5000');
+  const scatter = editors.nth(4);
+  await scatter.getByLabel('Vizualizare').selectOption('scatter');
+  await scatter.getByRole('listbox', { name: 'Dimensiuni' }).selectOption('store');
+  await scatter.getByLabel('Limită rânduri').fill('5000');
+  for (let index = 0; index < 5; index += 1) {
+    await page.locator('.widget-editor-header select').selectOption('sales');
+  }
+  await expect(editors).toHaveCount(10);
+
+  await page.route('**/api/v1/query/batch*', async (route) => {
+    const response = await route.fetch();
+    const body = (await response.json()) as {
+      results?: Array<{
+        query: { visualization: string };
+        dataset: { dimensions: unknown[]; rows: unknown[] } | null;
+      }>;
+    };
+    if (!Array.isArray(body.results)) {
+      await route.fulfill({ response, json: body });
+      return;
+    }
+    for (const result of body.results) {
+      if (!result.dataset) continue;
+      if (result.query.visualization === 'heatmap') {
+        result.dataset = {
+          dimensions: [
+            { id: 'x', label: 'Perioadă', kind: 'string', role: 'key' },
+            { id: 'y', label: 'Entitate', kind: 'string', role: 'label' },
+            { id: 'value', label: 'Realizare', kind: 'number', role: 'value' },
+          ],
+          rows: Array.from({ length: 36 }, (_, row) =>
+            Array.from({ length: 100 }, (_unused, column) => ({
+              x: `P${String(column + 1).padStart(3, '0')}`,
+              y: `S${String(row + 1).padStart(3, '0')}`,
+              value: 70 + ((row * 100 + column) % 41),
+            })),
+          ).flat(),
+        };
+      }
+      if (result.query.visualization === 'scatter') {
+        result.dataset = {
+          dimensions: [
+            { id: 'id', label: 'Cheie', kind: 'string', role: 'key' },
+            { id: 'label', label: 'Entitate', kind: 'string', role: 'label' },
+            { id: 'x', label: 'Productivitate', kind: 'number', role: 'value' },
+            { id: 'y', label: 'Realizare', kind: 'number', role: 'metadata' },
+          ],
+          rows: Array.from({ length: 5000 }, (_unused, index) => ({
+            id: `S${String(index + 1).padStart(5, '0')}`,
+            label: `Entitate ${index + 1}`,
+            x: 500 + (index % 1400),
+            y: 70 + (index % 45),
+          })),
+        };
+      }
+    }
+    await route.fulfill({ response, json: body });
+  });
+
+  await page.getByRole('button', { name: 'Salvează configurația' }).click();
+  await expect(page.locator('.save-message')).toContainText('Dashboard salvat');
+  const renderStart = await page.evaluate(() => performance.now());
+  await page.getByRole('button', { name: 'Vizualizare' }).click();
+  await expect
+    .poll(() =>
+      page
+        .locator('.widget-card')
+        .filter({ hasText: 'Matrice magazine' })
+        .locator('canvas')
+        .count(),
+    )
+    .toBeGreaterThanOrEqual(1);
+  await expect
+    .poll(() =>
+      page.locator('.widget-card').filter({ hasText: 'Clasament' }).locator('canvas').count(),
+    )
+    .toBeGreaterThanOrEqual(1);
+  const canvasCount = await page.locator('.configured-chart canvas').count();
+  const firstRenderMs = await page.evaluate((start) => performance.now() - start, renderStart);
+  await page.waitForTimeout(750);
+  const cdp = await context.newCDPSession(page);
+  await cdp.send('HeapProfiler.collectGarbage');
+  await page.waitForTimeout(250);
+  const resizeMeasurement = await page.evaluate(async () => {
+    const grid = document.querySelector<HTMLElement>('.insight-grid');
+    if (!grid) return { interactionDurations: [], maxFrameGaps: [] };
+    const durations: number[] = [];
+    const maxFrameGaps: number[] = [];
+    const widths = Array.from(
+      { length: 20 },
+      (_unused, index) => ['82%', '94%', '76%', '100%', '88%'][index % 5],
+    );
+    for (const width of widths) {
+      const started = performance.now();
+      grid.style.width = width;
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      );
+      durations.push(performance.now() - started);
+      let previousFrame = performance.now();
+      const observeUntil = previousFrame + 240;
+      let maxFrameGap = 0;
+      while (performance.now() < observeUntil) {
+        const currentFrame = await new Promise<number>((resolve) => requestAnimationFrame(resolve));
+        maxFrameGap = Math.max(maxFrameGap, currentFrame - previousFrame);
+        previousFrame = currentFrame;
+      }
+      maxFrameGaps.push(maxFrameGap);
+    }
+    grid.style.removeProperty('width');
+    return { interactionDurations: durations, maxFrameGaps };
+  });
+  const resizeDispatchSamples = resizeMeasurement.interactionDurations;
+  const orderedFrameGaps = [...resizeMeasurement.maxFrameGaps].sort((left, right) => left - right);
+  const resizeP95 =
+    orderedFrameGaps[Math.ceil(orderedFrameGaps.length * 0.95) - 1] ?? Number.POSITIVE_INFINITY;
+  await page.unrouteAll({ behavior: 'wait' });
+  await cdp.send('HeapProfiler.collectGarbage');
+  const memoryBefore = await page.evaluate(
+    () =>
+      (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory
+        ?.usedJSHeapSize ?? 0,
+  );
+  for (let index = 0; index < 3; index += 1) {
+    await page.getByRole('button', { name: 'Configurare' }).click();
+    await expect(editors).toHaveCount(10);
+    await page.getByRole('button', { name: 'Vizualizare' }).click();
+    await expect
+      .poll(() => page.locator('.configured-chart canvas').count())
+      .toBeGreaterThanOrEqual(2);
+  }
+  await cdp.send('HeapProfiler.collectGarbage');
+  const memoryAfter = await page.evaluate(
+    () =>
+      (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory
+        ?.usedJSHeapSize ?? 0,
+  );
+  const evidence = {
+    widgetCount: 10,
+    canvasCount,
+    heatmapCells: 3600,
+    scatterPoints: 5000,
+    firstRenderMs,
+    resizeDispatchSamples,
+    resizeBlockingSamples: resizeMeasurement.maxFrameGaps,
+    resizeP95,
+    memoryBefore,
+    memoryAfter,
+    memoryGrowth: memoryBefore && memoryAfter ? memoryAfter - memoryBefore : null,
+  };
+  console.info(`[canvas-poc] ${JSON.stringify(evidence)}`);
+  await testInfo.attach('canvas-performance.json', {
+    body: JSON.stringify(evidence, null, 2),
+    contentType: 'application/json',
+  });
+  expect(firstRenderMs).toBeLessThan(8000);
+  expect(resizeP95).toBeLessThan(200);
+  if (memoryBefore && memoryAfter)
+    expect(memoryAfter - memoryBefore).toBeLessThan(64 * 1024 * 1024);
 
   await page.getByRole('button', { name: 'Configurare' }).click();
   page.once('dialog', (confirmation) => confirmation.accept());

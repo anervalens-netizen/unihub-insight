@@ -15,6 +15,7 @@ const widget: DashboardWidget = {
   query_contract_version: 1,
   visualization: 'kpi',
   dimension: null,
+  dimensions: [],
   time_grain: 'month',
   filter_mode: 'inherit',
   filters: {},

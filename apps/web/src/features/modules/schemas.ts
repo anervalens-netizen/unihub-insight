@@ -80,6 +80,7 @@ export const moduleAnalyticsSchema = z.object({
       label: z.string(),
       primary: nullableNumeric,
       comparison: nullableNumeric.optional(),
+      comparisons: z.record(z.string(), nullableNumeric).default({}),
       target: nullableNumeric.optional(),
       secondary: nullableNumeric.optional(),
       is_estimate: z.boolean(),

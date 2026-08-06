@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Download, LoaderCircle, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import type { GlobalSearch } from '../../lib/search';
@@ -66,13 +66,14 @@ export function QueryInspector({
   metric,
   onClose,
 }: {
-  dashboardId: string;
+  dashboardId: string | null;
   snapshotId: string;
   search: GlobalSearch & { period: string };
-  result: WidgetQueryResult;
+  result: Pick<WidgetQueryResult, 'widget_id' | 'query' | 'meta'>;
   metric: MetricDefinition;
   onClose: () => void;
 }) {
+  const dialogRef = useRef<HTMLElement>(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const request = useMemo(
@@ -86,6 +87,44 @@ export function QueryInspector({
     : result.meta?.source
       ? [result.meta.source]
       : [];
+
+  useEffect(() => {
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const dialog = dialogRef.current;
+    dialog?.focus();
+    const handler = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab' || !dialog) return;
+      const focusable = [
+        ...dialog.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+        ),
+      ];
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => {
+      window.removeEventListener('keydown', handler);
+      previouslyFocused?.focus();
+    };
+  }, [onClose]);
 
   const exportCsv = (): void => {
     setExporting(true);
@@ -111,10 +150,13 @@ export function QueryInspector({
   return createPortal(
     <div className="widget-modal-backdrop">
       <section
+        ref={dialogRef}
         className="data-inspector"
         role="dialog"
         aria-modal="true"
         aria-labelledby="query-inspector-title"
+        tabIndex={-1}
+        onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="data-inspector-header">
           <div>

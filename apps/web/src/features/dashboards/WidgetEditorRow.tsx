@@ -2,7 +2,7 @@ import { CopyPlus, Trash2 } from 'lucide-react';
 
 import type { ModuleId } from '../modules/schemas';
 import type { MetricDefinition } from '../query/schemas';
-import type { DashboardWidget } from './schemas';
+import { type DashboardWidget, dashboardWidgetDimensions } from './schemas';
 import { moduleMetrics } from './templates';
 
 const filterFields = [
@@ -42,6 +42,12 @@ export function WidgetEditorRow({
   const availableDimensions = metric?.allowed_dimensions ?? [];
   const availableGrains = metric?.allowed_grains ?? ['month'];
   const availableVisualizations = metric?.allowed_shapes ?? ['table'];
+  const selectedDimensions = dashboardWidgetDimensions(widget);
+
+  const dimensionPatch = (dimensions: string[]): Partial<DashboardWidget> => ({
+    dimensions,
+    dimension: dimensions[0] ?? null,
+  });
 
   return (
     <article className="widget-editor-card">
@@ -67,15 +73,15 @@ export function WidgetEditorRow({
                     Object.entries(widget.filters).filter(([key]) => key !== 'agent'),
                   )
                 : widget.filters;
+            const dimensions = selectedDimensions.filter((dimension) =>
+              nextMetric?.allowed_dimensions.includes(dimension),
+            );
             onChange({
               module,
               metric_id: nextMetric?.id ?? widget.metric_id,
               title: nextMetric?.display_name ?? nextMetricReference?.label ?? widget.title,
               visualization,
-              dimension:
-                widget.dimension && nextMetric?.allowed_dimensions.includes(widget.dimension)
-                  ? widget.dimension
-                  : null,
+              ...dimensionPatch(dimensions),
               time_grain: nextMetric?.allowed_grains.includes(widget.time_grain)
                 ? widget.time_grain
                 : (nextMetric?.allowed_grains[0] ?? 'month'),
@@ -90,11 +96,18 @@ export function WidgetEditorRow({
           ))}
         </select>
         <select
-          value={widget.dimension ?? ''}
-          aria-label="Dimensiune"
-          onChange={(event) => onChange({ dimension: event.target.value || null })}
+          multiple
+          size={2}
+          value={selectedDimensions}
+          aria-label="Dimensiuni"
+          onChange={(event) =>
+            onChange(
+              dimensionPatch(
+                [...event.target.selectedOptions].slice(0, 2).map((option) => option.value),
+              ),
+            )
+          }
         >
-          <option value="">Fără dimensiune</option>
           {availableDimensions.map((dimension) => (
             <option key={dimension} value={dimension}>
               {dimension}
@@ -148,7 +161,16 @@ export function WidgetEditorRow({
           max={5000}
           value={widget.limit}
           aria-label="Limită rânduri"
-          onChange={(event) => onChange({ limit: Number(event.target.value) || 1 })}
+          onChange={(event) => {
+            const limit = Number(event.target.value) || 1;
+            onChange({
+              limit,
+              options:
+                widget.options.top_n && widget.options.top_n > limit
+                  ? { ...widget.options, top_n: limit }
+                  : widget.options,
+            });
+          }}
         />
         <select
           value={widget.metric_id}
@@ -156,6 +178,9 @@ export function WidgetEditorRow({
           onChange={(event) => {
             const nextMetric = metrics.find((item) => item.id === event.target.value);
             if (!nextMetric) return;
+            const dimensions = selectedDimensions.filter((dimension) =>
+              nextMetric.allowed_dimensions.includes(dimension),
+            );
             onChange({
               metric_id: nextMetric.id,
               metric_version: nextMetric.version,
@@ -164,10 +189,7 @@ export function WidgetEditorRow({
               visualization: nextMetric.allowed_shapes.includes(widget.visualization)
                 ? widget.visualization
                 : (nextMetric.allowed_shapes[0] ?? 'table'),
-              dimension:
-                widget.dimension && nextMetric.allowed_dimensions.includes(widget.dimension)
-                  ? widget.dimension
-                  : null,
+              ...dimensionPatch(dimensions),
               time_grain: nextMetric.allowed_grains.includes(widget.time_grain)
                 ? widget.time_grain
                 : (nextMetric.allowed_grains[0] ?? 'month'),
@@ -195,6 +217,94 @@ export function WidgetEditorRow({
             </option>
           ))}
         </select>
+        <label>
+          <input
+            type="checkbox"
+            checked={widget.options.show_legend !== false}
+            onChange={(event) =>
+              onChange({ options: { ...widget.options, show_legend: event.target.checked } })
+            }
+          />
+          Legendă
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={widget.options.show_labels === true}
+            onChange={(event) =>
+              onChange({ options: { ...widget.options, show_labels: event.target.checked } })
+            }
+          />
+          Etichete
+        </label>
+        <label>
+          <small>Top N</small>
+          <input
+            type="number"
+            min={1}
+            max={widget.limit}
+            value={widget.options.top_n ?? ''}
+            placeholder="Toate"
+            aria-label="Top N prezentat"
+            onChange={(event) => {
+              const value = event.target.value;
+              if (!value) {
+                const options = { ...widget.options };
+                delete options.top_n;
+                onChange({ options });
+                return;
+              }
+              onChange({
+                options: {
+                  ...widget.options,
+                  top_n: Math.min(widget.limit, Math.max(1, Number(value) || 1)),
+                },
+              });
+            }}
+          />
+        </label>
+        {widget.visualization === 'line' || widget.visualization === 'area' ? (
+          <label>
+            <input
+              type="checkbox"
+              checked={widget.options.smooth === true}
+              onChange={(event) =>
+                onChange({ options: { ...widget.options, smooth: event.target.checked } })
+              }
+            />
+            Netezire
+          </label>
+        ) : null}
+        {widget.visualization === 'bar' ? (
+          <label>
+            <input
+              type="checkbox"
+              checked={widget.options.stacked === true}
+              onChange={(event) =>
+                onChange({ options: { ...widget.options, stacked: event.target.checked } })
+              }
+            />
+            Stivuit
+          </label>
+        ) : null}
+        <label>
+          <small>PNG</small>
+          <select
+            aria-label="Rezoluție PNG"
+            value={widget.options.pixel_ratio === 1 ? '1' : '2'}
+            onChange={(event) =>
+              onChange({
+                options: {
+                  ...widget.options,
+                  pixel_ratio: event.target.value === '1' ? 1 : 2,
+                },
+              })
+            }
+          >
+            <option value="1">1×</option>
+            <option value="2">2×</option>
+          </select>
+        </label>
         <select
           value={widget.filter_mode}
           aria-label="Regulă filtre"

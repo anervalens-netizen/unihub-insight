@@ -310,6 +310,7 @@ class TrendPoint(BaseModel):
     label: str
     primary: Decimal | None
     comparison: Decimal | None = None
+    comparisons: dict[str, Decimal | None] = Field(default_factory=dict)
     target: Decimal | None = None
     secondary: Decimal | None = None
     is_estimate: bool = False
@@ -369,6 +370,7 @@ class DashboardWidget(BaseModel):
     query_contract_version: int = Field(default=1, ge=1)
     visualization: ChartKind
     dimension: str | None = Field(default=None, max_length=100)
+    dimensions: tuple[str, ...] = Field(default=(), max_length=2)
     time_grain: str = Field(default="month", max_length=40)
     comparisons: tuple[str, ...] = ()
     sort: tuple[str, ...] = ()
