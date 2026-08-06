@@ -2,6 +2,7 @@
 title: UniHub Insight roadmap integrat
 status: active
 baseline_date: 2026-08-05
+last_verified: 2026-08-06
 candidate: 1.0.0-rc.1
 ---
 
@@ -50,15 +51,15 @@ Dependențele se implementează vertical: o suprafață ajunge `LIVE` numai cân
 - [x] Compensation folosește exclusiv agregatul aprobat, fără persoană/nume/filtre diferențiatoare.
 - [ ] Custom dashboards acoperă blank/template/clone/duplicate/layout/versionare/ACL/scope/batch, shared read-only, preseturi, editor cu maximum două dimensiuni, opțiuni whitelist-uite și cross-filter semantic comun. Matricea live de sharing/revocare și browser QA complet rămân porți de acceptanță.
 - [ ] XLSX/CSV/PNG și audit există; widgeturile native/custom folosesc inspect/CSV/XLSX server-side pe același snapshot și exportă întregul dataset deja bounded, cu metadata per sursă. Browser QA și reconcilierea tuturor modulelor cu surse oficiale rămân deschise.
-- [ ] Reconcilierea, rollback B→A→B, load/concurrency și backup-ul off-host post-release trec; matricea reală a celor trei utilizatori Authentik, RUM pe 7 zile și N/N-1 acceptat rămân deschise.
+- [ ] Reconcilierea live (30/30 scope-uri, diferențe zero), load/concurrency, backup-ul off-host restaurat izolat și rollback N→N-1→N trec pe candidatul publicat; matricea reală a celor trei sesiuni Authentik și RUM pe 7 zile rămân deschise.
 - [ ] Suita Playwright trece 46/46 pentru cele 10 rute, toate sub-view-urile declarate, 1180/1440/1920/ultrawide, light/dark, densități, empty/partial/stale/unavailable/403, PNG/XLSX/CSV, drill/reload, comparații simultane, keyboard și dashboard lifecycle/POC; pilotul vizual owner rămâne poartă distinctă.
 - [ ] Acceptare vizuală owner și șapte zile curate de SLI producție.
 
 ## Porți deschise după RC1
 
 - Finance și Compensation sunt corect `UNAVAILABLE` în producție: tabelele de generații/head nu publică încă o generație eligibilă. Datele legacy nu sunt promovate implicit.
-- Migrarea Retail 047 este aditivă pentru compatibilitatea N/N-1. Granturile raw Finance/Planning se revocă numai după două release-uri de produs acceptate și rollback B→A; drill-ul tehnic între artefacte RC1 nu autorizează încă revocarea.
-- RC1 este publicat ca artefact immutable, reconciliat live, restaurat izolat și acoperit de rollback fail-closed. Release-urile pre-RC1 incompatibile sunt refuzate înainte de schimbarea symlinkului.
+- Migrarea Retail 047 este aditivă pentru compatibilitatea N/N-1. Reader-ul Insight nu mai are granturi pe tabelele raw Finance/Planning; citește numai read-model-urile aprobate, iar preflight-ul blochează regresia.
+- RC1 este publicat ca artefact immutable, reconciliat live, restaurat izolat din copia NAS și acoperit de rollback real N→N-1→N cu schema forward-only. Release-urile incompatibile sunt refuzate înainte de schimbarea symlinkului.
 - Promovarea `1.0.0` mai cere acceptarea vizuală owner și șapte zile curate conform [Performance Acceptance](docs/PERFORMANCE_ACCEPTANCE.md).
 
 ## Reguli de execuție

@@ -67,6 +67,12 @@ set +a
 
 The probe covers Overview, every native module, one 10-widget mixed batch and concurrent inspect/CSV/XLSX traffic. Its JSON is explicitly marked `synthetic`; passing it closes only the bounded concurrency check, never the seven-day/100-real-request RUM and API SLI gate.
 
+### RC1 live evidence — 2026-08-06
+
+The production probe completed 220 bounded synthetic requests with every scenario inside budget: Overview p95 126.57 ms, ordinary modules at most 146.87 ms, the 10-widget batch p95 686.22 ms and concurrent inspect/CSV/XLSX at most 311.68 ms. The same candidate passed preflight, smoke and the N→N-1→N runtime switch; no Insight alert was firing and Prometheus had no 5xx series at the 04:46 EEST observation.
+
+This is not the 1.0 temporal verdict. At that observation the oldest continuous Insight scrape was about 8.3 hours old, browser RUM had zero samples and the API route totals included the synthetic reconciliation/load traffic. The seven clean days, at least 100 demonstrably real requests per main route and owner visual acceptance therefore remain open.
+
 ## Failure criteria
 
 - any ordinary request exceeds the hard deadline;
