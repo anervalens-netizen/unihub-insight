@@ -371,10 +371,10 @@ class PostgresAnalyticsRepository:
                       )
                 ),
                 snapshot AS (
-                    SELECT is_month_final
-                    FROM import_snapshots
-                    WHERE import_month = $1 AND status = 'completed'
-                    ORDER BY created_at DESC
+                    SELECT is_final AS is_month_final
+                    FROM reporting_source_snapshot_v1
+                    WHERE domain = 'sales' AND period = $1
+                    ORDER BY produced_at DESC
                     LIMIT 1
                 )
                 SELECT

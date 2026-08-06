@@ -5,9 +5,17 @@ from fastapi.testclient import TestClient
 
 from unihub_insight_api.config import Settings
 from unihub_insight_api.main import create_app
+from unihub_insight_api.repositories.postgres import PostgresAnalyticsRepository
 from unihub_insight_api.repositories.postgres_modules import PostgresInsightRepository
 
 ROOT = Path(__file__).resolve().parents[3]
+
+
+def test_overview_snapshot_metadata_uses_only_the_governed_read_model() -> None:
+    summary = inspect.getsource(PostgresAnalyticsRepository._fetch_summary)
+
+    assert "reporting_source_snapshot_v1" in summary
+    assert "import_snapshots" not in summary
 
 
 def test_sensitive_modules_read_only_versioned_reporting_contracts() -> None:
