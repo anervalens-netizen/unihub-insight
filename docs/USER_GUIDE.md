@@ -18,7 +18,7 @@ Finance and Planning do not accept agent scope. Compensation is visible only wit
 - **Planning** — actual, forecast, target gap and forecast accuracy.
 - **Custom** — personal and shared dashboards assembled from governed metrics.
 
-În RC1, Sales–Planning au sub-view-uri și rețete distincte. Fiecare tab afișează `LIVE`, `PARTIAL` sau `UNAVAILABLE` din metadata sursei; un mecanism fără contract nu este înlocuit cu altă metrică. Click-ul pe entități actualizează drill-ul din URL și reload-ul reproduce selecția.
+În RC1, Sales–Planning au sub-view-uri și rețete distincte. Pace, ranking, scatter, histogramă, waterfall reconciliat, forecast și Calendar au forme native; fiecare folosește același contract pentru inspect/export. Fiecare tab afișează `LIVE`, `PARTIAL` sau `UNAVAILABLE` din metadata sursei; un mecanism fără contract nu este înlocuit cu altă metrică. Click-ul pe entități actualizează drill-ul din URL și reload-ul reproduce selecția.
 
 ## Dashboard interaction
 
@@ -46,6 +46,7 @@ Orice stare non-inherited este vizibilă pe card. Share-ul este țintit per subj
 - Cutoff is the last covered business date, not page-load time.
 - Forecast run-rate is labeled separately from persisted AI forecast.
 - Missing data is not silently converted to zero.
+- Calendarul Sales arată numai zile observate până la cutoff. O celulă absentă rămâne missing; returul este cantitate negativă, iar numărul afișat de magazine este observat, nu coverage complet declarat.
 - Compensation citește numai read-model-ul agregat Retail; nu există persoană/nume/CNP în contract. Cohortele sub trei persoane sunt suprimate inclusiv în inspect și export.
 - `UNAVAILABLE` înseamnă că nu există o generație autoritativă eligibilă; UI nu transformă date legacy sau lipsa în zero.
 

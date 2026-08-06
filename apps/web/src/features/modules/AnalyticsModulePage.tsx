@@ -57,6 +57,18 @@ function nativeWidgetQuery(
   } else if (spec.kind === 'matrix') {
     visualization = 'heatmap';
     dimensions = [moduleEntityDimension[module], 'time'];
+  } else if (spec.kind === 'scatter') {
+    visualization = 'scatter';
+    dimensions = [moduleEntityDimension[module]];
+  } else if (spec.kind === 'histogram') {
+    visualization = 'histogram';
+    dimensions = [moduleEntityDimension[module]];
+  } else if (spec.kind === 'waterfall') {
+    visualization = 'waterfall';
+    dimensions = ['category'];
+  } else if (spec.kind === 'calendar') {
+    visualization = 'calendar';
+    dimensions = ['time'];
   } else {
     visualization = 'table';
     dimensions = [moduleEntityDimension[module]];
@@ -80,9 +92,14 @@ function nativeWidgetQuery(
     query_contract_version: metric.query_contract_version,
     dimensions,
     time_range: rangeBounds(search),
-    time_grain: 'month',
+    time_grain: spec.kind === 'calendar' ? 'day' : 'month',
     filters,
-    comparisons: spec.kind === 'trend' ? parseComparisons(search) : [],
+    comparisons:
+      widgetId === 'forecast'
+        ? [...new Set<WidgetQuery['comparisons'][number]>(['target', ...parseComparisons(search)])]
+        : spec.kind === 'trend'
+          ? parseComparisons(search)
+          : [],
     sort: [],
     limit: spec.kind === 'matrix' ? 5000 : spec.kind === 'breakdown' ? 500 : 100,
     visualization,

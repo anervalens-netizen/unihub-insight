@@ -1,4 +1,5 @@
 import runpy
+from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
 from zipfile import ZipFile
@@ -105,6 +106,67 @@ def test_scatter_uses_explicit_business_axes(client: TestClient) -> None:
     assert dimensions["x"] == "Productivitate / zi-agent"
     assert dimensions["y"] == "Realizare target"
     assert result["dataset"]["rows"]
+
+
+def test_calendar_returns_only_observed_daily_rows_with_return_and_coverage_context(
+    client: TestClient,
+) -> None:
+    query = widget(
+        "sales-calendar",
+        metric_id="sales.total",
+        visualization="calendar",
+        dimensions=["time"],
+    )
+    query["time_grain"] = "day"
+    query["comparisons"] = []
+    response = client.post(
+        "/api/v1/query/batch",
+        params={"period": "2026-08"},
+        json={"widgets": [query]},
+    )
+
+    assert response.status_code == 200
+    result = response.json()["results"][0]
+    assert result["error"] is None
+    dimensions = {item["id"]: item for item in result["dataset"]["dimensions"]}
+    assert dimensions["date"]["kind"] == "time"
+    assert dimensions["return_quantity"]["role"] == "metadata"
+    assert dimensions["observed_store_count"]["role"] == "metadata"
+    rows = result["dataset"]["rows"]
+    assert rows
+    assert all(row["coverage_state"] == "observed" for row in rows)
+    assert all(Decimal(str(row["return_quantity"])) <= 0 for row in rows)
+    assert len({row["date"] for row in rows}) == len(rows)
+
+
+def test_composed_pace_and_forecast_queries_preserve_inspect_parity(client: TestClient) -> None:
+    pace = widget(
+        "sales-pace",
+        metric_id="target.progress_pct",
+        visualization="kpi",
+        dimensions=[],
+    )
+    pace["comparisons"] = []
+    forecast = widget(
+        "planning-forecast",
+        module="planning",
+        metric_id="planning.forecast",
+        visualization="line",
+    )
+    forecast["comparisons"] = ["target"]
+    response = client.post(
+        "/api/v1/query/batch",
+        params={"period": "2026-08"},
+        json={"widgets": [pace, forecast]},
+    )
+
+    assert response.status_code == 200
+    pace_result, forecast_result = response.json()["results"]
+    assert pace_result["error"] is None
+    assert {"value", "actual", "target", "gap"} <= set(pace_result["dataset"]["rows"][0])
+    assert forecast_result["error"] is None
+    forecast_dimensions = {item["id"] for item in forecast_result["dataset"]["dimensions"]}
+    assert {"value", "actual", "target"} <= forecast_dimensions
 
 
 def test_query_rejects_two_dimensions_when_the_shape_does_not_consume_them(

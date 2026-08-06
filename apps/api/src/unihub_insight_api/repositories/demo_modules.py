@@ -13,6 +13,7 @@ from unihub_insight_api.domain import (
     AlertSeverity,
     AnalyticsScope,
     BreakdownRow,
+    CalendarCell,
     Capability,
     ChartKind,
     DataMode,
@@ -64,7 +65,15 @@ PROFILES: dict[ModuleId, ModuleProfile] = {
             _axis("secondary", "Cantitate", MetricUnit.INTEGER),
             _axis("tertiary", "Bonuri", MetricUnit.INTEGER),
         ),
-        charts=(ChartKind.LINE, ChartKind.AREA, ChartKind.BAR, ChartKind.DONUT, ChartKind.TREEMAP, ChartKind.TABLE),
+        charts=(
+            ChartKind.LINE,
+            ChartKind.AREA,
+            ChartKind.BAR,
+            ChartKind.DONUT,
+            ChartKind.TREEMAP,
+            ChartKind.CALENDAR,
+            ChartKind.TABLE,
+        ),
         categories=("MOBIUP", "MOBICELL", "Online asistat", "Alte canale"),
         base=Decimal("930000"),
     ),
@@ -613,6 +622,37 @@ def _matrix(module: ModuleId, scope: AnalyticsScope, rows: list[BreakdownRow]) -
     return result
 
 
+def _calendar(module: ModuleId, scope: AnalyticsScope) -> list[CalendarCell]:
+    if module is not ModuleId.SALES:
+        return []
+    rng = random.Random(_seed(module, scope, "calendar"))
+    year, month = (int(part) for part in scope.period.split("-"))
+    as_of = _meta(module, scope).as_of
+    covered_through = as_of.day if as_of is not None else 0
+    rows: list[CalendarCell] = []
+    for day in range(1, covered_through + 1):
+        observed_date = date(year, month, day)
+        if observed_date.weekday() == 6:
+            continue
+        positive = Decimal(rng.randint(45, 130))
+        returns = -Decimal(rng.randint(0, 8))
+        receipts = Decimal(rng.randint(24, 72))
+        rows.append(
+            CalendarCell(
+                date=observed_date,
+                sales=_number(rng.uniform(18000, 52000)),
+                net_quantity=positive + returns,
+                positive_quantity=positive,
+                return_quantity=returns,
+                receipt_count=receipts,
+                receipt_2plus_count=min(receipts, Decimal(rng.randint(10, 42))),
+                observed_store_count=max(1, len(DemoAnalyticsRepository._selected_stores(scope))),
+                coverage_state="observed",
+            )
+        )
+    return rows
+
+
 def _alerts(module: ModuleId, rows: list[BreakdownRow]) -> list[InsightAlert]:
     alerts = [
         InsightAlert(
@@ -680,5 +720,6 @@ class DemoInsightRepository(DemoAnalyticsRepository):
             distribution=_distribution(module, scope),
             breakdown=rows,
             matrix=_matrix(module, scope, rows),
+            calendar=_calendar(module, scope),
             alerts=_alerts(module, rows),
         )

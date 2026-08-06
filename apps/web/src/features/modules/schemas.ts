@@ -111,6 +111,21 @@ export const moduleAnalyticsSchema = z.object({
       risk,
     }),
   ),
+  calendar: z
+    .array(
+      z.object({
+        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        sales: numeric,
+        net_quantity: numeric,
+        positive_quantity: numeric,
+        return_quantity: numeric,
+        receipt_count: numeric,
+        receipt_2plus_count: numeric,
+        observed_store_count: z.coerce.number().int().positive(),
+        coverage_state: z.literal('observed'),
+      }),
+    )
+    .default([]),
   alerts: z.array(
     z.object({
       id: z.string(),

@@ -34,7 +34,22 @@ from unihub_insight_api.services.scope import scope_label
 
 ALLOWED_FILTERS = frozenset({"firm", "regional", "asm", "stores", "agent"})
 ALLOWED_SORT_FIELDS = frozenset(
-    {"id", "key", "label", "value", "comparison", "target", "secondary", "tertiary", "progress_pct", "risk"}
+    {
+        "id",
+        "key",
+        "date",
+        "label",
+        "value",
+        "comparison",
+        "target",
+        "secondary",
+        "tertiary",
+        "progress_pct",
+        "risk",
+        "net_quantity",
+        "return_quantity",
+        "receipt_count",
+    }
 )
 METRICS = {metric.id: metric for metric in METRIC_CATALOG}
 MODULE_METRICS: dict[ModuleId, frozenset[str]] = {
@@ -163,6 +178,13 @@ def _metric_for(query: WidgetQuery, user: UserContext) -> MetricDefinition:
         query.metric_id != "finance.ebit" or query.dimensions != ("category",)
     ):
         raise QueryValidationFailure("Waterfall cere reconcilierea Finance EBIT pe category.")
+    if query.visualization is ChartKind.CALENDAR and (
+        query.module is not ModuleId.SALES
+        or query.metric_id != "sales.total"
+        or query.dimensions != ("time",)
+        or query.time_grain != "day"
+    ):
+        raise QueryValidationFailure("Calendar cere sales.total × time la granularitate day.")
     if len(query.dimensions) > 1 and query.visualization is not ChartKind.HEATMAP:
         raise QueryValidationFailure("Două dimensiuni sunt suportate numai de heatmap.")
     if query.visualization is ChartKind.HEATMAP and query.dimensions != (
@@ -278,6 +300,26 @@ def _dataset(
     comparison_responses: dict[QueryComparison, ModuleAnalyticsResponse] | None = None,
 ) -> QueryDataset:
     metric = next((item for item in response.kpis if item.id == query.metric_id), None)
+    if query.visualization is ChartKind.KPI and query.metric_id == "target.progress_pct":
+        actual = next((item for item in response.kpis if item.id == "sales.total"), None)
+        target = metric.supporting_value if metric is not None else None
+        actual_value = actual.value if actual is not None else None
+        return QueryDataset(
+            dimensions=[
+                DatasetDimension(id="value", label="Realizare target", kind="number"),
+                DatasetDimension(id="actual", label="Realizat", kind="number", role="metadata"),
+                DatasetDimension(id="target", label="Target", kind="number", role="target"),
+                DatasetDimension(id="gap", label="Gap", kind="number", role="metadata"),
+            ],
+            rows=[
+                {
+                    "value": metric.value if metric else None,
+                    "actual": actual_value,
+                    "target": target,
+                    "gap": target - actual_value if target is not None and actual_value is not None else None,
+                }
+            ],
+        )
     if query.visualization is ChartKind.KPI or not query.dimensions:
         return QueryDataset(
             dimensions=[DatasetDimension(id="value", label=metric.label if metric else query.metric_id, kind="number")],
@@ -361,6 +403,41 @@ def _dataset(
             rows=_sorted_rows(heatmap_rows, query.sort, query.limit),
         )
 
+    if query.visualization is ChartKind.CALENDAR:
+        calendar_rows: list[dict[str, str | Decimal | int | bool | None]] = [
+            {
+                "date": cell.date.isoformat(),
+                "label": cell.date.isoformat(),
+                "value": cell.sales,
+                "net_quantity": cell.net_quantity,
+                "positive_quantity": cell.positive_quantity,
+                "return_quantity": cell.return_quantity,
+                "receipt_count": cell.receipt_count,
+                "receipt_2plus_count": cell.receipt_2plus_count,
+                "observed_store_count": cell.observed_store_count,
+                "coverage_state": cell.coverage_state,
+            }
+            for cell in response.calendar
+            if query.time_range is None or query.time_range.start <= cell.date.strftime("%Y-%m") <= query.time_range.end
+        ]
+        return QueryDataset(
+            dimensions=[
+                DatasetDimension(id="date", label="Dată", kind="time", role="key", source_dimension="time"),
+                DatasetDimension(id="label", label="Zi observată", kind="string", role="label"),
+                DatasetDimension(id="value", label="Vânzări", kind="number"),
+                DatasetDimension(id="net_quantity", label="Cantitate netă", kind="integer", role="metadata"),
+                DatasetDimension(id="positive_quantity", label="Cantitate pozitivă", kind="integer", role="metadata"),
+                DatasetDimension(id="return_quantity", label="Cantitate retur", kind="integer", role="metadata"),
+                DatasetDimension(id="receipt_count", label="Bonuri", kind="integer", role="metadata"),
+                DatasetDimension(id="receipt_2plus_count", label="Bonuri 2+", kind="integer", role="metadata"),
+                DatasetDimension(
+                    id="observed_store_count", label="Magazine observate", kind="integer", role="metadata"
+                ),
+                DatasetDimension(id="coverage_state", label="Coverage", kind="string", role="metadata"),
+            ],
+            rows=_sorted_rows(calendar_rows, query.sort, query.limit),
+        )
+
     if "time" in query.dimensions or query.visualization in {ChartKind.LINE, ChartKind.AREA}:
         field = _field_for(query.module, query.metric_id)
         trend_rows: list[dict[str, str | Decimal | int | bool | None]] = []
@@ -402,6 +479,8 @@ def _dataset(
                     if query.module is ModuleId.PLANNING and query.metric_id == "planning.actual"
                     else None
                 )
+            if query.module is ModuleId.PLANNING and query.metric_id == "planning.forecast":
+                trend_row["actual"] = point.comparison
             trend_rows.append(trend_row)
         if QueryComparison.RECENT_AVERAGE in query.comparisons:
             for index, trend_row in enumerate(trend_rows):
@@ -429,6 +508,8 @@ def _dataset(
         )
         if QueryComparison.TARGET in query.comparisons:
             dimensions.append(DatasetDimension(id="target", label="Target", kind="number", role="target"))
+        if query.module is ModuleId.PLANNING and query.metric_id == "planning.forecast":
+            dimensions.append(DatasetDimension(id="actual", label="Actual", kind="number", role="comparison"))
         dimensions.append(DatasetDimension(id="is_estimate", label="Estimat", kind="boolean", role="metadata"))
         return QueryDataset(
             dimensions=dimensions,

@@ -127,3 +127,19 @@ def test_dashboard_validates_presentation_option_types_and_bounds(client: TestCl
         "options": {"show_labels": True, "top_n": 5, "pixel_ratio": 2},
     }
     assert client.post("/api/v1/dashboards", json=payload(valid)).status_code == 201
+
+
+def test_dashboard_accepts_only_the_daily_sales_calendar_contract(client: TestClient) -> None:
+    valid = {
+        **BASE_WIDGET,
+        "visualization": "calendar",
+        "dimension": "time",
+        "dimensions": ["time"],
+        "time_grain": "day",
+    }
+    assert client.post("/api/v1/dashboards", json=payload(valid)).status_code == 201
+
+    invalid = {**valid, "time_grain": "month"}
+    response = client.post("/api/v1/dashboards", json=payload(invalid))
+    assert response.status_code == 422
+    assert any("calendar requires" in item for item in response.json()["detail"]["errors"])

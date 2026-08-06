@@ -29,6 +29,11 @@ def test_all_demo_modules_have_complete_analytical_surfaces(client: TestClient) 
         assert payload["matrix"]
         assert payload["supported_charts"]
         assert payload["alerts"]
+        if module == "sales":
+            assert payload["calendar"]
+            assert all(item["coverage_state"] == "observed" for item in payload["calendar"])
+        else:
+            assert payload["calendar"] == []
 
 
 def test_module_response_is_deterministic(client: TestClient) -> None:

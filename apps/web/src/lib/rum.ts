@@ -47,6 +47,7 @@ function rating(metric: WebVitalPayload['metric'], value: number): WebVitalPaylo
 
 function observeLcp(): void {
   let latest = 0;
+  let flushed = false;
   const observer = new PerformanceObserver((list) => {
     const entry = list.getEntries().at(-1);
     if (entry) latest = entry.startTime;
@@ -57,6 +58,8 @@ function observeLcp(): void {
     return;
   }
   const flush = (): void => {
+    if (flushed) return;
+    flushed = true;
     if (latest > 0) {
       send({
         metric: 'LCP',
@@ -75,10 +78,12 @@ function observeLcp(): void {
     },
     { once: true },
   );
+  window.addEventListener('pagehide', flush, { once: true });
 }
 
 function observeInp(): void {
   const interactions = new Map<number, number>();
+  let flushed = false;
   const observer = new PerformanceObserver((list) => {
     for (const rawEntry of list.getEntries()) {
       const entry = rawEntry as InteractionTimingEntry;
@@ -95,6 +100,8 @@ function observeInp(): void {
     return;
   }
   const flush = (): void => {
+    if (flushed) return;
+    flushed = true;
     const value = Math.max(0, ...interactions.values());
     if (value > 0) {
       send({
@@ -113,6 +120,7 @@ function observeInp(): void {
     },
     { once: true },
   );
+  window.addEventListener('pagehide', flush, { once: true });
 }
 
 export async function initializeRum(): Promise<void> {

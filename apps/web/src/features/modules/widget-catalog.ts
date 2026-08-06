@@ -1,4 +1,4 @@
-import { type ComponentType, createElement } from 'react';
+import { type ComponentType, createElement, lazy } from 'react';
 
 import type { DashboardWidgetDefinition } from '../../components/dashboard/types';
 import type { ModuleAnalytics, ModuleId } from './schemas';
@@ -12,7 +12,20 @@ import {
   ModuleTrendWidget,
 } from './widgets';
 
-type RecipeKind = 'kpi' | 'trend' | 'distribution' | 'matrix' | 'breakdown' | 'alerts';
+type RecipeKind =
+  | 'kpi'
+  | 'trend'
+  | 'distribution'
+  | 'matrix'
+  | 'breakdown'
+  | 'alerts'
+  | 'pace'
+  | 'ranking'
+  | 'scatter'
+  | 'histogram'
+  | 'waterfall'
+  | 'forecast'
+  | 'calendar';
 type MetricSlot = 'primary' | 'secondary' | 'tertiary' | 'quaternary';
 interface Recipe {
   kind: RecipeKind;
@@ -22,7 +35,16 @@ interface Recipe {
 }
 
 export interface ModuleWidgetQuerySpec {
-  kind: Exclude<RecipeKind, 'alerts'>;
+  kind:
+    | 'kpi'
+    | 'trend'
+    | 'distribution'
+    | 'matrix'
+    | 'breakdown'
+    | 'scatter'
+    | 'histogram'
+    | 'waterfall'
+    | 'calendar';
   metricId: string;
 }
 
@@ -96,6 +118,30 @@ export function moduleWidgetQuerySpec(
     return { kind: 'kpi', metricId: widgetId.slice(4) };
   }
   if (widgetId === 'alerts') return null;
+  if (widgetId === 'pace' && module === 'sales') {
+    return { kind: 'kpi', metricId: 'target.progress_pct' };
+  }
+  if (widgetId === 'calendar' && module === 'sales') {
+    return { kind: 'calendar', metricId: 'sales.total' };
+  }
+  if (widgetId === 'ranking' && module === 'performance') {
+    return { kind: 'breakdown', metricId: 'performance.average' };
+  }
+  if (widgetId === 'scatter' && module === 'performance') {
+    return { kind: 'scatter', metricId: 'performance.average' };
+  }
+  if (widgetId === 'histogram' && module === 'performance') {
+    return { kind: 'histogram', metricId: 'performance.average' };
+  }
+  if (widgetId === 'histogram' && module === 'compensation') {
+    return { kind: 'histogram', metricId: 'compensation.average' };
+  }
+  if (widgetId === 'waterfall' && module === 'finance') {
+    return { kind: 'waterfall', metricId: 'finance.ebit' };
+  }
+  if (widgetId === 'forecast' && module === 'planning') {
+    return { kind: 'trend', metricId: 'planning.forecast' };
+  }
   if (widgetId === 'distribution') {
     const metricId = distributionMetrics[module];
     return metricId ? { kind: 'distribution', metricId } : null;
@@ -114,6 +160,11 @@ const recipes: Partial<Record<ModuleSubviewId, readonly Recipe[]>> = {
   pace: [
     { kind: 'kpi', slot: 'primary' },
     { kind: 'kpi', slot: 'secondary' },
+    {
+      kind: 'pace',
+      title: 'Pace către target',
+      subtitle: 'Realizat, target și gap din același snapshot.',
+    },
     {
       kind: 'trend',
       title: 'Pace și repere',
@@ -144,9 +195,13 @@ const recipes: Partial<Record<ModuleSubviewId, readonly Recipe[]>> = {
     { kind: 'distribution', title: 'Distribuție volum' },
   ],
   calendar: [
-    { kind: 'matrix', title: 'Calendar / acoperire temporală' },
-    { kind: 'trend', title: 'Evoluție pe interval' },
-    { kind: 'breakdown', title: 'Detaliu perioade' },
+    {
+      kind: 'calendar',
+      title: 'Calendar zilnic observat',
+      subtitle: 'Zilele absente rămân lipsă; retururile sunt cantități negative.',
+    },
+    { kind: 'trend', title: 'Evoluție lunară' },
+    { kind: 'alerts', title: 'Cutoff și coverage sursă' },
   ],
   overview: [
     { kind: 'kpi', slot: 'primary' },
@@ -156,7 +211,7 @@ const recipes: Partial<Record<ModuleSubviewId, readonly Recipe[]>> = {
   ],
   rankings: [
     { kind: 'kpi', slot: 'secondary' },
-    { kind: 'breakdown', title: 'Rankings' },
+    { kind: 'ranking', title: 'Rankings' },
     { kind: 'matrix', title: 'Rank × perioadă' },
   ],
   consistency: [
@@ -208,6 +263,7 @@ const recipes: Partial<Record<ModuleSubviewId, readonly Recipe[]>> = {
   distribution: [
     { kind: 'kpi', slot: 'primary' },
     { kind: 'distribution', title: 'Distribuție agregată' },
+    { kind: 'histogram', title: 'Profilul agregatelor eligibile' },
     { kind: 'breakdown', title: 'Cohorte agregate' },
   ],
   'payroll-ratios': [
@@ -229,6 +285,7 @@ const recipes: Partial<Record<ModuleSubviewId, readonly Recipe[]>> = {
   ],
   reconciliation: [
     { kind: 'kpi', slot: 'primary' },
+    { kind: 'waterfall', title: 'Venit → costuri → EBIT' },
     { kind: 'breakdown', title: 'Reconciliere' },
     { kind: 'alerts', title: 'Autoritate și warnings' },
   ],
@@ -241,7 +298,7 @@ const recipes: Partial<Record<ModuleSubviewId, readonly Recipe[]>> = {
   ],
   '12-months': [
     { kind: 'kpi', slot: 'primary' },
-    { kind: 'trend', title: 'Forecast 12 luni' },
+    { kind: 'forecast', title: 'Forecast 12 luni' },
     { kind: 'matrix', title: 'Forecast entitate × perioadă' },
   ],
   accuracy: [
@@ -261,12 +318,59 @@ const recipes: Partial<Record<ModuleSubviewId, readonly Recipe[]>> = {
   ],
 };
 
+const moduleRecipeOverrides: Partial<Record<`${ModuleId}:${ModuleSubviewId}`, readonly Recipe[]>> =
+  {
+    'performance:productivity': [
+      { kind: 'kpi', slot: 'quaternary' },
+      { kind: 'scatter', title: 'Productivitate × realizare target' },
+      { kind: 'breakdown', title: 'Productivitate' },
+      { kind: 'trend', title: 'Productivitate în timp' },
+    ],
+    'performance:consistency': [
+      { kind: 'kpi', slot: 'tertiary' },
+      { kind: 'histogram', title: 'Distribuția realizării targetului' },
+      { kind: 'trend', title: 'Consistență în timp' },
+      { kind: 'matrix', title: 'Volatilitate entitate × perioadă' },
+    ],
+  };
+
+const ModulePaceWidget = lazy(() =>
+  import('./specialized-widgets').then((module) => ({ default: module.ModulePaceWidget })),
+);
+const ModuleRankingWidget = lazy(() =>
+  import('./specialized-widgets').then((module) => ({ default: module.ModuleRankingWidget })),
+);
+const ModuleProductivityScatterWidget = lazy(() =>
+  import('./specialized-widgets').then((module) => ({
+    default: module.ModuleProductivityScatterWidget,
+  })),
+);
+const ModuleHistogramWidget = lazy(() =>
+  import('./specialized-widgets').then((module) => ({ default: module.ModuleHistogramWidget })),
+);
+const ModuleWaterfallWidget = lazy(() =>
+  import('./specialized-widgets').then((module) => ({ default: module.ModuleWaterfallWidget })),
+);
+const ModuleForecastWidget = lazy(() =>
+  import('./specialized-widgets').then((module) => ({ default: module.ModuleForecastWidget })),
+);
+const ModuleCalendarWidget = lazy(() =>
+  import('./specialized-widgets').then((module) => ({ default: module.ModuleCalendarWidget })),
+);
+
 const componentByKind: Record<Exclude<RecipeKind, 'kpi'>, ComponentType> = {
   trend: ModuleTrendWidget,
   distribution: ModuleDistributionWidget,
   matrix: ModuleMatrixWidget,
   breakdown: ModuleBreakdownWidget,
   alerts: ModuleAlertsWidget,
+  pace: ModulePaceWidget,
+  ranking: ModuleRankingWidget,
+  scatter: ModuleProductivityScatterWidget,
+  histogram: ModuleHistogramWidget,
+  waterfall: ModuleWaterfallWidget,
+  forecast: ModuleForecastWidget,
+  calendar: ModuleCalendarWidget,
 };
 
 function kpiComponent(metricId: string): ComponentType {
@@ -283,7 +387,11 @@ export function moduleWidgets(
   data: ModuleAnalytics,
   subviewId: ModuleSubviewId = subviewForId(data.module, undefined).id,
 ): DashboardWidgetDefinition[] {
-  const recipeList = recipes[subviewId] ?? recipes.overview ?? [];
+  const recipeList =
+    moduleRecipeOverrides[`${data.module}:${subviewId}`] ??
+    recipes[subviewId] ??
+    recipes.overview ??
+    [];
   let kpiIndex = 0;
   let bodyIndex = 0;
   const definitions: DashboardWidgetDefinition[] = [];

@@ -41,6 +41,7 @@ export interface ModuleSubview {
   readonly description: string;
   readonly sourceDomain: string;
   readonly mechanism?: readonly string[];
+  readonly blockedByWarnings?: readonly string[];
 }
 
 export const moduleSubviewConfig: Record<ModuleId, readonly ModuleSubview[]> = {
@@ -48,7 +49,7 @@ export const moduleSubviewConfig: Record<ModuleId, readonly ModuleSubview[]> = {
     {
       id: 'pace',
       label: 'Pace',
-      description: 'Realizat, target și run-rate în perioada selectată.',
+      description: 'Realizat, target și gap în luna selectată.',
       sourceDomain: 'sales',
     },
     {
@@ -163,24 +164,28 @@ export const moduleSubviewConfig: Record<ModuleId, readonly ModuleSubview[]> = {
       label: 'People',
       description: 'Headcount și identitate opacă din read-model.',
       sourceDomain: 'workforce',
+      blockedByWarnings: ['not an official workforce roster'],
     },
     {
       id: 'movements',
       label: 'Mișcări',
       description: 'Intrări, ieșiri și transferuri oficiale.',
       sourceDomain: 'workforce',
+      blockedByWarnings: ['not an official workforce roster'],
     },
     {
       id: 'stability',
       label: 'Stability',
       description: 'Vechime și stabilitate în perioada selectată.',
       sourceDomain: 'workforce',
+      blockedByWarnings: ['not an official workforce roster'],
     },
     {
       id: 'coverage',
       label: 'Coverage',
       description: 'Acoperirea magazinelor livrată de sursă.',
       sourceDomain: 'workforce',
+      blockedByWarnings: ['not an official workforce roster'],
     },
     {
       id: 'productivity',
@@ -199,6 +204,7 @@ export const moduleSubviewConfig: Record<ModuleId, readonly ModuleSubview[]> = {
       label: 'Grile',
       description: 'Statusul grilelor numai din contractul Grile.',
       sourceDomain: 'grile',
+      blockedByWarnings: ['unavailable'],
     },
   ],
   compensation: [
@@ -328,11 +334,42 @@ export function subviewStatus(data: ModuleAnalytics, view: ModuleSubview): Subvi
       source,
     };
   }
-  const sourceText = [source.source, ...source.warnings].join(' ').toLocaleLowerCase('ro-RO');
+  const normalize = (value: string): string =>
+    value
+      .toLocaleLowerCase('ro-RO')
+      .replace(/[^a-z0-9ăâîșț]+/gi, ' ')
+      .trim();
+  const warnings = source.warnings.map(normalize);
+  const sourceText = normalize(
+    [
+      source.source,
+      source.source_generation,
+      source.authority,
+      source.authority_head,
+      source.rule_version,
+      ...source.warnings,
+    ]
+      .filter(Boolean)
+      .join(' '),
+  );
+  const blockingWarning = view.blockedByWarnings?.find((marker) =>
+    warnings.some((warning) => warning.includes(normalize(marker))),
+  );
+  if (blockingWarning) {
+    return {
+      availability: 'unavailable',
+      reason: `Sursa curentă declară explicit că ${view.label} nu are contract oficial eligibil.`,
+      source,
+    };
+  }
   if (
-    view.mechanism?.some(
-      (token) =>
-        sourceText.includes(`${token} unavailable`) || sourceText.includes(`${token}: unavailable`),
+    view.mechanism?.some((token) =>
+      warnings.some(
+        (warning) =>
+          warning.includes(normalize(token)) &&
+          warning.includes('unavailable') &&
+          !warning.includes(`${normalize(token)} only`),
+      ),
     )
   ) {
     return {

@@ -81,7 +81,7 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         MetricUnit.CURRENCY,
         dimensions=("firm", "regional", "asm", "store", "agent", "category", "time"),
         comparisons=("target", *TEMPORAL_COMPARISONS),
-        shapes=TREND_MIX,
+        shapes=(*TREND_MIX[:-1], ChartKind.CALENDAR, ChartKind.TABLE),
     ),
     metric(
         "target.progress_pct",

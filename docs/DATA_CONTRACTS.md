@@ -53,6 +53,7 @@ For an open current period, future actual points are null, never repeated last v
 - `Cartele` are excluded from normal accessory KPIs.
 - Distribution / `TR %` locations are excluded from ordinary Retail KPI scope.
 - Quantities are net.
+- `reporting_sales_day_v1` expune numai zile observate din head-ul Sales eligibil. `coverage_state=observed` nu afirmă acoperire completă; zilele fără rând rămân missing, iar `return_quantity` păstrează semnul negativ. Bonurile de retur nu se deduc din agregatele pe produs.
 - Identical source rows are not deduplicated as transactions.
 - Snapshot and historical fallback coverage are explicit.
 - Salary totals follow the Retail salary contract.

@@ -17,13 +17,13 @@ const metric: MetricDefinition = {
   unit: 'currency',
   aggregation: 'sum',
   allowed_dimensions: ['store', 'time'],
-  allowed_grains: ['month'],
+  allowed_grains: ['day', 'month'],
   comparison_policy: 'previous-year',
   allowed_comparisons: ['previous-year'],
   missing_policy: 'null',
   required_capability: 'insight:analytics',
   formula_reference: 'retail',
-  allowed_shapes: ['line', 'table', 'waterfall', 'scatter', 'heatmap'],
+  allowed_shapes: ['line', 'table', 'waterfall', 'scatter', 'heatmap', 'calendar'],
   suppressible: false,
   source_authority: 'retail',
   query_contract_version: 1,
@@ -93,6 +93,34 @@ describe('ChartSpec registry', () => {
     expect(resolveChartSpec(metric, 'scatter', scatter)).toMatchObject({
       kind: 'chart',
       shape: 'scatter',
+    });
+  });
+
+  it('renders observed calendar rows without synthesizing missing dates', () => {
+    const calendar: QueryDataset = {
+      dimensions: [
+        { id: 'date', label: 'Dată', kind: 'time', role: 'key', source_dimension: 'time' },
+        { id: 'value', label: 'Vânzări', kind: 'number', role: 'value' },
+        { id: 'coverage_state', label: 'Coverage', kind: 'string', role: 'metadata' },
+      ],
+      rows: [
+        { date: '2026-08-01', value: 10, coverage_state: 'observed' },
+        { date: '2026-08-03', value: 30, coverage_state: 'observed' },
+      ],
+    };
+    const resolved = resolveChartSpec(metric, 'calendar', calendar);
+    expect(resolved).toMatchObject({ kind: 'chart', shape: 'calendar' });
+    if (resolved.kind !== 'chart') return;
+    expect(resolved.option).toMatchObject({
+      series: [
+        {
+          type: 'heatmap',
+          data: [
+            ['2026-08-01', 10],
+            ['2026-08-03', 30],
+          ],
+        },
+      ],
     });
   });
 

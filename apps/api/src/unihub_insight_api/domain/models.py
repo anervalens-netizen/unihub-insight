@@ -337,6 +337,18 @@ class MatrixCell(BaseModel):
     risk: RiskLevel = RiskLevel.HEALTHY
 
 
+class CalendarCell(BaseModel):
+    date: date
+    sales: Decimal
+    net_quantity: Decimal
+    positive_quantity: Decimal
+    return_quantity: Decimal
+    receipt_count: Decimal
+    receipt_2plus_count: Decimal
+    observed_store_count: int = Field(ge=1)
+    coverage_state: str = Field(pattern=r"^observed$")
+
+
 class ModuleAnalyticsResponse(BaseModel):
     meta: OverviewMeta
     module: ModuleId
@@ -350,6 +362,7 @@ class ModuleAnalyticsResponse(BaseModel):
     distribution: list[DimensionShare]
     breakdown: list[BreakdownRow]
     matrix: list[MatrixCell]
+    calendar: list[CalendarCell] = Field(default_factory=list)
     alerts: list[InsightAlert]
 
 

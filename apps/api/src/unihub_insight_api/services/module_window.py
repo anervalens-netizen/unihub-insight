@@ -57,9 +57,11 @@ def apply_module_window(
     if window.start is None or window.end is None:
         trend = enriched_trend
         matrix = data.matrix
+        calendar = data.calendar
     else:
         trend = [point for point in enriched_trend if window.start <= point.key <= window.end]
         matrix = [cell for cell in data.matrix if window.start <= cell.x <= window.end]
+        calendar = [cell for cell in data.calendar if window.start <= cell.date.strftime("%Y-%m") <= window.end]
 
     available = {"target"}
     available.update(temporal_points)
@@ -88,5 +90,6 @@ def apply_module_window(
             ),
             "trend": trend,
             "matrix": matrix,
+            "calendar": calendar,
         }
     )

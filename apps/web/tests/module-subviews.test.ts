@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ModuleAnalytics } from '../src/features/modules/schemas';
 import { subviewForId, subviewStatus } from '../src/features/modules/subviews';
-import { moduleWidgetQuerySpec } from '../src/features/modules/widget-catalog';
+import { moduleWidgetQuerySpec, moduleWidgets } from '../src/features/modules/widget-catalog';
 
 function moduleData(sources: Record<string, unknown>): ModuleAnalytics {
   return { meta: { sources, period: '2026-08' } } as ModuleAnalytics;
@@ -48,6 +48,51 @@ describe('module subview availability', () => {
     );
   });
 
+  it('understands normalized Retail warnings and never substitutes Focus for absent mechanisms', () => {
+    const campaignSource = {
+      ...source('partial', 'reporting_focus_item_month'),
+      warnings: ['focus_only_promo_incentive_contest_and_folii_unavailable'],
+    };
+    expect(
+      subviewStatus(moduleData({ campaigns: campaignSource }), subviewForId('campaigns', 'promo'))
+        .availability,
+    ).toBe('unavailable');
+    expect(
+      subviewStatus(moduleData({ campaigns: campaignSource }), subviewForId('campaigns', 'focus'))
+        .availability,
+    ).toBe('partial');
+  });
+
+  it('blocks official-roster surfaces when Workforce is only sales-derived activity', () => {
+    const workforceSource = {
+      ...source('partial', 'reporting_agent_month'),
+      domain: 'workforce',
+      warnings: ['sales_activity_is_not_an_official_workforce_roster'],
+    };
+    const data = moduleData({ workforce: workforceSource });
+    expect(subviewStatus(data, subviewForId('workforce', 'people')).availability).toBe(
+      'unavailable',
+    );
+    expect(subviewStatus(data, subviewForId('workforce', 'movements')).availability).toBe(
+      'unavailable',
+    );
+    expect(subviewStatus(data, subviewForId('workforce', 'productivity')).availability).toBe(
+      'partial',
+    );
+  });
+
+  it('recognizes scenario lineage outside the source label', () => {
+    const planningSource = {
+      ...source('official', 'planning_authorities'),
+      domain: 'planning',
+      source_generation: 'target-scenario:42',
+    };
+    expect(
+      subviewStatus(moduleData({ planning: planningSource }), subviewForId('planning', 'scenarios'))
+        .availability,
+    ).toBe('available');
+  });
+
   it('maps native analytical widgets to canonical query metrics and excludes alerts', () => {
     expect(moduleWidgetQuerySpec('sales', 'kpi:sales.total')).toEqual({
       kind: 'kpi',
@@ -63,5 +108,66 @@ describe('module subview availability', () => {
     });
     expect(moduleWidgetQuerySpec('planning', 'matrix')).toBeNull();
     expect(moduleWidgetQuerySpec('sales', 'alerts')).toBeNull();
+    expect(moduleWidgetQuerySpec('performance', 'scatter')).toEqual({
+      kind: 'scatter',
+      metricId: 'performance.average',
+    });
+    expect(moduleWidgetQuerySpec('performance', 'histogram')).toEqual({
+      kind: 'histogram',
+      metricId: 'performance.average',
+    });
+    expect(moduleWidgetQuerySpec('compensation', 'histogram')).toEqual({
+      kind: 'histogram',
+      metricId: 'compensation.average',
+    });
+    expect(moduleWidgetQuerySpec('finance', 'waterfall')).toEqual({
+      kind: 'waterfall',
+      metricId: 'finance.ebit',
+    });
+    expect(moduleWidgetQuerySpec('planning', 'forecast')).toEqual({
+      kind: 'trend',
+      metricId: 'planning.forecast',
+    });
+    expect(moduleWidgetQuerySpec('sales', 'calendar')).toEqual({
+      kind: 'calendar',
+      metricId: 'sales.total',
+    });
+  });
+
+  it('uses specialized recipes instead of the generic template where data supports them', () => {
+    const base = {
+      meta: { period: '2026-08', sources: {} },
+      kpis: [],
+      trend: [],
+      distribution: [],
+      breakdown: [],
+      matrix: [],
+      alerts: [],
+    } as unknown as ModuleAnalytics;
+    expect(
+      moduleWidgets({ ...base, module: 'sales' } as ModuleAnalytics, 'pace').map(
+        (widget) => widget.id,
+      ),
+    ).toContain('pace');
+    expect(
+      moduleWidgets({ ...base, module: 'performance' } as ModuleAnalytics, 'rankings').map(
+        (widget) => widget.id,
+      ),
+    ).toContain('ranking');
+    expect(
+      moduleWidgets({ ...base, module: 'performance' } as ModuleAnalytics, 'consistency').map(
+        (widget) => widget.id,
+      ),
+    ).toContain('histogram');
+    expect(
+      moduleWidgets({ ...base, module: 'finance' } as ModuleAnalytics, 'reconciliation').map(
+        (widget) => widget.id,
+      ),
+    ).toContain('waterfall');
+    expect(
+      moduleWidgets({ ...base, module: 'planning' } as ModuleAnalytics, '12-months').map(
+        (widget) => widget.id,
+      ),
+    ).toContain('forecast');
   });
 });

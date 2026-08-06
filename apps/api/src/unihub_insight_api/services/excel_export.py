@@ -403,6 +403,21 @@ def module_workbook(data: ModuleAnalyticsResponse) -> Path:
         data.matrix,
     )
     builder.add_sheet(
+        "Calendar",
+        [
+            Column("date", "Dată", width=14),
+            Column("sales", "Vânzări", "currency", 18),
+            Column("net_quantity", "Cantitate netă", "integer", 16),
+            Column("positive_quantity", "Cantitate pozitivă", "integer", 18),
+            Column("return_quantity", "Cantitate retur", "integer", 16),
+            Column("receipt_count", "Bonuri", "integer", 14),
+            Column("receipt_2plus_count", "Bonuri 2+", "integer", 14),
+            Column("observed_store_count", "Magazine observate", "integer", 20),
+            Column("coverage_state", "Coverage", width=14),
+        ],
+        data.calendar,
+    )
+    builder.add_sheet(
         "Alerte",
         [
             Column("severity", "Severitate", width=14),

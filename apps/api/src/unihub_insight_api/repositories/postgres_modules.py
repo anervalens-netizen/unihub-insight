@@ -14,6 +14,7 @@ from unihub_insight_api.domain import (
     AlertSeverity,
     AnalyticsScope,
     BreakdownRow,
+    CalendarCell,
     Capability,
     ChartKind,
     DataMode,
@@ -50,7 +51,15 @@ MODULE_DEFINITIONS: dict[ModuleId, tuple[str, str, Capability, tuple[ValueAxis, 
             ValueAxis(key="secondary", label="Cantitate", unit=MetricUnit.INTEGER),
             ValueAxis(key="tertiary", label="Bonuri", unit=MetricUnit.INTEGER),
         ),
-        (ChartKind.LINE, ChartKind.AREA, ChartKind.BAR, ChartKind.DONUT, ChartKind.TREEMAP, ChartKind.TABLE),
+        (
+            ChartKind.LINE,
+            ChartKind.AREA,
+            ChartKind.BAR,
+            ChartKind.DONUT,
+            ChartKind.TREEMAP,
+            ChartKind.CALENDAR,
+            ChartKind.TABLE,
+        ),
     ),
     ModuleId.PERFORMANCE: (
         "Performance",
@@ -321,6 +330,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         distribution: list[DimensionShare],
         breakdown: list[BreakdownRow],
         matrix: list[MatrixCell],
+        calendar: list[CalendarCell] | None = None,
         alerts: list[InsightAlert],
     ) -> ModuleAnalyticsResponse:
         title, description, capability, axes, charts = MODULE_DEFINITIONS[module]
@@ -337,6 +347,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             distribution=distribution,
             breakdown=breakdown,
             matrix=matrix,
+            calendar=calendar or [],
             alerts=alerts,
         )
 
@@ -419,6 +430,45 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                 *params,
             )
 
+    async def _sales_calendar(self, scope: AnalyticsScope) -> list[CalendarCell]:
+        params: list[Any] = [scope.period]
+        clauses = ["daily.period = $1"]
+        clauses.extend(append_reporting_scope(scope, alias="daily", params=params))
+        async with self.pool.acquire() as connection:
+            rows = await connection.fetch(
+                f"""
+                SELECT
+                    daily.sale_date,
+                    SUM(daily.net_sales) AS total_sales,
+                    SUM(daily.net_quantity) AS net_quantity,
+                    SUM(daily.positive_quantity) AS positive_quantity,
+                    SUM(daily.return_quantity) AS return_quantity,
+                    SUM(daily.receipt_count) AS receipt_count,
+                    SUM(daily.receipt_2plus_count) AS receipt_2plus_count,
+                    COUNT(DISTINCT daily.site_code) AS observed_store_count,
+                    MIN(daily.coverage_state) AS coverage_state
+                FROM reporting_sales_day_v1 AS daily
+                WHERE {" AND ".join(clauses)}
+                GROUP BY daily.sale_date
+                ORDER BY daily.sale_date
+                """,
+                *params,
+            )
+        return [
+            CalendarCell(
+                date=row["sale_date"],
+                sales=_money(row["total_sales"]),
+                net_quantity=Decimal(int(row["net_quantity"] or 0)),
+                positive_quantity=Decimal(int(row["positive_quantity"] or 0)),
+                return_quantity=Decimal(int(row["return_quantity"] or 0)),
+                receipt_count=Decimal(int(row["receipt_count"] or 0)),
+                receipt_2plus_count=Decimal(int(row["receipt_2plus_count"] or 0)),
+                observed_store_count=int(row["observed_store_count"]),
+                coverage_state=str(row["coverage_state"]),
+            )
+            for row in rows
+        ]
+
     @staticmethod
     def _store_breakdown(rows: Sequence[asyncpg.Record]) -> list[BreakdownRow]:
         result: list[BreakdownRow] = []
@@ -471,9 +521,10 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
 
     async def _sales(self, scope: AnalyticsScope) -> ModuleAnalyticsResponse:
         start = shift_month(scope.period, -23)
-        history, categories, meta = await asyncio.gather(
+        history, categories, calendar_rows, meta = await asyncio.gather(
             self._sales_history(scope, start=start, end=scope.period),
             self._category_distribution(scope),
+            self._sales_calendar(scope),
             self._meta(ModuleId.SALES, scope, "reporting_agent_month/reporting_category_month"),
         )
         current = [row for row in history if str(row["import_month"]) == scope.period]
@@ -581,6 +632,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             distribution=shares([(str(row["label"]), _money(row["value"])) for row in categories]),
             breakdown=breakdown,
             matrix=self._store_matrix(history, matrix_periods),
+            calendar=calendar_rows,
             alerts=alerts,
         )
 

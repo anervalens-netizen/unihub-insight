@@ -84,6 +84,7 @@ MODULE_CHARTS: dict[ModuleId, frozenset[ChartKind]] = {
             ChartKind.DONUT,
             ChartKind.TREEMAP,
             ChartKind.HEATMAP,
+            ChartKind.CALENDAR,
             ChartKind.TABLE,
         }
     ),
@@ -319,6 +320,13 @@ def validate_dashboard(request: DashboardCreateRequest, user: UserContext) -> No
             widget.metric_id != "finance.ebit" or dimensions != ("category",)
         ):
             errors.append(f"{prefix}.waterfall requires finance.ebit × category")
+        if widget.visualization is ChartKind.CALENDAR and (
+            widget.module is not ModuleId.SALES
+            or widget.metric_id != "sales.total"
+            or dimensions != ("time",)
+            or widget.time_grain != "day"
+        ):
+            errors.append(f"{prefix}.calendar requires sales.total × time at day grain")
         if len(dimensions) > 1 and widget.visualization is not ChartKind.HEATMAP:
             errors.append(f"{prefix}.two dimensions require heatmap")
         if widget.visualization is ChartKind.HEATMAP and dimensions != (

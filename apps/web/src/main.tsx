@@ -4,9 +4,11 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { queryClient } from './lib/query-client';
+import { initializeRum } from './lib/rum';
 import { router } from './router';
 import './styles.css';
 import './features.css';
+import './module-specialization.css';
 import './dashboard-editor.css';
 import './monthly-review.css';
 import './chart-studio.css';
@@ -14,6 +16,8 @@ import './chart-studio-a11y.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Root element #root is missing.');
+
+void initializeRum();
 
 createRoot(root).render(
   <StrictMode>

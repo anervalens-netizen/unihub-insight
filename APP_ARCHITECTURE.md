@@ -139,4 +139,6 @@ Overview și Monthly Review sunt suprafețe distincte. Cele șapte module au sub
 
 Retail publică read-model-uri versionate. Insight rezolvă un `analytical_snapshot_id`, apoi un query batch finit execută 8–12 widgeturi cu deadline comun, deduplicare și eroare izolată. Catalogul versionat de metrici/dimensiuni și `ChartSpec` alimentează identic modulele specializate, custom dashboards, inspectorul server-side și exporturile. Metadata de cutoff/finalitate rămâne per domeniu; nicio pagină Finance/HR/Planning nu moștenește metadata Sales.
 
+Sales Calendar citește exclusiv `reporting_sales_day_v1`. API-ul păstrează granulația zilnică observată, cantitatea retur negativă și numărul de magazine observate; nu generează zile lipsă și nu afirmă coverage zilnic complet. Același dataset alimentează widgetul Calendar, custom dashboards, inspect și XLSX.
+
 Detaliile, ordinea de dependență și porțile sunt canonice în [Planul integrat](docs/PLAN_DEZVOLTARE_INTEGRAT.md).

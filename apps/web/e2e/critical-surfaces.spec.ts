@@ -147,6 +147,29 @@ for (const module of moduleSubviews) {
   });
 }
 
+test('native modules render their specialized analytical forms', async ({ page }) => {
+  const errors = collectRuntimeErrors(page);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const cases = [
+    ['/sales?period=2026-08&range=12&subview=pace', 'pace', 'progress'],
+    ['/sales?period=2026-08&range=12&subview=calendar', 'calendar', 'canvas'],
+    ['/performance?period=2026-08&range=12&subview=rankings', 'ranking', 'canvas'],
+    ['/performance?period=2026-08&range=12&subview=consistency', 'histogram', 'canvas'],
+    ['/performance?period=2026-08&range=12&subview=productivity', 'scatter', 'canvas'],
+    ['/planning?period=2026-08&range=12&subview=12-months', 'forecast', 'canvas'],
+  ] as const;
+
+  for (const [path, widgetId, surface] of cases) {
+    await page.goto(path);
+    const widget = page.locator(`[gs-id="${widgetId}"]`);
+    await expect(widget).toBeVisible();
+    await expect(widget.locator(surface).first()).toBeVisible();
+  }
+
+  await page.goto('about:blank');
+  expect(errors).toEqual([]);
+});
+
 for (const width of [1180, 1440, 1920, 2560]) {
   for (const theme of ['light', 'dark'] as const) {
     for (const density of ['comfortable', 'compact'] as const) {

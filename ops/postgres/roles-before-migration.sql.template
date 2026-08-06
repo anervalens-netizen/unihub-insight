@@ -59,6 +59,7 @@ GRANT SELECT ON TABLE
     reporting_agent_profile,
     reporting_agent_lifecycle_month,
     reporting_source_snapshot_v1,
+    reporting_sales_day_v1,
     reporting_campaign_month_v1,
     reporting_workforce_month_v1,
     reporting_compensation_month_v1,

@@ -40,6 +40,15 @@ def test_sensitive_modules_read_only_versioned_reporting_contracts() -> None:
     assert "target_contract_invalid" in planning
 
 
+def test_sales_calendar_reads_only_the_versioned_daily_contract() -> None:
+    calendar = inspect.getsource(PostgresInsightRepository._sales_calendar)
+
+    assert "reporting_sales_day_v1" in calendar
+    assert "reporting_agent_day" not in calendar
+    assert "reporting_item_day" not in calendar
+    assert "sales_transactions" not in calendar
+
+
 def test_compensation_rejects_direct_differentiating_scope_and_export() -> None:
     settings = Settings(
         environment="test",
@@ -75,6 +84,7 @@ def test_bootstrap_uses_view_only_sensitive_acl_and_audit_is_append_only() -> No
     assert "reporting_compensation_month_v1" in roles
     assert "reporting_finance_month_v1" in roles
     assert "reporting_planning_scenario_v1" in roles
+    assert "reporting_sales_day_v1" in roles
     assert "ON TABLE salary_records" not in roles
     assert "ON TABLE agent_salary_links" not in roles
     assert "store_pnl_monthly," not in roles
