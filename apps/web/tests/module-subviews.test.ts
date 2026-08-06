@@ -132,6 +132,14 @@ describe('module subview availability', () => {
       kind: 'calendar',
       metricId: 'sales.total',
     });
+    expect(moduleWidgetQuerySpec('campaigns', 'focus-ranking')).toEqual({
+      kind: 'breakdown',
+      metricId: 'campaigns.focus_share',
+    });
+    expect(moduleWidgetQuerySpec('planning', 'accuracy-scatter')).toEqual({
+      kind: 'scatter',
+      metricId: 'planning.forecast',
+    });
   });
 
   it('uses specialized recipes instead of the generic template where data supports them', () => {
@@ -169,5 +177,33 @@ describe('module subview availability', () => {
         (widget) => widget.id,
       ),
     ).toContain('forecast');
+    expect(
+      moduleWidgets({ ...base, module: 'sales' } as ModuleAnalytics, 'transactions').map(
+        (widget) => widget.id,
+      ),
+    ).toEqual([
+      'kpi:receipts.total',
+      'kpi:receipts.average_value',
+      'kpi:receipt_2plus_pct',
+      'alerts',
+    ]);
+    expect(
+      moduleWidgets({ ...base, module: 'campaigns' } as ModuleAnalytics, 'focus').map(
+        (widget) => widget.id,
+      ),
+    ).toEqual([
+      'kpi:campaigns.focus_sales',
+      'kpi:campaigns.focus_share',
+      'kpi:campaigns.active_stores',
+      'kpi:campaigns.active_products',
+      'focus-ranking',
+      'distribution',
+      'matrix',
+    ]);
+    expect(
+      moduleWidgets({ ...base, module: 'planning' } as ModuleAnalytics, 'accuracy').map(
+        (widget) => widget.id,
+      ),
+    ).toContain('accuracy-scatter');
   });
 });

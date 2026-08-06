@@ -54,6 +54,7 @@ For an open current period, future actual points are null, never repeated last v
 - Distribution / `TR %` locations are excluded from ordinary Retail KPI scope.
 - Quantities are net.
 - `reporting_sales_day_v1` expune numai zile observate din head-ul Sales eligibil. `coverage_state=observed` nu afirmă acoperire completă; zilele fără rând rămân missing, iar `return_quantity` păstrează semnul negativ. Bonurile de retur nu se deduc din agregatele pe produs.
+- Sub-view-ul Sales Transactions expune numai `receipts.total`, `receipts.average_value` și `receipt_2plus_pct` din contractul agregat. Nu reconstruiește linii de bon și nu etichetează cantitatea negativă drept număr de bonuri retur.
 - Identical source rows are not deduplicated as transactions.
 - Snapshot and historical fallback coverage are explicit.
 - Salary totals follow the Retail salary contract.
@@ -64,11 +65,11 @@ Initial alerts are deterministic rules, not machine-learning scores. They expose
 
 ## Domain contracts and privacy
 
-- Campaign mechanisms remain separate and carry their own cutoff/status/eligibility authority; they are not summed without a defined metric.
+- Campaign mechanisms remain separate and carry their own cutoff/status/eligibility authority; they are not summed without a defined metric. Focus Top/Bottom folosește numai magazine observate și `campaigns.focus_share`; nu afirmă coverage, adopție sau cauzalitate.
 - Workforce movements come from official effective-dated events, never inferred only from missing sales.
 - Compensation reads an aggregate Retail view only. No direct `salary_records`, `agent_salary_links`, names or private IDs remain granted. Total uses all rows, average uses values at least 2,000 RON, median uses all values; cohorts of one or two are suppressed across KPI, series, inspect and export, including differencing attacks through filters.
 - Finance explicitly marks `actual`/`estimated` and authority. `__FINANCE_UNALLOCATED__` belongs in company totals and never in store/RM detail. Shadow or unpromoted generations are unavailable, not actual.
-- Planning forecast identifies run, horizon, method/model, input cutoff and coverage. Target scenarios identify scenario, revision, status, rule-set hash and snapshot; drafts are not implicitly shared truth.
+- Planning forecast identifies run, horizon, method/model, input cutoff and coverage. Target scenarios identify scenario, revision, status, rule-set hash and snapshot; drafts are not implicitly shared truth. Accuracy păstrează KPI-ul server-side și vizualizează perechile Actual × Forecast publicate pe magazin; clientul nu recalculează o formulă alternativă.
 
 Retail migration 047 is intentionally additive for consumer N/N-1. Insight RC1 reads only the approved v1 views, while legacy Finance/Planning raw grants are revoked only after two compatible Insight releases and a verified B→A rollback. This temporary publisher compatibility does not authorize new Insight code to query raw tables.
 

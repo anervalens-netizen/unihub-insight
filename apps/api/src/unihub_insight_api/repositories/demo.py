@@ -200,18 +200,37 @@ class DemoAnalyticsRepository:
         sources = {
             domain.value: SourceMetadata(
                 domain=domain,
-                source=f"deterministic-demo-{domain.value}",
+                source=(
+                    "deterministic-demo-focus-campaigns"
+                    if domain is SourceDomain.CAMPAIGNS
+                    else f"deterministic-demo-{domain.value}"
+                ),
                 period=scope.period,
                 cutoff=cutoff,
                 as_of=cutoff,
                 is_final=is_final,
                 coverage_numerator=cutoff.day if cutoff else 0,
                 coverage_denominator=days_in_month,
-                source_generation=f"demo:{scope.period}:{domain.value}:v1",
+                source_generation=(
+                    f"demo:{scope.period}:campaigns:focus-only:v1"
+                    if domain is SourceDomain.CAMPAIGNS
+                    else f"demo:{scope.period}:{domain.value}:v1"
+                ),
                 authority="deterministic-demo",
                 authority_head="demo-v1",
-                status=SourceStatus.OFFICIAL if cutoff else SourceStatus.UNAVAILABLE,
+                status=(
+                    SourceStatus.PARTIAL
+                    if cutoff and domain is SourceDomain.CAMPAIGNS
+                    else SourceStatus.OFFICIAL
+                    if cutoff
+                    else SourceStatus.UNAVAILABLE
+                ),
                 produced_at=datetime.now(UTC),
+                warnings=(
+                    ("focus_only_promo_incentive_contest_and_folii_unavailable",)
+                    if domain is SourceDomain.CAMPAIGNS
+                    else ()
+                ),
             )
             for domain in domains
         }

@@ -108,6 +108,58 @@ def test_scatter_uses_explicit_business_axes(client: TestClient) -> None:
     assert result["dataset"]["rows"]
 
 
+def test_planning_accuracy_scatter_uses_actual_and_forecast_axes(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/query/batch",
+        params={"period": "2026-08"},
+        json={
+            "widgets": [
+                widget(
+                    "planning-accuracy",
+                    module="planning",
+                    metric_id="planning.forecast",
+                    visualization="scatter",
+                    dimensions=["store"],
+                )
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    result = response.json()["results"][0]
+    assert result["error"] is None
+    dimensions = {item["id"]: item["label"] for item in result["dataset"]["dimensions"]}
+    assert dimensions["x"] == "Actual"
+    assert dimensions["y"] == "Forecast"
+    assert result["dataset"]["rows"]
+
+
+def test_campaign_focus_breakdown_returns_observed_store_rows(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/query/batch",
+        params={"period": "2026-08"},
+        json={
+            "widgets": [
+                widget(
+                    "campaign-focus-ranking",
+                    module="campaigns",
+                    metric_id="campaigns.focus_share",
+                    visualization="table",
+                    dimensions=["store"],
+                )
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    result = response.json()["results"][0]
+    assert result["error"] is None
+    dimensions = {item["id"]: item for item in result["dataset"]["dimensions"]}
+    assert {"id", "label", "progress_pct"} <= dimensions.keys()
+    assert dimensions["id"]["source_dimension"] == "store"
+    assert result["dataset"]["rows"]
+
+
 def test_calendar_returns_only_observed_daily_rows_with_return_and_coverage_context(
     client: TestClient,
 ) -> None:

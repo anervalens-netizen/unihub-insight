@@ -25,11 +25,14 @@ type RecipeKind =
   | 'histogram'
   | 'waterfall'
   | 'forecast'
-  | 'calendar';
+  | 'calendar'
+  | 'focus-ranking'
+  | 'accuracy-scatter';
 type MetricSlot = 'primary' | 'secondary' | 'tertiary' | 'quaternary';
 interface Recipe {
   kind: RecipeKind;
   slot?: MetricSlot;
+  metricId?: string;
   title?: string;
   subtitle?: string;
 }
@@ -142,6 +145,12 @@ export function moduleWidgetQuerySpec(
   if (widgetId === 'forecast' && module === 'planning') {
     return { kind: 'trend', metricId: 'planning.forecast' };
   }
+  if (widgetId === 'focus-ranking' && module === 'campaigns') {
+    return { kind: 'breakdown', metricId: 'campaigns.focus_share' };
+  }
+  if (widgetId === 'accuracy-scatter' && module === 'planning') {
+    return { kind: 'scatter', metricId: 'planning.forecast' };
+  }
   if (widgetId === 'distribution') {
     const metricId = distributionMetrics[module];
     return metricId ? { kind: 'distribution', metricId } : null;
@@ -189,10 +198,15 @@ const recipes: Partial<Record<ModuleSubviewId, readonly Recipe[]>> = {
     { kind: 'alerts', title: 'Atenție managerială' },
   ],
   transactions: [
-    { kind: 'kpi', slot: 'tertiary' },
-    { kind: 'kpi', slot: 'quaternary' },
-    { kind: 'breakdown', title: 'Tranzacții / volum disponibil' },
-    { kind: 'distribution', title: 'Distribuție volum' },
+    { kind: 'kpi', metricId: 'receipts.total' },
+    { kind: 'kpi', metricId: 'receipts.average_value' },
+    { kind: 'kpi', metricId: 'receipt_2plus_pct' },
+    {
+      kind: 'alerts',
+      title: 'Contract tranzacțional agregat',
+      subtitle:
+        'Bonuri și volum agregat din contractul Retail; fără linii de tranzacție inventate.',
+    },
   ],
   calendar: [
     {
@@ -235,8 +249,11 @@ const recipes: Partial<Record<ModuleSubviewId, readonly Recipe[]>> = {
   focus: [
     { kind: 'kpi', slot: 'primary' },
     { kind: 'kpi', slot: 'secondary' },
+    { kind: 'kpi', slot: 'tertiary' },
+    { kind: 'kpi', slot: 'quaternary' },
+    { kind: 'focus-ranking', title: 'Top / Bottom magazine observate' },
     { kind: 'distribution', title: 'Focus mix' },
-    { kind: 'breakdown', title: 'Focus pe magazine' },
+    { kind: 'matrix', title: 'Pondere Focus magazin × perioadă' },
   ],
   folii: [{ kind: 'alerts', title: 'Folii indisponibil' }],
   people: [
@@ -303,8 +320,9 @@ const recipes: Partial<Record<ModuleSubviewId, readonly Recipe[]>> = {
   ],
   accuracy: [
     { kind: 'kpi', slot: 'tertiary' },
-    { kind: 'trend', title: 'Acuratețe' },
-    { kind: 'breakdown', title: 'Acuratețe pe entitate' },
+    { kind: 'accuracy-scatter', title: 'Actual × forecast pe magazin' },
+    { kind: 'forecast', title: 'Forecast și actual observat în timp' },
+    { kind: 'alerts', title: 'Coverage actual și autoritate forecast' },
   ],
   scenarios: [
     { kind: 'kpi', slot: 'primary' },
@@ -357,6 +375,14 @@ const ModuleForecastWidget = lazy(() =>
 const ModuleCalendarWidget = lazy(() =>
   import('./specialized-widgets').then((module) => ({ default: module.ModuleCalendarWidget })),
 );
+const ModuleFocusRankingWidget = lazy(() =>
+  import('./specialized-widgets').then((module) => ({ default: module.ModuleFocusRankingWidget })),
+);
+const ModulePlanningAccuracyWidget = lazy(() =>
+  import('./specialized-widgets').then((module) => ({
+    default: module.ModulePlanningAccuracyWidget,
+  })),
+);
 
 const componentByKind: Record<Exclude<RecipeKind, 'kpi'>, ComponentType> = {
   trend: ModuleTrendWidget,
@@ -371,6 +397,8 @@ const componentByKind: Record<Exclude<RecipeKind, 'kpi'>, ComponentType> = {
   waterfall: ModuleWaterfallWidget,
   forecast: ModuleForecastWidget,
   calendar: ModuleCalendarWidget,
+  'focus-ranking': ModuleFocusRankingWidget,
+  'accuracy-scatter': ModulePlanningAccuracyWidget,
 };
 
 function kpiComponent(metricId: string): ComponentType {
@@ -379,7 +407,8 @@ function kpiComponent(metricId: string): ComponentType {
 
 function recipeTitle(data: ModuleAnalytics, recipe: Recipe): string {
   if (recipe.title) return recipe.title;
-  const metricId = recipe.slot ? metricSlots[data.module][recipe.slot] : undefined;
+  const metricId =
+    recipe.metricId ?? (recipe.slot ? metricSlots[data.module][recipe.slot] : undefined);
   return data.kpis.find((metric) => metric.id === metricId)?.label ?? 'Metrica disponibilă';
 }
 
@@ -394,17 +423,19 @@ export function moduleWidgets(
     [];
   let kpiIndex = 0;
   let bodyIndex = 0;
+  const kpiCount = recipeList.filter((item) => item.kind === 'kpi').length;
+  const bodyCount = recipeList.length - kpiCount;
+  const kpiColumns = kpiCount > 0 ? Math.floor(24 / Math.min(4, kpiCount)) : 6;
   const definitions: DashboardWidgetDefinition[] = [];
   for (const recipe of recipeList) {
-    const metricId = recipe.slot ? metricSlots[data.module][recipe.slot] : undefined;
+    const metricId =
+      recipe.metricId ?? (recipe.slot ? metricSlots[data.module][recipe.slot] : undefined);
     const isKpi = recipe.kind === 'kpi';
     const index = isKpi ? kpiIndex++ : bodyIndex++;
-    const columns = isKpi
-      ? 6
-      : recipeList.filter((item) => item.kind !== 'kpi').length <= 2
-        ? 12
-        : 8;
-    const x = isKpi ? (index % 4) * 6 : (index % Math.max(1, 24 / columns)) * columns;
+    const columns = isKpi ? kpiColumns : bodyCount <= 2 ? 12 : 8;
+    const x = isKpi
+      ? (index % Math.max(1, 24 / kpiColumns)) * kpiColumns
+      : (index % Math.max(1, 24 / columns)) * columns;
     const y = isKpi ? 0 : 5 + Math.floor(index / Math.max(1, 24 / columns)) * 14;
     const height = isKpi ? 5 : 14;
     const component =

@@ -156,7 +156,10 @@ test('native modules render their specialized analytical forms', async ({ page }
     ['/performance?period=2026-08&range=12&subview=rankings', 'ranking', 'canvas'],
     ['/performance?period=2026-08&range=12&subview=consistency', 'histogram', 'canvas'],
     ['/performance?period=2026-08&range=12&subview=productivity', 'scatter', 'canvas'],
+    ['/campaigns?period=2026-08&range=12&subview=focus', 'focus-ranking', 'canvas'],
     ['/planning?period=2026-08&range=12&subview=12-months', 'forecast', 'canvas'],
+    ['/planning?period=2026-08&range=12&subview=accuracy', 'accuracy-scatter', 'canvas'],
+    ['/sales?period=2026-08&range=12&subview=transactions', 'kpi:receipts.total', '.kpi-widget'],
   ] as const;
 
   for (const [path, widgetId, surface] of cases) {

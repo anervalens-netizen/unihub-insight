@@ -6,8 +6,23 @@ import { EChart, type EChartEvent } from '../../components/charts/EChart';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { formatCurrency, formatPercent } from '../../lib/format';
 import type { MetricDefinition, QueryDataset } from '../query/schemas';
-import { useModuleData, useModuleUrlRangeChange, useModuleUrlStateChange } from './context';
+import {
+  useModuleData,
+  useModuleUrlRangeChange,
+  useModuleUrlStateChange,
+  useModuleUrlStateReset,
+} from './context';
 import { moduleEntityDimension } from './interactions';
+
+function quantile(sortedValues: readonly number[], percentile: number): number {
+  if (sortedValues.length === 0) return 0;
+  const position = (sortedValues.length - 1) * percentile;
+  const lowerIndex = Math.floor(position);
+  const upperIndex = Math.ceil(position);
+  const lower = sortedValues[lowerIndex] ?? 0;
+  const upper = sortedValues[upperIndex] ?? lower;
+  return lower + (upper - lower) * (position - lowerIndex);
+}
 
 export function ModulePaceWidget() {
   const data = useModuleData();
@@ -55,16 +70,19 @@ export function ModulePaceWidget() {
 export function ModuleRankingWidget() {
   const data = useModuleData();
   const onUrlStateChange = useModuleUrlStateChange();
-  const rows = useMemo(
-    () =>
-      [...data.breakdown]
-        .sort(
-          (left, right) =>
-            (right.progress_pct ?? right.primary) - (left.progress_pct ?? left.primary),
-        )
-        .slice(0, 15),
-    [data.breakdown],
-  );
+  const onUrlStateReset = useModuleUrlStateReset();
+  const rows = useMemo(() => {
+    const sorted = [...data.breakdown].sort(
+      (left, right) => (right.progress_pct ?? right.primary) - (left.progress_pct ?? left.primary),
+    );
+    const top = sorted.slice(0, 5).map((row) => ({ ...row, group: 'Top' as const }));
+    const topIds = new Set(top.map((row) => row.id));
+    const bottom = sorted
+      .slice(-5)
+      .filter((row) => !topIds.has(row.id))
+      .map((row) => ({ ...row, group: 'Bottom' as const }));
+    return [...top, ...bottom];
+  }, [data.breakdown]);
   const option = useMemo<EChartsCoreOption>(
     () => ({
       animationDuration: 220,
@@ -82,7 +100,7 @@ export function ModuleRankingWidget() {
       yAxis: {
         type: 'category',
         inverse: true,
-        data: rows.map((row) => row.label),
+        data: rows.map((row) => `${row.group} · ${row.label}`),
         axisLabel: { color: '#64748b', fontSize: 9, width: 108, overflow: 'truncate' },
       },
       series: [
@@ -101,22 +119,25 @@ export function ModuleRankingWidget() {
     [data.title, rows],
   );
   if (rows.length === 0) return <EmptyState message="Clasamentul nu are entități eligibile." />;
+  const handleRow = (event: EChartEvent) => {
+    const row = event.dataIndex === undefined ? undefined : rows[event.dataIndex];
+    if (row) {
+      onUrlStateChange?.({
+        dimensionId: moduleEntityDimension[data.module],
+        value: row.id,
+        label: row.label,
+      });
+    }
+  };
   return (
     <EChart
       option={option}
       className="chart--fill"
       ariaLabel={`Clasament ${data.title}`}
       pngExport={{ filename: `${data.module}-${data.meta.period}-ranking`, pixelRatio: 2 }}
-      onEvent={(event) => {
-        const row = event.dataIndex === undefined ? undefined : rows[event.dataIndex];
-        if (row) {
-          onUrlStateChange?.({
-            dimensionId: moduleEntityDimension[data.module],
-            value: row.id,
-            label: row.label,
-          });
-        }
-      }}
+      onEvent={handleRow}
+      onDoubleEvent={handleRow}
+      {...(onUrlStateReset ? { onBlankReset: onUrlStateReset } : {})}
     />
   );
 }
@@ -124,6 +145,7 @@ export function ModuleRankingWidget() {
 export function ModuleProductivityScatterWidget() {
   const data = useModuleData();
   const onUrlStateChange = useModuleUrlStateChange();
+  const onUrlStateReset = useModuleUrlStateReset();
   const rows = useMemo(
     () =>
       data.breakdown.filter(
@@ -188,22 +210,217 @@ export function ModuleProductivityScatterWidget() {
   if (rows.length === 0) {
     return <EmptyState message="Relația productivitate × target nu are perechi complete." />;
   }
+  const handleRow = (event: EChartEvent) => {
+    const row = event.dataIndex === undefined ? undefined : rows[event.dataIndex];
+    if (row) {
+      onUrlStateChange?.({
+        dimensionId: moduleEntityDimension[data.module],
+        value: row.id,
+        label: row.label,
+      });
+    }
+  };
   return (
     <EChart
       option={option}
       className="chart--fill"
       ariaLabel="Productivitate versus realizare target"
       pngExport={{ filename: `${data.module}-${data.meta.period}-productivity`, pixelRatio: 2 }}
-      onEvent={(event) => {
-        const row = event.dataIndex === undefined ? undefined : rows[event.dataIndex];
-        if (row) {
-          onUrlStateChange?.({
-            dimensionId: moduleEntityDimension[data.module],
-            value: row.id,
-            label: row.label,
-          });
-        }
-      }}
+      onEvent={handleRow}
+      onDoubleEvent={handleRow}
+      {...(onUrlStateReset ? { onBlankReset: onUrlStateReset } : {})}
+    />
+  );
+}
+
+export function ModuleFocusRankingWidget() {
+  const data = useModuleData();
+  const onUrlStateChange = useModuleUrlStateChange();
+  const onUrlStateReset = useModuleUrlStateReset();
+  const rows = useMemo(() => {
+    const sorted = [...data.breakdown].sort(
+      (left, right) => (right.progress_pct ?? 0) - (left.progress_pct ?? 0),
+    );
+    const top = sorted.slice(0, 5).map((row) => ({ ...row, group: 'Top' as const }));
+    const topIds = new Set(top.map((row) => row.id));
+    const bottom = sorted
+      .slice(-5)
+      .filter((row) => !topIds.has(row.id))
+      .map((row) => ({ ...row, group: 'Bottom' as const }));
+    return [...top, ...bottom];
+  }, [data.breakdown]);
+  const option = useMemo<EChartsCoreOption>(
+    () => ({
+      animationDuration: 220,
+      aria: {
+        enabled: true,
+        description: 'Top și Bottom magazine observate după ponderea vânzărilor Focus.',
+      },
+      grid: { top: 8, right: 24, bottom: 30, left: 128 },
+      tooltip: {
+        trigger: 'item',
+        formatter: (input: unknown) => {
+          const item = input as { dataIndex?: number };
+          const row = item.dataIndex === undefined ? undefined : rows[item.dataIndex];
+          return row
+            ? [
+                row.label,
+                `Pondere Focus: ${formatPercent(row.progress_pct ?? 0)}`,
+                `Vânzări Focus: ${formatCurrency(row.primary, true)}`,
+                `Cantitate netă: ${(row.secondary ?? 0).toLocaleString('ro-RO')}`,
+                `Produse active: ${(row.tertiary ?? 0).toLocaleString('ro-RO')}`,
+              ].join('<br/>')
+            : '';
+        },
+      },
+      xAxis: {
+        type: 'value',
+        axisLabel: {
+          color: '#64748b',
+          fontSize: 9,
+          formatter: (value: number) => formatPercent(value),
+        },
+      },
+      yAxis: {
+        type: 'category',
+        inverse: true,
+        data: rows.map((row) => `${row.group} · ${row.label}`),
+        axisLabel: { color: '#64748b', fontSize: 9, width: 118, overflow: 'truncate' },
+      },
+      series: [
+        {
+          type: 'bar',
+          data: rows.map((row) => ({
+            value: row.progress_pct ?? 0,
+            itemStyle: {
+              color: row.group === 'Top' ? '#0f766e' : '#d97706',
+              borderRadius: [0, 5, 5, 0],
+            },
+          })),
+        },
+      ],
+    }),
+    [rows],
+  );
+  if (rows.length === 0) {
+    return <EmptyState message="Nu există magazine observate eligibile pentru Focus." />;
+  }
+  const handleRow = (event: EChartEvent) => {
+    const row = event.dataIndex === undefined ? undefined : rows[event.dataIndex];
+    if (row) {
+      onUrlStateChange?.({ dimensionId: 'store', value: row.id, label: row.label });
+    }
+  };
+  return (
+    <EChart
+      option={option}
+      className="chart--fill"
+      ariaLabel="Top și Bottom magazine observate Focus"
+      pngExport={{ filename: `campaigns-${data.meta.period}-focus-ranking`, pixelRatio: 2 }}
+      onEvent={handleRow}
+      onDoubleEvent={handleRow}
+      {...(onUrlStateReset ? { onBlankReset: onUrlStateReset } : {})}
+    />
+  );
+}
+
+export function ModulePlanningAccuracyWidget() {
+  const data = useModuleData();
+  const onUrlStateChange = useModuleUrlStateChange();
+  const onUrlStateReset = useModuleUrlStateReset();
+  const rows = useMemo(
+    () =>
+      data.breakdown.filter(
+        (row) =>
+          row.secondary !== null &&
+          row.secondary !== undefined &&
+          Number.isFinite(row.secondary) &&
+          Number.isFinite(row.primary),
+      ),
+    [data.breakdown],
+  );
+  const extent = useMemo(() => {
+    const values = rows.flatMap((row) => [row.secondary ?? 0, row.primary]);
+    return values.length > 0 ? [Math.min(...values), Math.max(...values)] : [0, 1];
+  }, [rows]);
+  const option = useMemo<EChartsCoreOption>(
+    () => ({
+      animationDuration: 220,
+      aria: {
+        enabled: true,
+        description: 'Actual observat versus forecast publicat, pentru fiecare magazin eligibil.',
+      },
+      grid: { top: 18, right: 22, bottom: 48, left: 70 },
+      tooltip: {
+        trigger: 'item',
+        formatter: (input: unknown) => {
+          const item = input as { dataIndex?: number };
+          const row = item.dataIndex === undefined ? undefined : rows[item.dataIndex];
+          const actual = row?.secondary;
+          if (!row || actual === null || actual === undefined) return '';
+          return [
+            row.label,
+            `Actual: ${formatCurrency(actual, true)}`,
+            `Forecast: ${formatCurrency(row.primary, true)}`,
+            `Diferență: ${formatCurrency(row.primary - actual, true)}`,
+          ].join('<br/>');
+        },
+      },
+      xAxis: {
+        type: 'value',
+        name: 'Actual observat',
+        nameLocation: 'middle',
+        nameGap: 31,
+        axisLabel: {
+          color: '#64748b',
+          fontSize: 9,
+          formatter: (value: number) => formatCurrency(value, true),
+        },
+      },
+      yAxis: {
+        type: 'value',
+        name: 'Forecast',
+        axisLabel: {
+          color: '#64748b',
+          fontSize: 9,
+          formatter: (value: number) => formatCurrency(value, true),
+        },
+        splitLine: { lineStyle: { color: '#e7edf5', type: 'dashed' } },
+      },
+      series: [
+        {
+          type: 'scatter',
+          symbolSize: 12,
+          data: rows.map((row) => [row.secondary, row.primary]),
+          itemStyle: { color: '#4f46e5', opacity: 0.78 },
+          markLine: {
+            silent: true,
+            symbol: ['none', 'none'],
+            label: { formatter: 'Forecast = actual', color: '#64748b', fontSize: 9 },
+            lineStyle: { color: '#94a3b8', type: 'dashed' },
+            data: [[{ coord: [extent[0], extent[0]] }, { coord: [extent[1], extent[1]] }]],
+          },
+        },
+      ],
+    }),
+    [extent, rows],
+  );
+  if (rows.length === 0) {
+    return <EmptyState message="Nu există perechi complete Actual × Forecast pe magazin." />;
+  }
+  const handleRow = (event: EChartEvent) => {
+    const row = event.dataIndex === undefined ? undefined : rows[event.dataIndex];
+    if (row) onUrlStateChange?.({ dimensionId: 'store', value: row.id, label: row.label });
+  };
+  return (
+    <EChart
+      option={option}
+      className="chart--fill"
+      ariaLabel="Actual observat versus forecast pe magazin"
+      pngExport={{ filename: `planning-${data.meta.period}-accuracy`, pixelRatio: 2 }}
+      onEvent={handleRow}
+      onDoubleEvent={handleRow}
+      {...(onUrlStateReset ? { onBlankReset: onUrlStateReset } : {})}
     />
   );
 }
@@ -222,9 +439,30 @@ export function ModuleHistogramWidget() {
           unit: 'currency' as const,
           values: data.breakdown.map((row) => row.secondary),
         };
-  const values = profile.values.filter(
-    (value): value is number => value !== null && value !== undefined && Number.isFinite(value),
+  const values = useMemo(
+    () =>
+      profile.values
+        .filter(
+          (value): value is number =>
+            value !== null && value !== undefined && Number.isFinite(value),
+        )
+        .sort((left, right) => left - right),
+    [profile.values],
   );
+  const statistics = useMemo(() => {
+    const q1 = quantile(values, 0.25);
+    const median = quantile(values, 0.5);
+    const q3 = quantile(values, 0.75);
+    const iqr = q3 - q1;
+    const lowerFence = q1 - iqr * 1.5;
+    const upperFence = q3 + iqr * 1.5;
+    return {
+      q1,
+      median,
+      q3,
+      outliers: values.filter((value) => value < lowerFence || value > upperFence).length,
+    };
+  }, [values]);
   const bins = useMemo(() => {
     if (values.length === 0) return [];
     const minimum = Math.min(...values);
@@ -288,13 +526,37 @@ export function ModuleHistogramWidget() {
   if (bins.length === 0) {
     return <EmptyState message="Nu există suficiente agregate eligibile pentru distribuție." />;
   }
+  const formatStatistic = (value: number): string =>
+    profile.unit === 'percent' ? formatPercent(value) : formatCurrency(value, true);
   return (
-    <EChart
-      option={option}
-      className="chart--fill"
-      ariaLabel={`Histogramă ${profile.label}`}
-      pngExport={{ filename: `${data.module}-${data.meta.period}-histogram`, pixelRatio: 2 }}
-    />
+    <div className="module-distribution-widget">
+      <dl className="module-distribution-stats" aria-label="Statistici distribuție">
+        <div>
+          <dt>n</dt>
+          <dd>{values.length}</dd>
+        </div>
+        <div>
+          <dt>Mediană</dt>
+          <dd>{formatStatistic(statistics.median)}</dd>
+        </div>
+        <div>
+          <dt>Q1–Q3</dt>
+          <dd>
+            {formatStatistic(statistics.q1)}–{formatStatistic(statistics.q3)}
+          </dd>
+        </div>
+        <div>
+          <dt>Outlieri IQR</dt>
+          <dd>{statistics.outliers}</dd>
+        </div>
+      </dl>
+      <EChart
+        option={option}
+        className="chart--fill"
+        ariaLabel={`Histogramă ${profile.label}`}
+        pngExport={{ filename: `${data.module}-${data.meta.period}-histogram`, pixelRatio: 2 }}
+      />
+    </div>
   );
 }
 
@@ -365,6 +627,7 @@ export function ModuleForecastWidget() {
   const data = useModuleData();
   const onUrlStateChange = useModuleUrlStateChange();
   const onUrlRangeChange = useModuleUrlRangeChange();
+  const onUrlStateReset = useModuleUrlStateReset();
   const option = useMemo<EChartsCoreOption>(
     () => ({
       animationDuration: 260,
@@ -460,12 +723,14 @@ export function ModuleForecastWidget() {
         );
         if (range) onUrlRangeChange?.(range);
       }}
+      {...(onUrlStateReset ? { onBlankReset: onUrlStateReset } : {})}
     />
   );
 }
 
 export function ModuleCalendarWidget() {
   const data = useModuleData();
+  const onUrlStateReset = useModuleUrlStateReset();
   const rows = data.calendar;
   const values = useMemo(() => rows.map((row) => row.sales).filter(Number.isFinite), [rows]);
   const option = useMemo<EChartsCoreOption>(() => {
@@ -540,6 +805,7 @@ export function ModuleCalendarWidget() {
         className="chart--fill"
         ariaLabel={`Calendar zilnic observat ${data.meta.period}`}
         pngExport={{ filename: `sales-${data.meta.period}-calendar`, pixelRatio: 2 }}
+        {...(onUrlStateReset ? { onBlankReset: onUrlStateReset } : {})}
       />
     </div>
   );
