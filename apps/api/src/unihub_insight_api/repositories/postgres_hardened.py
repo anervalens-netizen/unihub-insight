@@ -23,7 +23,6 @@ from unihub_insight_api.repositories.postgres_modules import (
 )
 
 MIN_SALARY_FOR_AVERAGE = Decimal("2000")
-MIN_COMPENSATION_POPULATION = 3
 
 
 @dataclass(frozen=True)
@@ -52,10 +51,6 @@ def salary_statistics(values: Sequence[Decimal]) -> SalaryStatistics:
         median=median,
         eligible_average_count=len(eligible),
     )
-
-
-def compensation_is_suppressed(person_count: int) -> bool:
-    return 0 < person_count < MIN_COMPENSATION_POPULATION
 
 
 class PostgresHardenedInsightRepository(PostgresInsightRepository):

@@ -76,6 +76,22 @@ def test_dashboard_accepts_two_ordered_dimensions_and_keeps_legacy_alias(client:
     assert saved["dimensions"] == ["store", "time"]
 
 
+def test_dashboard_rejects_two_dimensions_when_the_shape_does_not_consume_them(
+    client: TestClient,
+) -> None:
+    widget = {
+        **BASE_WIDGET,
+        "visualization": "table",
+        "dimension": "store",
+        "dimensions": ["store", "time"],
+    }
+
+    response = client.post("/api/v1/dashboards", json=payload(widget))
+
+    assert response.status_code == 422
+    assert any("two dimensions require heatmap" in item for item in response.json()["detail"]["errors"])
+
+
 def test_dashboard_rejects_a_divergent_legacy_dimension_alias(client: TestClient) -> None:
     widget = {
         **BASE_WIDGET,

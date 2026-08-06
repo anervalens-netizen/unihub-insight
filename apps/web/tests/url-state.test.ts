@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  crossFilterMultiPatch,
   crossFilterPatch,
+  crossFilterRangePatch,
   resetCrossFilterPatch,
   truncateCrossFilterPatch,
 } from '../src/lib/cross-filter';
@@ -78,6 +80,34 @@ describe('analytical URL state', () => {
     expect(
       crossFilterPatch(undefined, { dimensionId: 'category', value: 'device', label: 'Device' }),
     ).toEqual({});
+  });
+
+  it('applies a chart-selected temporal window as an exact custom URL range', () => {
+    expect(crossFilterRangePatch('store:S001', { start: '2026-03', end: '2026-08' })).toEqual({
+      drill: 'store:S001/time:2026-08:2026-03%20%E2%86%92%202026-08',
+      period: '2026-08',
+      range: 'custom',
+      start: '2026-03',
+      end: '2026-08',
+    });
+    expect(crossFilterRangePatch(undefined, { start: 'invalid', end: '2026-08' })).toEqual({});
+  });
+
+  it('applies both entity and time coordinates from a matrix cell', () => {
+    expect(
+      crossFilterMultiPatch(undefined, [
+        { dimensionId: 'store', value: 'S001', label: 'Magazin 1' },
+        { dimensionId: 'time', value: '2026-08', label: 'August 2026' },
+      ]),
+    ).toEqual({
+      drill: 'store:S001:Magazin%201/time:2026-08:August%202026',
+      stores: 'S001',
+      agent: undefined,
+      period: '2026-08',
+      range: 'month',
+      start: undefined,
+      end: undefined,
+    });
   });
 
   it('clears only filters represented by removed drill levels', () => {

@@ -43,14 +43,14 @@ Dependențele se implementează vertical: o suprafață ajunge `LIVE` numai cân
 ## Registru de workstream-uri
 
 - [ ] Read-model-uri Retail v1 sunt publicate aditiv; Workforce/Visits/Campaigns rămân `partial`, iar Finance/Compensation nu au încă head eligibil.
-- [ ] Catalogul și snapshotul sunt versionate; matricea metrică × dimensiune × chart este în curs de restrângere la combinații dovedite.
+- [ ] Catalogul și snapshotul sunt versionate; formulele au referințe versionate distincte, comparațiile native respectă allowlist-ul metricii, iar două dimensiuni sunt acceptate numai pentru heatmap-ul exact entitate × timp. Formele specializate încă lipsă rămân deschise.
 - [x] Query batch finit, snapshot fail-closed, deadline comun, izolare per widget, inspect și CSV server-side.
-- [ ] Intervalele și URL state există; click-ul semantic acoperă timp și ierarhia firmă→RM→ASM→magazin→agent, cu breadcrumb/reset/reload și allowlist de comparații per metrică. Selecția unei zone temporale, deep-link-ul Retail și browser QA complet rămân deschise.
+- [ ] Intervalele și URL state există; click-ul semantic acoperă timp și ierarhia firmă→RM→ASM→magazin→agent, heatmap aplică simultan entitate+timp, iar dataZoom aplică un interval custom exact, cu breadcrumb/reset/reload și allowlist de comparații per metrică. Deep-link-ul Retail și browser QA complet pentru selecția temporală rămân deschise.
 - [ ] `ChartSpec` ECharts 6.1 Canvas are dataset/encode, fallback, PNG, keyboard QA și POC măsurat pentru 10 widgeturi/heatmap 100×36/scatter 5.000. Calendarul/forecast-band și celelalte forme cer încă dataset autoritativ sau caz de business.
 - [ ] Cele șapte module au sub-view-uri/rețete distincte, dar încă reutilizează componente generice și nu acoperă toate contractele specializate din plan.
-- [x] Compensation folosește exclusiv agregatul aprobat, fără persoană/nume/filtre diferențiatoare.
+- [x] Compensation folosește exclusiv agregatul aprobat, fără persoană/nume/filtre diferențiatoare; cohortele de 1–2 sunt eliminate fail-closed din KPI, serie, breakdown, matrice și export.
 - [ ] Custom dashboards acoperă blank/template/clone/duplicate/layout/versionare/ACL/scope/batch, shared read-only, preseturi, editor cu maximum două dimensiuni, opțiuni whitelist-uite și cross-filter semantic comun. Matricea live de sharing/revocare și browser QA complet rămân porți de acceptanță.
-- [ ] XLSX/CSV/PNG și audit există; widgeturile native/custom folosesc inspect/CSV/XLSX server-side pe același snapshot și exportă întregul dataset deja bounded, cu metadata per sursă. Browser QA și reconcilierea tuturor modulelor cu surse oficiale rămân deschise.
+- [ ] XLSX/CSV/PNG și audit există; widgeturile native/custom folosesc inspect/CSV/XLSX server-side pe același snapshot, exportul nativ refuză surse indisponibile/stale snapshot înainte de fetch, iar CSV/XLSX păstrează coverage, finalitate, as-of, generație și versiuni per sursă. Browser QA și reconcilierea tuturor modulelor cu surse oficiale rămân deschise.
 - [ ] Reconcilierea live (30/30 scope-uri, diferențe zero), load/concurrency, backup-ul off-host restaurat izolat și rollback N→N-1→N trec pe candidatul publicat; matricea reală a celor trei sesiuni Authentik și RUM pe 7 zile rămân deschise.
 - [ ] Suita Playwright trece 46/46 pentru cele 10 rute, toate sub-view-urile declarate, 1180/1440/1920/ultrawide, light/dark, densități, empty/partial/stale/unavailable/403, PNG/XLSX/CSV, drill/reload, comparații simultane, keyboard și dashboard lifecycle/POC; pilotul vizual owner rămâne poartă distinctă.
 - [ ] Acceptare vizuală owner și șapte zile curate de SLI producție.

@@ -46,6 +46,19 @@ export interface ChartUrlStateEvent {
   readonly label: string | null;
 }
 
+export interface EChartRangeEvent {
+  readonly start?: number;
+  readonly end?: number;
+  readonly startValue?: string | number;
+  readonly endValue?: string | number;
+  readonly batch?: readonly EChartRangeEvent[];
+}
+
+export interface ChartUrlRangeEvent {
+  readonly start: string;
+  readonly end: string;
+}
+
 const chartSpecRegistry: Partial<Record<ChartKind, ChartSpec>> = {
   line: { shape: 'line', renderer: 'canvas', requiredDimensionKinds: ['string', 'time'] },
   area: { shape: 'area', renderer: 'canvas', requiredDimensionKinds: ['string', 'time'] },
@@ -76,36 +89,49 @@ const chartSpecRegistry: Partial<Record<ChartKind, ChartSpec>> = {
 
 export { chartSpecRegistry };
 
+type ChartOptionOverrideRecord = Record<string, unknown> & {
+  legend?: unknown;
+  series?: unknown;
+};
+
+type ChartSeriesOverrideRecord = Record<string, unknown> & {
+  label?: unknown;
+  type?: unknown;
+  smooth?: unknown;
+  stack?: unknown;
+};
+
 export function applyWidgetChartOptions(
   option: EChartsCoreOption,
   shape: ChartKind,
   options: WidgetChartOptions,
 ): EChartsCoreOption {
-  const record = isRecord(option) ? option : {};
-  const legend = isRecord(record['legend']) ? record['legend'] : {};
-  const series = Array.isArray(record['series'])
-    ? record['series'].map((entry) => {
+  const record = (isRecord(option) ? option : {}) as ChartOptionOverrideRecord;
+  const legend = isRecord(record.legend) ? record.legend : {};
+  const series = Array.isArray(record.series)
+    ? record.series.map((entry) => {
         if (!isRecord(entry)) return entry;
-        const next = { ...entry };
+        const seriesEntry = entry as ChartSeriesOverrideRecord;
+        const next: ChartSeriesOverrideRecord = { ...seriesEntry };
         if (typeof options.show_labels === 'boolean') {
-          next['label'] = {
-            ...(isRecord(entry['label']) ? entry['label'] : {}),
+          next.label = {
+            ...(isRecord(seriesEntry.label) ? seriesEntry.label : {}),
             show: options.show_labels,
           };
         }
         if (
           typeof options.smooth === 'boolean' &&
           (shape === 'line' || shape === 'area') &&
-          entry['type'] === 'line'
+          seriesEntry.type === 'line'
         ) {
-          next['smooth'] = options.smooth;
+          next.smooth = options.smooth;
         }
-        if (typeof options.stacked === 'boolean' && shape === 'bar' && entry['type'] === 'bar') {
-          next['stack'] = options.stacked ? 'value' : undefined;
+        if (typeof options.stacked === 'boolean' && shape === 'bar' && seriesEntry.type === 'bar') {
+          next.stack = options.stacked ? 'value' : undefined;
         }
         return next;
       })
-    : record['series'];
+    : record.series;
   return {
     ...record,
     ...(typeof options.show_legend === 'boolean'
@@ -167,6 +193,8 @@ function lineOption(
   if (!category || !value) return null;
   const comparisons = dataset.dimensions.filter((dimension) => dimension.role === 'comparison');
   const target = dimensionByRole(dataset, 'target');
+  const temporalCategory =
+    category.kind === 'time' || category.source_dimension === 'time' || category.id === 'period';
   const type = shape === 'bar' || shape === 'stacked-bar' ? 'bar' : 'line';
   const series: Array<Record<string, unknown>> = [
     {
@@ -200,11 +228,11 @@ function lineOption(
     ...baseOption(dataset),
     xAxis: { type: 'category' },
     yAxis: { type: 'value' },
-    ...(dataset.rows.length > 18
+    ...(dataset.rows.length > 18 || (temporalCategory && dataset.rows.length > 1)
       ? {
           dataZoom: [
-            { type: 'inside', start: 0, end: 100 },
-            { type: 'slider', height: 16 },
+            { type: 'inside', start: 0, end: 100, filterMode: 'none', realtime: false },
+            { type: 'slider', height: 16, filterMode: 'none', realtime: false },
           ],
         }
       : {}),
@@ -629,6 +657,63 @@ export function chartEventToUrlState(
     value: String(rawValue),
     label: rawLabel === null || rawLabel === undefined ? null : String(rawLabel),
   };
+}
+
+function monthValue(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const candidate = value.slice(0, 7);
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(candidate) ? candidate : null;
+}
+
+function rangeIndex(
+  values: readonly unknown[],
+  value: string | number | undefined,
+  percent: number | undefined,
+): number | null {
+  if (typeof value === 'string') {
+    const index = values.findIndex((candidate) => String(candidate) === value);
+    if (index >= 0) return index;
+  }
+  if (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value < values.length) {
+    return value;
+  }
+  if (typeof percent !== 'number' || !Number.isFinite(percent) || values.length === 0) return null;
+  return Math.max(
+    0,
+    Math.min(values.length - 1, Math.round((percent / 100) * (values.length - 1))),
+  );
+}
+
+export function chartRangeEventToMonthRange(
+  values: readonly unknown[],
+  event: EChartRangeEvent,
+): ChartUrlRangeEvent | null {
+  if (values.length < 2) return null;
+  const payload = event.batch?.[0] ?? event;
+  const firstIndex = rangeIndex(values, payload.startValue, payload.start);
+  const lastIndex = rangeIndex(values, payload.endValue, payload.end);
+  if (firstIndex === null || lastIndex === null) return null;
+  const lower = Math.min(firstIndex, lastIndex);
+  const upper = Math.max(firstIndex, lastIndex);
+  const start = monthValue(values[lower]);
+  const end = monthValue(values[upper]);
+  if (!start || !end || start === end) return null;
+  return { start, end };
+}
+
+export function chartRangeEventToUrlState(
+  dataset: QueryDataset,
+  event: EChartRangeEvent,
+): ChartUrlRangeEvent | null {
+  const time = dataset.dimensions.find(
+    (dimension) =>
+      dimension.source_dimension === 'time' || dimension.id === 'time' || dimension.id === 'period',
+  );
+  if (!time) return null;
+  return chartRangeEventToMonthRange(
+    dataset.rows.map((row) => row[time.id]),
+    event,
+  );
 }
 
 export interface ChartPngExportConfig {

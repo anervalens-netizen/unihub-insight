@@ -21,10 +21,17 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+import { chartRangeEventToMonthRange } from '../../components/charts/chart-spec';
 import { EChart, type EChartEvent } from '../../components/charts/EChart';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { formatCurrency, formatInteger, formatPercent } from '../../lib/format';
-import { useModuleData, useModuleUrlStateChange, useModuleUrlStateReset } from './context';
+import {
+  useModuleData,
+  useModuleUrlRangeChange,
+  useModuleUrlStateChange,
+  useModuleUrlStateChanges,
+  useModuleUrlStateReset,
+} from './context';
 import { moduleEntityDimension } from './interactions';
 import type { BreakdownRow, ChartKind, ModuleKpi } from './schemas';
 
@@ -159,6 +166,7 @@ function ChartToggle<Kind extends ChartKind>({
 export function ModuleTrendWidget() {
   const data = useModuleData();
   const onUrlStateChange = useModuleUrlStateChange();
+  const onUrlRangeChange = useModuleUrlRangeChange();
   const onUrlStateReset = useModuleUrlStateReset();
   const supported = data.supported_charts.filter(
     (kind): kind is 'line' | 'area' | 'bar' => kind === 'line' || kind === 'area' || kind === 'bar',
@@ -210,24 +218,23 @@ export function ModuleTrendWidget() {
       lineStyle: { width: 1.5, color: comparisonColors[index % comparisonColors.length] },
       itemStyle: { color: comparisonColors[index % comparisonColors.length] },
     }));
-    const targetSeries =
-      requestedComparisons.length === 0 || requestedComparisons.includes('target')
-        ? [
-            {
-              type: 'line' as const,
-              name: 'Target',
-              data: data.trend.map((point) => point.target ?? null),
-              showSymbol: false,
-              connectNulls: false,
-              lineStyle: { width: 2, type: 'dashed' as const, color: '#0f766e' },
-              itemStyle: { color: '#0f766e' },
-            },
-          ]
-        : [];
+    const targetSeries = requestedComparisons.includes('target')
+      ? [
+          {
+            type: 'line' as const,
+            name: 'Target',
+            data: data.trend.map((point) => point.target ?? null),
+            showSymbol: false,
+            connectNulls: false,
+            lineStyle: { width: 2, type: 'dashed' as const, color: '#0f766e' },
+            itemStyle: { color: '#0f766e' },
+          },
+        ]
+      : [];
     return {
       animationDuration: 260,
       aria: { enabled: true, description: `Evoluție ${data.title} pentru ${data.meta.period}.` },
-      grid: { top: 42, right: 18, bottom: 34, left: 62 },
+      grid: { top: 42, right: 18, bottom: data.trend.length > 1 ? 54 : 34, left: 62 },
       tooltip: { trigger: 'axis' },
       legend: { top: 0, right: 0, textStyle: { color: '#64748b', fontSize: 11 } },
       xAxis: {
@@ -241,6 +248,22 @@ export function ModuleTrendWidget() {
         axisLabel: { color: '#64748b', fontSize: 10, formatter: axisFormatter },
         splitLine: { lineStyle: { color: '#e7edf5', type: 'dashed' } },
       },
+      ...(data.trend.length > 1
+        ? {
+            dataZoom: [
+              { type: 'inside', start: 0, end: 100, filterMode: 'none', realtime: false },
+              {
+                type: 'slider',
+                start: 0,
+                end: 100,
+                height: 16,
+                bottom: 2,
+                filterMode: 'none',
+                realtime: false,
+              },
+            ],
+          }
+        : {}),
       series: [mainSeries, ...comparisonSeries, ...targetSeries],
     };
   }, [data, kind, primaryAxis, requestedComparisons]);
@@ -270,6 +293,13 @@ export function ModuleTrendWidget() {
         pngExport={{ filename: `${data.module}-${data.meta.period}-trend`, pixelRatio: 2 }}
         onEvent={handlePointEvent}
         onDoubleEvent={handlePointEvent}
+        onRangeEvent={(event) => {
+          const range = chartRangeEventToMonthRange(
+            data.trend.map((point) => point.key),
+            event,
+          );
+          if (range) onUrlRangeChange?.(range);
+        }}
         {...(onUrlStateReset ? { onBlankReset: onUrlStateReset } : {})}
       />
     </div>
@@ -339,6 +369,7 @@ export function ModuleDistributionWidget() {
 export function ModuleMatrixWidget() {
   const data = useModuleData();
   const onUrlStateChange = useModuleUrlStateChange();
+  const onUrlStateChanges = useModuleUrlStateChanges();
   const onUrlStateReset = useModuleUrlStateReset();
   const xValues = useMemo(() => [...new Set(data.matrix.map((cell) => cell.x))], [data.matrix]);
   const yValues = useMemo(() => [...new Set(data.matrix.map((cell) => cell.y))], [data.matrix]);
@@ -394,11 +425,16 @@ export function ModuleMatrixWidget() {
     if (cell) {
       const entity = data.breakdown.find((item) => item.id === cell.y || item.label === cell.y);
       if (entity) {
-        onUrlStateChange?.({
+        const entityEvent = {
           dimensionId: moduleEntityDimension[data.module],
           value: entity.id,
           label: entity.label,
-        });
+        };
+        if (/^\d{4}-(0[1-9]|1[0-2])$/.test(cell.x) && onUrlStateChanges) {
+          onUrlStateChanges([entityEvent, { dimensionId: 'time', value: cell.x, label: cell.x }]);
+        } else {
+          onUrlStateChange?.(entityEvent);
+        }
         return;
       }
       if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(cell.x)) return;

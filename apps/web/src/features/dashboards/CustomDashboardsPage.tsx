@@ -6,7 +6,11 @@ import { useGlobalSearch, useUpdateGlobalSearch } from '../../app/search-hooks';
 import type { DashboardLayoutItem } from '../../components/dashboard/types';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { LoadingState } from '../../components/ui/LoadingState';
-import { crossFilterPatch, resetCrossFilterPatch } from '../../lib/cross-filter';
+import {
+  crossFilterPatch,
+  crossFilterRangePatch,
+  resetCrossFilterPatch,
+} from '../../lib/cross-filter';
 import { currentBusinessMonth } from '../../lib/search';
 import { useIdentity } from '../identity/context';
 import type { Capability } from '../identity/schemas';
@@ -449,6 +453,9 @@ export function CustomDashboardsPage() {
                   onLayoutChange={canEdit ? applyLayout : () => undefined}
                   onUrlStateChange={(event) => {
                     updateSearch(crossFilterPatch(search.drill, event));
+                  }}
+                  onUrlRangeChange={(event) => {
+                    updateSearch(crossFilterRangePatch(search.drill, event));
                   }}
                   onUrlStateReset={() => updateSearch(resetCrossFilterPatch(search.drill))}
                 />

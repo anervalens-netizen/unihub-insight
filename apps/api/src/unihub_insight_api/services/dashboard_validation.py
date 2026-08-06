@@ -14,7 +14,7 @@ from unihub_insight_api.domain import (
     QueryBatchRequest,
     UserContext,
 )
-from unihub_insight_api.services.metric_catalog import METRIC_CATALOG
+from unihub_insight_api.services.metric_catalog import METRIC_CATALOG, MODULE_ENTITY_DIMENSIONS
 
 CATALOG_METRICS = {metric.id: metric for metric in METRIC_CATALOG}
 
@@ -319,8 +319,13 @@ def validate_dashboard(request: DashboardCreateRequest, user: UserContext) -> No
             widget.metric_id != "finance.ebit" or dimensions != ("category",)
         ):
             errors.append(f"{prefix}.waterfall requires finance.ebit × category")
-        if widget.visualization is ChartKind.HEATMAP and "time" not in dimensions:
-            errors.append(f"{prefix}.heatmap requires a time dimension")
+        if len(dimensions) > 1 and widget.visualization is not ChartKind.HEATMAP:
+            errors.append(f"{prefix}.two dimensions require heatmap")
+        if widget.visualization is ChartKind.HEATMAP and dimensions != (
+            MODULE_ENTITY_DIMENSIONS[widget.module],
+            "time",
+        ):
+            errors.append(f"{prefix}.heatmap requires the module entity dimension and time")
         if widget.visualization in {ChartKind.HISTOGRAM, ChartKind.BOXPLOT, ChartKind.SCATTER} and (
             not dimensions or "time" in dimensions
         ):

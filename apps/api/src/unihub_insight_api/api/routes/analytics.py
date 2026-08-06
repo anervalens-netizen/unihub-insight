@@ -23,7 +23,7 @@ from unihub_insight_api.services.module_availability import (
     unavailable_module_response,
     unavailable_source_domains,
 )
-from unihub_insight_api.services.module_window import apply_module_window
+from unihub_insight_api.services.module_window import allowed_module_window, apply_module_window
 
 router = APIRouter(prefix="/api/v1", tags=["analytics"])
 
@@ -64,6 +64,7 @@ async def module_analytics(
     window: ModuleWindowDependency,
     user: Annotated[UserContext, Depends(require_capability(Capability.ANALYTICS))],
 ) -> ModuleAnalyticsResponse:
+    window = allowed_module_window(module, window)
     required = MODULE_CAPABILITIES[module]
     if required not in user.capabilities:
         raise HTTPException(

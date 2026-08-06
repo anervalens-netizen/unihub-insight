@@ -349,7 +349,10 @@ test('custom dashboard blank, widget duplication, versioning and clone lifecycle
   const firstEditor = page.locator('.widget-editor-card').first();
   await firstEditor.getByLabel('Modul').selectOption('performance');
   await firstEditor.getByLabel('Vizualizare').selectOption('heatmap');
-  await firstEditor.getByRole('listbox', { name: 'Dimensiuni' }).selectOption(['store', 'time']);
+  await expect(firstEditor.getByRole('listbox', { name: 'Dimensiuni' })).toHaveValues([
+    'store',
+    'time',
+  ]);
   await firstEditor.getByLabel('Legendă').uncheck();
   await firstEditor.getByLabel('Etichete').check();
   await firstEditor.getByLabel('Top N prezentat').fill('5');
@@ -437,7 +440,7 @@ test('canvas POC bounds 10 widgets, heatmap 100x36, scatter 5000 and repeated na
   await page.getByRole('button', { name: 'Configurare' }).click();
   const editors = page.locator('.widget-editor-card');
   const matrix = editors.nth(3);
-  await matrix.getByRole('listbox', { name: 'Dimensiuni' }).selectOption(['store', 'time']);
+  await expect(matrix.getByRole('listbox', { name: 'Dimensiuni' })).toHaveValues(['store', 'time']);
   await matrix.getByLabel('Limită rânduri').fill('5000');
   const scatter = editors.nth(4);
   await scatter.getByLabel('Vizualizare').selectOption('scatter');

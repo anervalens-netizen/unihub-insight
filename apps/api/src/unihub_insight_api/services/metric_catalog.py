@@ -5,6 +5,7 @@ from unihub_insight_api.domain import (
     DimensionDefinition,
     MetricDefinition,
     MetricUnit,
+    ModuleId,
 )
 from unihub_insight_api.services.monthly_review_contract import (
     MONTHLY_REVIEW_METRICS,
@@ -14,6 +15,26 @@ KPI_TABLE = (ChartKind.KPI, ChartKind.TABLE)
 TREND = (ChartKind.KPI, ChartKind.LINE, ChartKind.AREA, ChartKind.BAR, ChartKind.TABLE)
 TREND_MIX = (*TREND[:-1], ChartKind.DONUT, ChartKind.TREEMAP, ChartKind.TABLE)
 TEMPORAL_COMPARISONS = ("previous-period", "previous-year", "recent-average")
+
+MODULE_PRIMARY_METRIC_IDS: dict[ModuleId, str] = {
+    ModuleId.SALES: "sales.total",
+    ModuleId.PERFORMANCE: "performance.average",
+    ModuleId.CAMPAIGNS: "campaigns.focus_sales",
+    ModuleId.WORKFORCE: "workforce.headcount",
+    ModuleId.COMPENSATION: "compensation.payroll",
+    ModuleId.FINANCE: "finance.revenue",
+    ModuleId.PLANNING: "planning.forecast",
+}
+
+MODULE_ENTITY_DIMENSIONS: dict[ModuleId, str] = {
+    ModuleId.SALES: "store",
+    ModuleId.PERFORMANCE: "store",
+    ModuleId.CAMPAIGNS: "store",
+    ModuleId.WORKFORCE: "agent",
+    ModuleId.COMPENSATION: "firm",
+    ModuleId.FINANCE: "store",
+    ModuleId.PLANNING: "store",
+}
 
 
 def metric(
@@ -45,6 +66,7 @@ def metric(
         allowed_comparisons=comparisons,
         missing_policy=missing,
         required_capability=capability,
+        formula_reference=f"unihub-insight:metric:{metric_id}:v1",
         allowed_shapes=shapes,
         suppressible=suppressible,
         source_authority=source_authority,

@@ -4,6 +4,7 @@ import {
   applyWidgetChartOptions,
   buildSafePngExport,
   chartEventToUrlState,
+  chartRangeEventToUrlState,
   resolveChartSpec,
 } from '../src/components/charts/chart-spec';
 import type { MetricDefinition, QueryDataset } from '../src/features/query/schemas';
@@ -110,6 +111,30 @@ describe('ChartSpec registry', () => {
         pixelRatio: 2,
       });
     }
+  });
+
+  it('adapts a temporal dataZoom selection to a bounded month range', () => {
+    const temporal: QueryDataset = {
+      dimensions: [
+        { id: 'period', label: 'Perioadă', kind: 'time', role: 'key', source_dimension: 'time' },
+        { id: 'value', label: 'Vânzări', kind: 'number', role: 'value' },
+      ],
+      rows: [
+        { period: '2026-01', value: 10 },
+        { period: '2026-02', value: 20 },
+        { period: '2026-03', value: 30 },
+        { period: '2026-04', value: 40 },
+      ],
+    };
+    expect(chartRangeEventToUrlState(temporal, { start: 25, end: 75 })).toEqual({
+      start: '2026-02',
+      end: '2026-03',
+    });
+    expect(
+      chartRangeEventToUrlState(temporal, {
+        batch: [{ startValue: '2026-04', endValue: '2026-02' }],
+      }),
+    ).toEqual({ start: '2026-02', end: '2026-04' });
   });
 
   it('applies only whitelisted presentation options without mutating the contract', () => {

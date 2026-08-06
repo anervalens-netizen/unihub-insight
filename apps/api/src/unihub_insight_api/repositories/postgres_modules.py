@@ -165,6 +165,7 @@ MODULE_SOURCE_DOMAINS: dict[ModuleId, SourceDomain] = {
 REVENUE_CODES = {"v1", "v11", "v2", "v3"}
 COGS_CODES = {"c1", "c11", "c2"}
 OPERATING_CODES = {"c3", "c4", "c5", "c6"}
+MIN_COMPENSATION_POPULATION = 3
 CATEGORY_LABELS = {
     "v1": "Venit accesorii",
     "v11": "Alte venituri",
@@ -179,6 +180,14 @@ CATEGORY_LABELS = {
     "c6": "Alte costuri operaționale",
     "a1": "Amortizare",
 }
+
+
+def compensation_is_suppressed(person_count: int) -> bool:
+    return 0 < person_count < MIN_COMPENSATION_POPULATION
+
+
+def filter_visible_compensation_rows(rows: Sequence[Any]) -> list[Any]:
+    return [row for row in rows if not compensation_is_suppressed(int(row["eligible_person_count"]))]
 
 
 def shift_month(period: str, offset: int) -> str:
@@ -738,7 +747,12 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         rows, distribution_rows, meta = await asyncio.gather(
             self._campaign_rows(scope, start=start, end=scope.period),
             self._campaign_distribution(scope),
-            self._meta(ModuleId.CAMPAIGNS, scope, "reporting_focus_item_month"),
+            self._meta(
+                ModuleId.CAMPAIGNS,
+                scope,
+                "reporting_focus_item_month",
+                (SourceDomain.SALES,),
+            ),
         )
         current = [row for row in rows if str(row["import_month"]) == scope.period]
         focus_sales = sum((_money(row["focus_sales"]) for row in current), Decimal(0))
@@ -1092,10 +1106,11 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                 (SourceDomain.SALES,),
             ),
         )
+        visible_compensation_rows = filter_visible_compensation_rows(compensation_rows)
         selected_company = scope.firm or "__ALL__"
         current = [
             row
-            for row in compensation_rows
+            for row in visible_compensation_rows
             if str(row["period"]) == scope.period and str(row["company_name"]).casefold() == selected_company.casefold()
         ]
         current_row = current[0] if current else None
@@ -1108,7 +1123,9 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         )
         ratio = _ratio(payroll, sales)
         selected_rows = [
-            row for row in compensation_rows if str(row["company_name"]).casefold() == selected_company.casefold()
+            row
+            for row in visible_compensation_rows
+            if str(row["company_name"]).casefold() == selected_company.casefold()
         ]
         trend = [
             TrendPoint(
@@ -1122,7 +1139,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         ]
         company_rows = [
             row
-            for row in compensation_rows
+            for row in visible_compensation_rows
             if str(row["period"]) == scope.period and str(row["company_name"]) != "__ALL__"
         ]
         breakdown = [
@@ -1144,7 +1161,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                 value=_money(row["payroll_total"]),
                 risk=RiskLevel.HEALTHY,
             )
-            for row in compensation_rows
+            for row in visible_compensation_rows
             if str(row["company_name"]) != "__ALL__" and str(row["period"]) >= shift_month(scope.period, -5)
         ]
         alerts: list[InsightAlert] = []

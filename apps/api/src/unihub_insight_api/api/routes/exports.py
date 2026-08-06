@@ -22,7 +22,8 @@ from unihub_insight_api.services.excel_export import (
     monthly_review_workbook,
     overview_workbook,
 )
-from unihub_insight_api.services.module_window import apply_module_window
+from unihub_insight_api.services.module_availability import unavailable_source_domains
+from unihub_insight_api.services.module_window import allowed_module_window, apply_module_window
 
 router = APIRouter(prefix="/api/v1/exports", tags=["exports"])
 
@@ -114,7 +115,9 @@ async def export_module(
         UserContext,
         Depends(require_capability(Capability.ANALYTICS)),
     ],
+    snapshot_id: Annotated[str | None, Query(max_length=200)] = None,
 ) -> FileResponse:
+    window = allowed_module_window(module, window)
     required = MODULE_CAPABILITIES[module]
     if required not in user.capabilities:
         raise HTTPException(
@@ -134,7 +137,25 @@ async def export_module(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Filtrul Agent nu este compatibil cu modulul {module.value}.",
         )
+    snapshot = await repository.resolve_snapshot(scope)
+    if snapshot_id and snapshot_id != snapshot.id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Snapshot is no longer eligible.",
+        )
+    unavailable_domains = unavailable_source_domains(module, snapshot)
+    if unavailable_domains:
+        names = ", ".join(domain.value for domain in unavailable_domains)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Sursele {names} nu sunt disponibile în snapshotul eligibil.",
+        )
     data = apply_module_window(await repository.get_module(module, scope), window)
+    if data.meta.analytical_snapshot_id != snapshot.id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Snapshot is no longer eligible.",
+        )
     path = module_workbook(data)
     await store.record_query_audit(
         actor_subject=user.subject,

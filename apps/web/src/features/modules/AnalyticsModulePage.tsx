@@ -7,7 +7,12 @@ import { DashboardCanvas } from '../../components/dashboard/DashboardCanvas';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { ExcelExportButton } from '../../components/ui/ExcelExportButton';
 import { LoadingState } from '../../components/ui/LoadingState';
-import { crossFilterPatch, resetCrossFilterPatch } from '../../lib/cross-filter';
+import {
+  crossFilterMultiPatch,
+  crossFilterPatch,
+  crossFilterRangePatch,
+  resetCrossFilterPatch,
+} from '../../lib/cross-filter';
 import { analyticsSearchParams } from '../../lib/download';
 import { formatDate, formatMonth } from '../../lib/format';
 import { currentBusinessMonth, parseComparisons, rangeBounds } from '../../lib/search';
@@ -82,6 +87,15 @@ function nativeWidgetQuery(
   };
 }
 
+function moduleExportParams(
+  input: Parameters<typeof analyticsSearchParams>[0],
+  snapshotId: string | null | undefined,
+): URLSearchParams {
+  const params = analyticsSearchParams(input);
+  if (snapshotId) params.set('snapshot_id', snapshotId);
+  return params;
+}
+
 function SubviewNavigation({
   views,
   selected,
@@ -154,8 +168,20 @@ function SourceMetadataStrip({ data }: { data: ModuleAnalytics }) {
             </summary>
             <div>
               <span>{source.source}</span>
-              <span>Cutoff: {source.cutoff ?? '—'}</span>
-              <span>Autoritate: {source.authority}</span>
+              <span>
+                Cutoff: {source.cutoff ?? '—'} · as of: {source.as_of ?? '—'} ·{' '}
+                {source.is_final ? 'final' : 'deschis'}
+              </span>
+              <span>
+                Coverage: {source.coverage_numerator ?? '—'}/{source.coverage_denominator ?? '—'}
+              </span>
+              <span>
+                Autoritate: {source.authority} · head {source.authority_head ?? '—'}
+              </span>
+              <span>
+                Generație: {source.source_generation ?? '—'} · contract v{source.contract_version} ·
+                rule {source.rule_version ?? '—'}
+              </span>
               {source.warnings.length > 0 ? (
                 <span>Warnings: {source.warnings.join(' · ')}</span>
               ) : null}
@@ -247,6 +273,8 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
     <ModuleProvider
       data={data}
       onUrlStateChange={handleUrlState}
+      onUrlStateChanges={(events) => updateSearch(crossFilterMultiPatch(search.drill, events))}
+      onUrlRangeChange={(event) => updateSearch(crossFilterRangePatch(search.drill, event))}
       onUrlStateReset={() => updateSearch(resetCrossFilterPatch(search.drill))}
     >
       <SubviewNavigation
@@ -287,7 +315,7 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
         <div className="overview-actions">
           <ExcelExportButton
             path={`/exports/modules/${module}.xlsx`}
-            params={analyticsSearchParams(input)}
+            params={moduleExportParams(input, data.meta.analytical_snapshot_id)}
             filename={`${module}-${period}.xlsx`}
           />
           <button

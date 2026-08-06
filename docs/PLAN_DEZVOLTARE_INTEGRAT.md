@@ -33,7 +33,7 @@ La 2026-08-05, Retail SHA `a335348c7a2c1bfd27ab587c2ddfb5242c515e51` a publicat 
 | Sales, Performance, Campaigns, Workforce, Compensation, Finance, Planning | PARȚIAL | date live și câte o pagină, dar predominant același șablon generic cu 4 KPI, trend, distribuție, matrice și tabel |
 | Custom Dashboards | PARȚIAL | CRUD în DB, template-uri, layout, metrică/vizualizare și filtre locale; lipsesc configurarea completă, ACL țintit, preseturi, clone și toate interacțiunile |
 | Inspect/export | PARȚIAL | query/inspect/CSV/XLSX server-side unificat pe widgeturi native/custom și PNG sigur; lipsește reconcilierea tuturor surselor oficiale și browser QA complet |
-| Interacțiuni analitice | PARȚIAL | fullscreen/focus trap, keyboard drill/reset, breadcrumb/reload, click semantic pe timp și ierarhia completă, plus comparații simultane allowlist-uite; lipsesc deep-link Retail și selectarea unei zone temporale din grafic |
+| Interacțiuni analitice | PARȚIAL | fullscreen/focus trap, keyboard drill/reset, breadcrumb/reload, click semantic pe timp și ierarhia completă, selecție temporală dataZoom și comparații simultane allowlist-uite; lipsește deep-link-ul contextual Retail și browser QA dedicat selecției temporale |
 | Identitate versiune | PARȚIAL | UI indică `v0.5`, în timp ce metadatele pachetelor/API au versiuni mai vechi; versiunea produsului trebuie unificată |
 
 O rută care se încarcă sau un canvas care desenează un grafic nu înseamnă că modulul de business este complet.

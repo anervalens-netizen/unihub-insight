@@ -29,7 +29,7 @@ from unihub_insight_api.domain import (
     WidgetQueryResult,
 )
 from unihub_insight_api.repositories.base import AnalyticsRepository
-from unihub_insight_api.services.metric_catalog import METRIC_CATALOG
+from unihub_insight_api.services.metric_catalog import METRIC_CATALOG, MODULE_ENTITY_DIMENSIONS
 from unihub_insight_api.services.scope import scope_label
 
 ALLOWED_FILTERS = frozenset({"firm", "regional", "asm", "stores", "agent"})
@@ -37,15 +37,6 @@ ALLOWED_SORT_FIELDS = frozenset(
     {"id", "key", "label", "value", "comparison", "target", "secondary", "tertiary", "progress_pct", "risk"}
 )
 METRICS = {metric.id: metric for metric in METRIC_CATALOG}
-MODULE_ENTITY_DIMENSIONS: dict[ModuleId, str] = {
-    ModuleId.SALES: "store",
-    ModuleId.PERFORMANCE: "store",
-    ModuleId.CAMPAIGNS: "store",
-    ModuleId.WORKFORCE: "agent",
-    ModuleId.COMPENSATION: "firm",
-    ModuleId.FINANCE: "store",
-    ModuleId.PLANNING: "store",
-}
 MODULE_METRICS: dict[ModuleId, frozenset[str]] = {
     ModuleId.SALES: frozenset(
         {"sales.total", "target.progress_pct", "receipts.total", "receipts.average_value", "receipt_2plus_pct"}
@@ -83,7 +74,7 @@ MODULE_SOURCE_DOMAINS: dict[ModuleId, SourceDomain] = {
 
 def required_source_domains(query: WidgetQuery) -> tuple[SourceDomain, ...]:
     primary = MODULE_SOURCE_DOMAINS[query.module]
-    if query.module in {ModuleId.COMPENSATION, ModuleId.PLANNING}:
+    if query.module in {ModuleId.CAMPAIGNS, ModuleId.COMPENSATION, ModuleId.PLANNING}:
         return (primary, SourceDomain.SALES)
     return (primary,)
 
@@ -172,8 +163,13 @@ def _metric_for(query: WidgetQuery, user: UserContext) -> MetricDefinition:
         query.metric_id != "finance.ebit" or query.dimensions != ("category",)
     ):
         raise QueryValidationFailure("Waterfall cere reconcilierea Finance EBIT pe category.")
-    if query.visualization is ChartKind.HEATMAP and "time" not in query.dimensions:
-        raise QueryValidationFailure("Heatmap cere dimensiunea time.")
+    if len(query.dimensions) > 1 and query.visualization is not ChartKind.HEATMAP:
+        raise QueryValidationFailure("Două dimensiuni sunt suportate numai de heatmap.")
+    if query.visualization is ChartKind.HEATMAP and query.dimensions != (
+        MODULE_ENTITY_DIMENSIONS[query.module],
+        "time",
+    ):
+        raise QueryValidationFailure("Heatmap cere exact dimensiunile entitate × time ale modulului.")
     if query.visualization in {ChartKind.HISTOGRAM, ChartKind.BOXPLOT, ChartKind.SCATTER} and (
         not query.dimensions or "time" in query.dimensions
     ):

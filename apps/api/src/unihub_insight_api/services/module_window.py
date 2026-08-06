@@ -4,6 +4,9 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from unihub_insight_api.domain import ModuleAnalyticsResponse, ModuleId
+from unihub_insight_api.services.metric_catalog import METRIC_CATALOG, MODULE_PRIMARY_METRIC_IDS
+
+METRICS_BY_ID = {metric.id: metric for metric in METRIC_CATALOG}
 
 
 @dataclass(frozen=True)
@@ -11,6 +14,21 @@ class ModuleWindow:
     start: str | None = None
     end: str | None = None
     requested_comparisons: tuple[str, ...] = ()
+    ignored_comparisons: tuple[str, ...] = ()
+
+
+def allowed_module_window(module: ModuleId, window: ModuleWindow) -> ModuleWindow:
+    metric = METRICS_BY_ID[MODULE_PRIMARY_METRIC_IDS[module]]
+    return ModuleWindow(
+        start=window.start,
+        end=window.end,
+        requested_comparisons=tuple(
+            comparison for comparison in window.requested_comparisons if comparison in metric.allowed_comparisons
+        ),
+        ignored_comparisons=tuple(
+            comparison for comparison in window.requested_comparisons if comparison not in metric.allowed_comparisons
+        ),
+    )
 
 
 def apply_module_window(
@@ -51,6 +69,10 @@ def apply_module_window(
         available.add("forecast")
     missing = sorted(set(window.requested_comparisons) - available)
     warnings = list(data.meta.warnings)
+    if window.ignored_comparisons:
+        warnings.append(
+            "Comparații ignorate de allowlist-ul metricii native: " + ", ".join(window.ignored_comparisons) + "."
+        )
     if missing:
         warnings.append("Comparații indisponibile în contractul nativ curent: " + ", ".join(missing) + ".")
 

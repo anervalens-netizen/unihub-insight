@@ -25,7 +25,7 @@ import { UniversalTransition } from 'echarts/features';
 import { CanvasRenderer } from 'echarts/renderers';
 import { type KeyboardEvent, useEffect, useMemo, useRef } from 'react';
 import { applyChartDesign, useChartDesign } from './chart-design';
-import type { ChartPngExportConfig } from './chart-spec';
+import type { ChartPngExportConfig, EChartRangeEvent } from './chart-spec';
 
 echarts.use([
   AriaComponent,
@@ -55,6 +55,32 @@ export type EChartEvent = {
   name?: string;
 };
 
+const resizeQueue = new Set<EChartsType>();
+let resizeQueueFrame = 0;
+
+function flushResizeQueue(): void {
+  resizeQueueFrame = 0;
+  const next = resizeQueue.values().next();
+  if (!next.done) {
+    resizeQueue.delete(next.value);
+    if (!next.value.isDisposed()) next.value.resize({ animation: { duration: 0 } });
+  }
+  if (resizeQueue.size > 0) resizeQueueFrame = requestAnimationFrame(flushResizeQueue);
+}
+
+function enqueueResize(chart: EChartsType): void {
+  resizeQueue.add(chart);
+  if (!resizeQueueFrame) resizeQueueFrame = requestAnimationFrame(flushResizeQueue);
+}
+
+function dequeueResize(chart: EChartsType): void {
+  resizeQueue.delete(chart);
+  if (resizeQueue.size === 0 && resizeQueueFrame) {
+    cancelAnimationFrame(resizeQueueFrame);
+    resizeQueueFrame = 0;
+  }
+}
+
 function safeFilename(value: string): string {
   const normalized = value
     .normalize('NFKD')
@@ -66,17 +92,20 @@ function safeFilename(value: string): string {
 }
 
 function chartDataCount(option: EChartsCoreOption): number {
-  const record = typeof option === 'object' && option !== null ? option : {};
-  const datasetValue = (record as Record<string, unknown>)['dataset'];
+  const record = (typeof option === 'object' && option !== null ? option : {}) as {
+    dataset?: unknown;
+    series?: unknown;
+  };
+  const datasetValue = record.dataset;
   const dataset = Array.isArray(datasetValue) ? datasetValue[0] : datasetValue;
   if (typeof dataset === 'object' && dataset !== null) {
-    const source = (dataset as Record<string, unknown>)['source'];
+    const source = (dataset as { source?: unknown }).source;
     if (Array.isArray(source)) return source.length;
   }
-  const series = (record as Record<string, unknown>)['series'];
+  const series = record.series;
   const firstSeries = Array.isArray(series) ? series[0] : series;
   if (typeof firstSeries === 'object' && firstSeries !== null) {
-    const data = (firstSeries as Record<string, unknown>)['data'];
+    const data = (firstSeries as { data?: unknown }).data;
     if (Array.isArray(data)) return data.length;
   }
   return 0;
@@ -100,6 +129,7 @@ export function EChart({
   ariaLabel,
   onEvent,
   onDoubleEvent,
+  onRangeEvent,
   onBlankReset,
   pngExport,
 }: {
@@ -108,6 +138,7 @@ export function EChart({
   ariaLabel: string;
   onEvent?: (event: EChartEvent) => void;
   onDoubleEvent?: (event: EChartEvent) => void;
+  onRangeEvent?: (event: EChartRangeEvent) => void;
   onBlankReset?: () => void;
   pngExport?: ChartPngExportConfig;
 }) {
@@ -128,7 +159,7 @@ export function EChart({
       : designed;
   }, [design, option, rawDataCount]);
   const dataCount = useMemo(() => chartDataCount(designedOption), [designedOption]);
-  const interactive = Boolean(onEvent || onBlankReset);
+  const interactive = Boolean(onEvent || onRangeEvent || onBlankReset);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -142,22 +173,18 @@ export function EChart({
       locale: 'EN',
     });
     chartRef.current = chart;
-    let resizeFrame = 0;
     let resizeTimer = 0;
     const resizeObserver = new ResizeObserver(() => {
       window.clearTimeout(resizeTimer);
-      cancelAnimationFrame(resizeFrame);
       resizeTimer = window.setTimeout(() => {
-        resizeFrame = requestAnimationFrame(() => {
-          if (!chart.isDisposed()) chart.resize({ animation: { duration: 0 } });
-        });
+        enqueueResize(chart);
       }, 120);
     });
     resizeObserver.observe(host);
     return () => {
       resizeObserver.disconnect();
       window.clearTimeout(resizeTimer);
-      cancelAnimationFrame(resizeFrame);
+      dequeueResize(chart);
       chartRef.current = null;
       if (!chart.isDisposed()) {
         chart.clear();
@@ -185,6 +212,19 @@ export function EChart({
       if (!chart.isDisposed()) chart.off('dblclick', handleDoubleClick);
     };
   }, [onDoubleEvent]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || !onRangeEvent) return;
+    const handleRange = (...args: unknown[]) => {
+      const event = args[0];
+      if (typeof event === 'object' && event !== null) onRangeEvent(event as EChartRangeEvent);
+    };
+    chart.on('datazoom', handleRange);
+    return () => {
+      if (!chart.isDisposed()) chart.off('datazoom', handleRange);
+    };
+  }, [onRangeEvent]);
 
   useEffect(() => {
     const chart = chartRef.current;

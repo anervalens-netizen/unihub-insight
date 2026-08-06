@@ -48,6 +48,9 @@ def test_versioned_catalog_exposes_query_and_dimension_contract(client: TestClie
     assert sales["source_authority"] == "unihub-retail"
     assert "scatter" not in sales["allowed_shapes"]
     assert "treemap" in sales["allowed_shapes"]
+    formula_references = [item["formula_reference"] for item in payload["metrics"]]
+    assert len(formula_references) == len(set(formula_references))
+    assert all(reference != "retail-reporting-contract" for reference in formula_references)
 
 
 def test_batch_reuses_one_snapshot_and_isolates_invalid_widget(client: TestClient) -> None:
@@ -102,6 +105,21 @@ def test_scatter_uses_explicit_business_axes(client: TestClient) -> None:
     assert dimensions["x"] == "Productivitate / zi-agent"
     assert dimensions["y"] == "Realizare target"
     assert result["dataset"]["rows"]
+
+
+def test_query_rejects_two_dimensions_when_the_shape_does_not_consume_them(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        "/api/v1/query/batch",
+        params={"period": "2026-08"},
+        json={"widgets": [widget("invalid-2d", visualization="table", dimensions=["store", "time"])]},
+    )
+
+    assert response.status_code == 200
+    result = response.json()["results"][0]
+    assert result["error"]["code"] == "invalid-query"
+    assert "Două dimensiuni" in result["error"]["message"]
 
 
 def test_trend_returns_all_requested_comparisons_in_one_dataset(client: TestClient) -> None:
@@ -258,6 +276,45 @@ def test_batch_does_not_query_an_unavailable_source(client: TestClient) -> None:
     assert finance_fetches == 0
 
 
+def test_campaign_query_requires_sales_denominator_source(client: TestClient) -> None:
+    repository = client.app.state.analytics_repository
+    original_resolve = repository.resolve_snapshot
+    original_get_module = repository.get_module
+    campaign_fetches = 0
+
+    async def unavailable_sales(scope):
+        snapshot = await original_resolve(scope)
+        sales = snapshot.sources["sales"].model_copy(update={"status": SourceStatus.UNAVAILABLE})
+        return snapshot.model_copy(update={"sources": {**snapshot.sources, "sales": sales}})
+
+    async def counted_get_module(module, scope):
+        nonlocal campaign_fetches
+        if module.value == "campaigns":
+            campaign_fetches += 1
+        return await original_get_module(module, scope)
+
+    repository.resolve_snapshot = unavailable_sales
+    repository.get_module = counted_get_module
+    response = client.post(
+        "/api/v1/query/batch",
+        params={"period": "2026-08"},
+        json={
+            "widgets": [
+                widget(
+                    "campaign-share",
+                    module="campaigns",
+                    metric_id="campaigns.focus_share",
+                    visualization="line",
+                )
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["results"][0]["error"]["code"] == "unavailable"
+    assert campaign_fetches == 0
+
+
 def test_inspect_requires_and_reuses_the_same_snapshot(client: TestClient) -> None:
     batch = client.post(
         "/api/v1/query/batch",
@@ -357,6 +414,9 @@ def test_csv_export_reuses_snapshot_carries_metadata_and_is_audited(client: Test
     assert "unihub-insight-sales-table-2026-08.csv" in response.headers["content-disposition"]
     content = response.content.decode("utf-8-sig")
     assert "_analytical_snapshot_id" in content
+    assert "_coverage_numerator" in content
+    assert "_contract_version" in content
+    assert "_rule_version" in content
     assert batch["snapshot"]["id"] in content
     store = client.app.state.dashboard_store
     assert store._query_audit[-1]["action"] == "export.csv"
@@ -390,6 +450,9 @@ def test_xlsx_export_reuses_snapshot_carries_metadata_and_is_audited(client: Tes
         xml = b"".join(workbook.read(name) for name in names if name.endswith(".xml"))
         assert batch["snapshot"]["id"].encode() in xml
         assert b"sales.total" in xml
+        assert b"coverage num" in xml
+        assert b"contract version" in xml
+        assert b"rule version" in xml
     store = client.app.state.dashboard_store
     assert store._query_audit[-1]["action"] == "export.xlsx"
     assert store._query_audit[-1]["row_count"] == len(batch["results"][0]["dataset"]["rows"])

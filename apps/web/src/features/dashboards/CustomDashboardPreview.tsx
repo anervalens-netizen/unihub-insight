@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { lazy, Suspense, useMemo, useState } from 'react';
-import type { ChartUrlStateEvent } from '../../components/charts/chart-spec';
+import type { ChartUrlRangeEvent, ChartUrlStateEvent } from '../../components/charts/chart-spec';
 import { DashboardCanvas } from '../../components/dashboard/DashboardCanvas';
 import type {
   DashboardLayoutItem,
@@ -23,6 +23,7 @@ export function CustomDashboardPreview({
   resetToken,
   onLayoutChange,
   onUrlStateChange,
+  onUrlRangeChange,
   onUrlStateReset,
 }: {
   dashboard: DashboardDocument;
@@ -31,6 +32,7 @@ export function CustomDashboardPreview({
   resetToken: number;
   onLayoutChange: (items: DashboardLayoutItem[]) => void;
   onUrlStateChange?: (event: ChartUrlStateEvent) => void;
+  onUrlRangeChange?: (event: ChartUrlRangeEvent) => void;
   onUrlStateReset?: () => void;
 }) {
   const catalogQuery = useQuery(analyticsCatalogQuery());
@@ -77,6 +79,7 @@ export function CustomDashboardPreview({
         }
         onRetry={retry}
         {...(onUrlStateChange ? { onUrlStateChange } : {})}
+        {...(onUrlRangeChange ? { onUrlRangeChange } : {})}
         {...(onUrlStateReset ? { onUrlStateReset } : {})}
       />
     );

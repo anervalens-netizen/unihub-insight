@@ -19,7 +19,7 @@ from unihub_insight_api.services.scope import scope_label
 MODULE_SOURCE_DOMAINS: dict[ModuleId, tuple[SourceDomain, ...]] = {
     ModuleId.SALES: (SourceDomain.SALES,),
     ModuleId.PERFORMANCE: (SourceDomain.SALES,),
-    ModuleId.CAMPAIGNS: (SourceDomain.CAMPAIGNS,),
+    ModuleId.CAMPAIGNS: (SourceDomain.CAMPAIGNS, SourceDomain.SALES),
     ModuleId.WORKFORCE: (SourceDomain.WORKFORCE,),
     ModuleId.COMPENSATION: (SourceDomain.COMPENSATION, SourceDomain.SALES),
     ModuleId.FINANCE: (SourceDomain.FINANCE,),

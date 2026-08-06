@@ -217,7 +217,15 @@ async def export_query_csv(
         "_authority",
         "_authority_head",
         "_status",
+        "_source_period",
         "_cutoff",
+        "_as_of",
+        "_is_final",
+        "_coverage_numerator",
+        "_coverage_denominator",
+        "_contract_version",
+        "_rule_version",
+        "_produced_at",
         "_warnings",
     ]
     source_items = sorted(result.meta.sources.items())
@@ -230,7 +238,15 @@ async def export_query_csv(
                 f"{prefix}_authority",
                 f"{prefix}_head",
                 f"{prefix}_status",
+                f"{prefix}_period",
                 f"{prefix}_cutoff",
+                f"{prefix}_as_of",
+                f"{prefix}_is_final",
+                f"{prefix}_coverage_numerator",
+                f"{prefix}_coverage_denominator",
+                f"{prefix}_contract_version",
+                f"{prefix}_rule_version",
+                f"{prefix}_produced_at",
                 f"{prefix}_warnings",
             ]
         )
@@ -244,7 +260,15 @@ async def export_query_csv(
         source.authority,
         source.authority_head,
         source.status.value,
+        source.period,
         source.cutoff,
+        source.as_of,
+        source.is_final,
+        source.coverage_numerator,
+        source.coverage_denominator,
+        source.contract_version,
+        source.rule_version,
+        source.produced_at,
         ";".join(source.warnings),
     ]
     for _domain, item in source_items:
@@ -255,7 +279,15 @@ async def export_query_csv(
                 item.authority,
                 item.authority_head,
                 item.status.value,
+                item.period,
                 item.cutoff,
+                item.as_of,
+                item.is_final,
+                item.coverage_numerator,
+                item.coverage_denominator,
+                item.contract_version,
+                item.rule_version,
+                item.produced_at,
                 ";".join(item.warnings),
             ]
         )

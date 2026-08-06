@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
-import type { ChartUrlStateEvent } from '../../components/charts/chart-spec';
+import type { ChartUrlRangeEvent, ChartUrlStateEvent } from '../../components/charts/chart-spec';
 import {
   applyWidgetChartOptions,
   buildSafePngExport,
   chartEventToUrlState,
+  chartRangeEventToUrlState,
   resolveChartSpec,
 } from '../../components/charts/chart-spec';
 import { EChart } from '../../components/charts/EChart';
@@ -78,12 +79,23 @@ function QueryMetadata({
           Metric v{metric.version} · query v{metric.query_contract_version}
         </span>
         <span>
-          Cutoff: {source?.cutoff ?? '—'} · authority: {source?.authority ?? '—'}
+          Cutoff: {source?.cutoff ?? '—'} · as of: {source?.as_of ?? '—'} ·{' '}
+          {source?.is_final ? 'final' : 'deschis'}
+        </span>
+        <span>
+          Coverage: {source?.coverage_numerator ?? '—'}/{source?.coverage_denominator ?? '—'} ·
+          authority: {source?.authority ?? '—'} · head {source?.authority_head ?? '—'}
+        </span>
+        <span>
+          Generație: {source?.source_generation ?? '—'} · contract v
+          {source?.contract_version ?? '—'} · rule {source?.rule_version ?? '—'}
         </span>
         {sources.length > 1
           ? sources.map((item) => (
               <span key={item.domain}>
-                {item.domain}: {item.status} · cutoff {item.cutoff ?? '—'} · {item.authority}
+                {item.domain}: {item.status} · cutoff {item.cutoff ?? '—'} · coverage{' '}
+                {item.coverage_numerator ?? '—'}/{item.coverage_denominator ?? '—'} ·{' '}
+                {item.authority}
               </span>
             ))
           : null}
@@ -135,6 +147,7 @@ function ConfiguredChart({
   metric,
   result,
   onUrlStateChange,
+  onUrlRangeChange,
   onUrlStateReset,
 }: {
   widget: DashboardWidget;
@@ -142,6 +155,7 @@ function ConfiguredChart({
   metric: MetricDefinition;
   result: WidgetQueryResult;
   onUrlStateChange?: (event: ChartUrlStateEvent) => void;
+  onUrlRangeChange?: (event: ChartUrlRangeEvent) => void;
   onUrlStateReset?: () => void;
 }) {
   const presentedDataset = useMemo(
@@ -185,6 +199,10 @@ function ConfiguredChart({
           const interaction = chartEventToUrlState(presentedDataset, event);
           if (interaction) onUrlStateChange?.(interaction);
         }}
+        onRangeEvent={(event) => {
+          const range = chartRangeEventToUrlState(presentedDataset, event);
+          if (range) onUrlRangeChange?.(range);
+        }}
         {...(onUrlStateReset ? { onBlankReset: onUrlStateReset } : {})}
       />
       <details className="chart-backing-table">
@@ -204,6 +222,7 @@ export function ConfiguredWidget({
   requestError,
   onRetry,
   onUrlStateChange,
+  onUrlRangeChange,
   onUrlStateReset,
 }: {
   widget: DashboardWidget;
@@ -213,6 +232,7 @@ export function ConfiguredWidget({
   requestError?: unknown;
   onRetry?: () => void;
   onUrlStateChange?: (event: ChartUrlStateEvent) => void;
+  onUrlRangeChange?: (event: ChartUrlRangeEvent) => void;
   onUrlStateReset?: () => void;
 }) {
   if (loading) return <LoadingState label={`Se încarcă ${widget.title}…`} />;
@@ -305,6 +325,7 @@ export function ConfiguredWidget({
       metric={metric}
       result={result}
       {...(onUrlStateChange ? { onUrlStateChange } : {})}
+      {...(onUrlRangeChange ? { onUrlRangeChange } : {})}
       {...(onUrlStateReset ? { onUrlStateReset } : {})}
     />
   );

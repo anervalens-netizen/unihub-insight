@@ -215,19 +215,7 @@ def query_workbook(
         ("Warnings", meta.warnings),
         ("Generat", meta.generated_at),
     ]
-    for domain, source in sorted(meta.sources.items()):
-        prefix = f"Sursă {domain}"
-        notes.extend(
-            [
-                (prefix, source.source),
-                (f"{prefix} status", source.status.value),
-                (f"{prefix} cutoff", source.cutoff),
-                (f"{prefix} generație", source.source_generation),
-                (f"{prefix} autoritate", source.authority),
-                (f"{prefix} head", source.authority_head),
-                (f"{prefix} warnings", source.warnings),
-            ]
-        )
+    notes.extend(_source_notes(meta.sources))
     builder.add_notes("Metadata", notes)
     return builder.close()
 
@@ -240,10 +228,18 @@ def _source_notes(sources: Mapping[Any, SourceMetadata]) -> list[tuple[str, Any]
             [
                 (prefix, source.source),
                 (f"{prefix} status", source.status.value),
+                (f"{prefix} perioadă", source.period),
                 (f"{prefix} cutoff", source.cutoff),
+                (f"{prefix} as of", source.as_of),
+                (f"{prefix} final", source.is_final),
+                (f"{prefix} coverage numărător", source.coverage_numerator),
+                (f"{prefix} coverage numitor", source.coverage_denominator),
                 (f"{prefix} generație", source.source_generation),
                 (f"{prefix} autoritate", source.authority),
                 (f"{prefix} head", source.authority_head),
+                (f"{prefix} contract version", source.contract_version),
+                (f"{prefix} rule version", source.rule_version),
+                (f"{prefix} produs la", source.produced_at),
                 (f"{prefix} warnings", source.warnings),
             ]
         )

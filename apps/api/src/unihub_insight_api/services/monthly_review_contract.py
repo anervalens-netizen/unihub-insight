@@ -64,6 +64,7 @@ def _review_metric(
         allowed_grains=("month",),
         comparison_policy="same-month-previous-year,previous-month,trailing-average",
         missing_policy=missing,
+        formula_reference=f"unihub-insight:monthly-review:{metric_id}:v1",
     )
 
 

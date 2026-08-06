@@ -12,6 +12,11 @@ export interface CrossFilterEvent {
   label: string | null;
 }
 
+export interface CrossFilterRangeEvent {
+  start: string;
+  end: string;
+}
+
 function clearPatch(items: readonly DrillPathItem[]): GlobalSearchPatch {
   const patch: GlobalSearchPatch = {};
   for (const item of items) {
@@ -80,6 +85,43 @@ export function crossFilterPatch(
     default:
       return {};
   }
+}
+
+export function crossFilterMultiPatch(
+  currentDrill: string | undefined,
+  events: readonly CrossFilterEvent[],
+): GlobalSearchPatch {
+  let drill = currentDrill;
+  let combined: GlobalSearchPatch = {};
+  for (const event of events) {
+    const next = crossFilterPatch(drill, event);
+    combined = { ...combined, ...next };
+    if ('drill' in next) drill = next.drill;
+  }
+  return combined;
+}
+
+export function crossFilterRangePatch(
+  currentDrill: string | undefined,
+  event: CrossFilterRangeEvent,
+): GlobalSearchPatch {
+  const monthPattern = /^\d{4}-(0[1-9]|1[0-2])$/;
+  if (!monthPattern.test(event.start) || !monthPattern.test(event.end)) return {};
+  const [start, end] =
+    event.start <= event.end ? [event.start, event.end] : [event.end, event.start];
+  if (start === end)
+    return crossFilterPatch(currentDrill, { dimensionId: 'time', value: end, label: end });
+  return {
+    drill: updateDrillPath(currentDrill, {
+      dimension: 'time',
+      value: end,
+      label: `${start} → ${end}`,
+    }),
+    period: end,
+    range: 'custom',
+    start,
+    end,
+  };
 }
 
 export function truncateCrossFilterPatch(

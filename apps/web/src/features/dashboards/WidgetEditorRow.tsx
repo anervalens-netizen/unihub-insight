@@ -1,5 +1,6 @@
 import { CopyPlus, Trash2 } from 'lucide-react';
 
+import { moduleEntityDimension } from '../modules/interactions';
 import type { ModuleId } from '../modules/schemas';
 import type { MetricDefinition } from '../query/schemas';
 import { type DashboardWidget, dashboardWidgetDimensions } from './schemas';
@@ -22,6 +23,25 @@ const comparisonOptions = [
 
 function metricAllowsComparison(metric: MetricDefinition | undefined, comparison: string): boolean {
   return metric?.allowed_comparisons.some((allowed) => allowed === comparison) ?? false;
+}
+
+function dimensionsForVisualization(
+  module: ModuleId,
+  visualization: DashboardWidget['visualization'],
+  metric: MetricDefinition | undefined,
+  dimensions: string[],
+): string[] {
+  if (!metric) return [];
+  if (visualization === 'heatmap') {
+    const required = [moduleEntityDimension[module], 'time'];
+    return required.every((dimension) => metric.allowed_dimensions.includes(dimension))
+      ? required
+      : [];
+  }
+  if (visualization === 'line' || visualization === 'area') {
+    return metric.allowed_dimensions.includes('time') ? ['time'] : [];
+  }
+  return dimensions.slice(0, 1);
 }
 
 export function WidgetEditorRow({
@@ -84,8 +104,13 @@ export function WidgetEditorRow({
                     Object.entries(widget.filters).filter(([key]) => key !== 'agent'),
                   )
                 : widget.filters;
-            const dimensions = selectedDimensions.filter((dimension) =>
-              nextMetric?.allowed_dimensions.includes(dimension),
+            const dimensions = dimensionsForVisualization(
+              module,
+              visualization,
+              nextMetric,
+              selectedDimensions.filter((dimension) =>
+                nextMetric?.allowed_dimensions.includes(dimension),
+              ),
             );
             onChange({
               module,
@@ -111,13 +136,19 @@ export function WidgetEditorRow({
         </select>
         <select
           multiple
-          size={2}
+          size={widget.visualization === 'heatmap' ? 2 : 1}
           value={selectedDimensions}
           aria-label="Dimensiuni"
+          disabled={widget.visualization === 'heatmap'}
+          title={
+            widget.visualization === 'heatmap'
+              ? 'Heatmap folosește perechea fixă entitate × timp.'
+              : undefined
+          }
           onChange={(event) =>
             onChange(
               dimensionPatch(
-                [...event.target.selectedOptions].slice(0, 2).map((option) => option.value),
+                [...event.target.selectedOptions].slice(0, 1).map((option) => option.value),
               ),
             )
           }
@@ -192,17 +223,23 @@ export function WidgetEditorRow({
           onChange={(event) => {
             const nextMetric = metrics.find((item) => item.id === event.target.value);
             if (!nextMetric) return;
-            const dimensions = selectedDimensions.filter((dimension) =>
-              nextMetric.allowed_dimensions.includes(dimension),
+            const visualization = nextMetric.allowed_shapes.includes(widget.visualization)
+              ? widget.visualization
+              : (nextMetric.allowed_shapes[0] ?? 'table');
+            const dimensions = dimensionsForVisualization(
+              widget.module,
+              visualization,
+              nextMetric,
+              selectedDimensions.filter((dimension) =>
+                nextMetric.allowed_dimensions.includes(dimension),
+              ),
             );
             onChange({
               metric_id: nextMetric.id,
               metric_version: nextMetric.version,
               query_contract_version: nextMetric.query_contract_version,
               title: nextMetric.display_name,
-              visualization: nextMetric.allowed_shapes.includes(widget.visualization)
-                ? widget.visualization
-                : (nextMetric.allowed_shapes[0] ?? 'table'),
+              visualization,
               ...dimensionPatch(dimensions),
               time_grain: nextMetric.allowed_grains.includes(widget.time_grain)
                 ? widget.time_grain
@@ -224,11 +261,20 @@ export function WidgetEditorRow({
         <select
           value={widget.visualization}
           aria-label="Vizualizare"
-          onChange={(event) =>
+          onChange={(event) => {
+            const visualization = event.target.value as DashboardWidget['visualization'];
             onChange({
-              visualization: event.target.value as DashboardWidget['visualization'],
-            })
-          }
+              visualization,
+              ...dimensionPatch(
+                dimensionsForVisualization(
+                  widget.module,
+                  visualization,
+                  metric,
+                  selectedDimensions,
+                ),
+              ),
+            });
+          }}
         >
           {availableVisualizations.map((visualization) => (
             <option key={visualization} value={visualization}>

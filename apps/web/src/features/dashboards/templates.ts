@@ -1,4 +1,5 @@
 import type { Capability } from '../identity/schemas';
+import { moduleEntityDimension } from '../modules/interactions';
 import type { DashboardCreateInput, DashboardWidget } from './schemas';
 
 function widget(
@@ -20,8 +21,14 @@ function widget(
         : visualization === 'donut'
           ? 'category'
           : visualization === 'heatmap'
-            ? 'time'
+            ? moduleEntityDimension[module]
             : 'store';
+  const dimensions =
+    visualization === 'heatmap'
+      ? [moduleEntityDimension[module], 'time']
+      : dimension
+        ? [dimension]
+        : [];
   return {
     id,
     module,
@@ -31,7 +38,7 @@ function widget(
     query_contract_version: 1,
     visualization,
     dimension,
-    dimensions: dimension ? [dimension] : [],
+    dimensions,
     time_grain: 'month',
     filter_mode: 'inherit',
     filters: {},
