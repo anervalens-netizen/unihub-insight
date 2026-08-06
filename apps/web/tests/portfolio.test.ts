@@ -163,13 +163,15 @@ describe('Sales Portfolio web contract', () => {
       'portfolio-distribution',
       'portfolio-table',
     ]);
-    expect(moduleWidgets(base, 'portfolio-product').map((widget) => widget.id)).toEqual([
+    const productWidgets = moduleWidgets(base, 'portfolio-product');
+    expect(productWidgets.map((widget) => widget.id)).toEqual([
       'kpi:sales.portfolio_sales',
       'kpi:sales.portfolio_net_quantity',
       'kpi:sales.portfolio_return_quantity',
       'kpi:sales.portfolio_receipt_incidence',
       'portfolio-table',
     ]);
+    expect(productWidgets.at(-1)?.w).toBe(24);
   });
 
   it('keeps portfolio search local and paginates in pages of 50', () => {

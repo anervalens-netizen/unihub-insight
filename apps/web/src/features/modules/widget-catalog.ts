@@ -552,7 +552,7 @@ export function moduleWidgets(
       recipe.metricId ?? (recipe.slot ? metricSlots[data.module][recipe.slot] : undefined);
     const isKpi = recipe.kind === 'kpi';
     const index = isKpi ? kpiIndex++ : bodyIndex++;
-    const columns = isKpi ? kpiColumns : bodyCount <= 2 ? 12 : 8;
+    const columns = isKpi ? kpiColumns : bodyCount === 1 ? 24 : bodyCount === 2 ? 12 : 8;
     const x = isKpi
       ? (index % Math.max(1, 24 / kpiColumns)) * kpiColumns
       : (index % Math.max(1, 24 / columns)) * columns;
