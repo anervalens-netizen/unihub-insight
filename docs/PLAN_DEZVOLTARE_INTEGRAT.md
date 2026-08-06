@@ -3,7 +3,7 @@ title: Plan integrat de dezvoltare UniHub Insight
 status: active
 baseline_date: 2026-08-05
 baseline_sha: 9fecf15b938954bb93567fa4b51e4b8f73cda76e
-retail_contract_sha: 8f47db86532b72740a1b762e142e7bab5c75402f
+retail_contract_sha: 0aef1b01e103b864455e537e71df786109f14d53
 candidate: 1.0.0-rc.1
 ---
 
@@ -19,7 +19,7 @@ Acesta este un singur plan persistent. Nu este împărțit în luni, proiecte su
 
 ## Stare candidat RC1
 
-La 2026-08-06, Retail SHA `8f47db86532b72740a1b762e142e7bab5c75402f` publică aditiv read-model-urile v1, Sales day v1 și Visits v2 pe autor Team Leader. Candidatul Insight `1.0.0-rc.1` implementează catalogul/query batch/inspect/export, `ChartSpec`, sub-view-urile specializate, Visits nativ și dashboard ACL/preset/versionare. Finance și Compensation rămân explicit `UNAVAILABLE` până când Retail promovează generații eligibile; datele legacy nu sunt declarate oficiale. Închiderea `1.0.0` rămâne condiționată de matricea reală Authentik, acceptarea vizuală owner și șapte zile curate de performanță/RUM pe exact SHA-ul final.
+La 2026-08-06, Retail SHA `0aef1b01e103b864455e537e71df786109f14d53` publică aditiv read-model-urile v1, Sales day v1 și Visits v2 pe autor Team Leader, cu regula de completion recalculată din cele 19 câmpuri FieldOps. Candidatul Insight `1.0.0-rc.1` implementează catalogul/query batch/inspect/export, `ChartSpec`, sub-view-urile specializate, Visits nativ și dashboard ACL/preset/versionare. Finance și Compensation rămân explicit `UNAVAILABLE` până când Retail promovează generații eligibile; datele legacy nu sunt declarate oficiale. Închiderea `1.0.0` rămâne condiționată de matricea reală Authentik, acceptarea vizuală owner și șapte zile curate de performanță/RUM pe exact SHA-ul final.
 
 ## Adevărul de pornire
 

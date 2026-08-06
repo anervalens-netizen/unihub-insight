@@ -141,6 +141,6 @@ Retail publică read-model-uri versionate. Insight rezolvă un `analytical_snaps
 
 Sales Calendar citește exclusiv `reporting_sales_day_v1`. API-ul păstrează granulația zilnică observată, cantitatea retur negativă și numărul de magazine observate; nu generează zile lipsă și nu afirmă coverage zilnic complet. Același dataset alimentează widgetul Calendar, custom dashboards, inspect și XLSX.
 
-Performance și Workforce consumă aceeași felie Visits din `reporting_visit_month_v2`. Grain-ul Retail este lună × Team Leader autor × magazin; `team_leader_id/name` vin din snapshotul vizitei, iar firma/RM/ASM/locația sunt numai îmbogățirea curentă a magazinului. Felia are KPI, trend, breakdown, matrice, inspect și foi XLSX proprii; filtrul agent este refuzat explicit.
+Performance și Workforce consumă aceeași felie Visits din `reporting_visit_month_v2`. Grain-ul Retail este lună × Team Leader autor × magazin; `team_leader_id/name` vin din snapshotul vizitei, iar firma/RM/ASM/locația sunt numai îmbogățirea curentă a magazinului. Completion-ul este derivat din cele 19 câmpuri canonice ale vizitei, inclusiv pentru istoricul cu procent persistent înghețat. Felia are KPI, trend, breakdown, matrice, inspect și foi XLSX proprii; filtrul agent este refuzat explicit.
 
 Detaliile, ordinea de dependență și porțile sunt canonice în [Planul integrat](docs/PLAN_DEZVOLTARE_INTEGRAT.md).

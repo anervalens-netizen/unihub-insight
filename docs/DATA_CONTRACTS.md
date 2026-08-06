@@ -25,7 +25,7 @@ Saved widgets persist `metric_id`, `metric_version` and `query_contract_version`
 | `quantity.total` | Sum of net accessory quantity | integer | returns reduce quantity |
 | `visits.total` | Count of eligible FieldOps visits, grouped by visit-author Team Leader snapshot | integer | missing period remains missing |
 | `visits.distinct_stores` | Distinct visited `site_code` values in scope | integer | missing period remains missing |
-| `visits.avg_completion` | Visit-count-weighted FieldOps completion average | % | null without eligible visits |
+| `visits.avg_completion` | Visit-count-weighted FieldOps completion average, derived from the 19 canonical visit fields | % | null without eligible visits |
 | `visits.checklist_score` | Visit-count-weighted mean of the five boolean checklist checks | % | null without eligible visits |
 
 The linear forecast is explicitly labeled run-rate; it is not the persisted AI forecast used elsewhere in UniHub.
@@ -72,12 +72,12 @@ Initial alerts are deterministic rules, not machine-learning scores. They expose
 
 - Campaign mechanisms remain separate and carry their own cutoff/status/eligibility authority; they are not summed without a defined metric. Focus Top/Bottom folosește numai magazine observate și `campaigns.focus_share`; nu afirmă coverage, adopție sau cauzalitate.
 - Workforce movements come from official effective-dated events, never inferred only from missing sales.
-- Visits read only `reporting_visit_month_v2`; draft rows, distribution/`TR %` locations and `Cartele` are excluded. Performance and Workforce expose the same Visits slice and source metadata, so their native widgets, query batch, inspect and XLSX cannot drift to the legacy ASM projection.
+- Visits read only `reporting_visit_month_v2`; draft rows, distribution/`TR %` locations and `Cartele` are excluded. `avg_completion` is recalculated from the 19 canonical FieldOps fields, not from a stale persisted percentage. Performance and Workforce expose the same Visits slice and source metadata, so their native widgets, query batch, inspect and XLSX cannot drift to the legacy ASM projection.
 - Compensation reads an aggregate Retail view only. No direct `salary_records`, `agent_salary_links`, names or private IDs remain granted. Total uses all rows, average uses values at least 2,000 RON, median uses all values; cohorts of one or two are suppressed across KPI, series, inspect and export, including differencing attacks through filters.
 - Finance explicitly marks `actual`/`estimated` and authority. `__FINANCE_UNALLOCATED__` belongs in company totals and never in store/RM detail. Shadow or unpromoted generations are unavailable, not actual.
 - Planning forecast identifies run, horizon, method/model, input cutoff and coverage. Target scenarios identify scenario, revision, status, rule-set hash and snapshot; drafts are not implicitly shared truth. Accuracy păstrează KPI-ul server-side și vizualizează perechile Actual × Forecast publicate pe magazin; clientul nu recalculează o formulă alternativă.
 
-Retail migration 047 is intentionally additive for consumer N/N-1. Migration 049 adds `reporting_source_snapshot_v2` and `reporting_visit_month_v2` without changing v1; the new consumer selects v2 while the old Visits ASM projection remains only a rollback anchor. Legacy Finance/Planning raw grants are revoked only after two compatible Insight releases and a verified B→A rollback. This temporary publisher compatibility does not authorize new Insight code to query raw tables.
+Retail migration 047 is intentionally additive for consumer N/N-1. Migration 049 adds `reporting_source_snapshot_v2` and `reporting_visit_month_v2` without changing v1; migration 050 preserves that shape and advances the Visits rule/source generation for canonical completion recomputation without rewriting FieldOps history. The new consumer selects v2 while the old Visits ASM projection remains only a rollback anchor. Legacy Finance/Planning raw grants are revoked only after two compatible Insight releases and a verified B→A rollback. This temporary publisher compatibility does not authorize new Insight code to query raw tables.
 
 ## Export contract
 
