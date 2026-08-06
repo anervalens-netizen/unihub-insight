@@ -625,7 +625,7 @@ export function chartEventToUrlState(
   const labelDimension = dataset.dimensions.find((dimension) => dimension.role === 'label');
   const rawLabel = labelDimension && row ? row[labelDimension.id] : null;
   return {
-    dimensionId: category.id,
+    dimensionId: category.source_dimension ?? category.id,
     value: String(rawValue),
     label: rawLabel === null || rawLabel === undefined ? null : String(rawLabel),
   };

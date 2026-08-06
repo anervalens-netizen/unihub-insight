@@ -13,7 +13,18 @@ from typing import Any, Literal
 import xlsxwriter
 from pydantic import BaseModel
 
-from unihub_insight_api.domain import ModuleAnalyticsResponse, OverviewResponse
+from unihub_insight_api.domain import (
+    AnalyticalSnapshot,
+    DatasetDimension,
+    MetricDefinition,
+    MetricUnit,
+    ModuleAnalyticsResponse,
+    OverviewResponse,
+    QueryDataset,
+    QueryExecutionMeta,
+    SourceMetadata,
+    WidgetQuery,
+)
 from unihub_insight_api.domain.monthly_review import MonthlyReviewResponse
 
 ExcelKind = Literal["text", "integer", "decimal", "currency", "percent", "date", "datetime"]
@@ -128,6 +139,8 @@ class ExcelBuilder:
             value = value.value
         if isinstance(value, Decimal):
             value = float(value)
+        if isinstance(value, str) and value.startswith(("=", "+", "-", "@", "\t", "\r", "\n")):
+            value = f"'{value}"
         if kind == "percent" and isinstance(value, int | float):
             value /= 100
         if kind in {"date", "datetime"} and isinstance(value, str):
@@ -155,6 +168,88 @@ class ExcelBuilder:
             sheet.write(row, column, str(value), self._format(kind))
 
 
+def _query_column(dimension: DatasetDimension, metric: MetricDefinition) -> Column:
+    kind: ExcelKind = "text"
+    if dimension.kind == "integer":
+        kind = "integer"
+    elif dimension.kind == "number":
+        if dimension.role in {"value", "comparison", "target"}:
+            unit_kinds: dict[MetricUnit, ExcelKind] = {
+                MetricUnit.CURRENCY: "currency",
+                MetricUnit.PERCENT: "percent",
+                MetricUnit.INTEGER: "integer",
+                MetricUnit.DECIMAL: "decimal",
+            }
+            kind = unit_kinds[metric.unit]
+        else:
+            kind = "decimal"
+    return Column(dimension.id, dimension.label, kind, 22)
+
+
+def query_workbook(
+    dataset: QueryDataset,
+    meta: QueryExecutionMeta,
+    snapshot: AnalyticalSnapshot,
+    query: WidgetQuery,
+    metric: MetricDefinition,
+) -> Path:
+    """Build a bounded per-widget workbook from the exact inspected query snapshot."""
+    builder = ExcelBuilder("widget")
+    builder.add_sheet(
+        "Date",
+        [_query_column(dimension, metric) for dimension in dataset.dimensions],
+        dataset.rows,
+    )
+    notes: list[tuple[str, Any]] = [
+        ("Snapshot analitic", snapshot.id),
+        ("Perioadă", meta.period),
+        ("Scope", meta.scope_label),
+        ("Widget", query.widget_id),
+        ("Modul", query.module.value),
+        ("Metrică", metric.id),
+        ("Metric version", metric.version),
+        ("Query contract version", query.query_contract_version),
+        ("Dimensiuni", query.dimensions),
+        ("Interval", f"{query.time_range.start} → {query.time_range.end}" if query.time_range else meta.period),
+        ("Comparații", tuple(item.value for item in query.comparisons)),
+        ("Warnings", meta.warnings),
+        ("Generat", meta.generated_at),
+    ]
+    for domain, source in sorted(meta.sources.items()):
+        prefix = f"Sursă {domain}"
+        notes.extend(
+            [
+                (prefix, source.source),
+                (f"{prefix} status", source.status.value),
+                (f"{prefix} cutoff", source.cutoff),
+                (f"{prefix} generație", source.source_generation),
+                (f"{prefix} autoritate", source.authority),
+                (f"{prefix} head", source.authority_head),
+                (f"{prefix} warnings", source.warnings),
+            ]
+        )
+    builder.add_notes("Metadata", notes)
+    return builder.close()
+
+
+def _source_notes(sources: Mapping[Any, SourceMetadata]) -> list[tuple[str, Any]]:
+    notes: list[tuple[str, Any]] = []
+    for domain, source in sorted(sources.items(), key=lambda item: str(item[0])):
+        prefix = f"Sursă {domain}"
+        notes.extend(
+            [
+                (prefix, source.source),
+                (f"{prefix} status", source.status.value),
+                (f"{prefix} cutoff", source.cutoff),
+                (f"{prefix} generație", source.source_generation),
+                (f"{prefix} autoritate", source.authority),
+                (f"{prefix} head", source.authority_head),
+                (f"{prefix} warnings", source.warnings),
+            ]
+        )
+    return notes
+
+
 def overview_workbook(data: OverviewResponse) -> Path:
     builder = ExcelBuilder("overview")
     builder.add_notes(
@@ -165,7 +260,9 @@ def overview_workbook(data: OverviewResponse) -> Path:
             ("Cutoff", data.meta.as_of),
             ("Lună finală", data.meta.is_final),
             ("Sursă", data.meta.source),
+            ("Snapshot analitic", data.meta.analytical_snapshot_id),
             ("Generat", data.meta.generated_at),
+            *_source_notes(data.meta.sources),
         ],
     )
     builder.add_sheet(
@@ -241,7 +338,9 @@ def module_workbook(data: ModuleAnalyticsResponse) -> Path:
             ("Scope", data.meta.scope_label),
             ("Cutoff", data.meta.as_of),
             ("Sursă", data.meta.source),
+            ("Snapshot analitic", data.meta.analytical_snapshot_id),
             ("Capabilitate", data.required_capability.value),
+            *_source_notes(data.meta.sources),
         ],
     )
     builder.add_sheet(
@@ -340,7 +439,9 @@ def monthly_review_workbook(
                 ("Lună finală", data.meta.is_final),
                 ("Reper recent", f"{data.recent_months} luni"),
                 ("Sursă", data.meta.source),
+                ("Snapshot analitic", data.meta.analytical_snapshot_id),
                 ("Generat", data.meta.generated_at),
+                *_source_notes(data.meta.sources),
             ],
         )
         builder.add_sheet(

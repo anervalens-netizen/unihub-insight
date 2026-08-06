@@ -32,6 +32,7 @@ export const metricDefinitionSchema = z.object({
   allowed_dimensions: z.array(z.string()),
   allowed_grains: z.array(z.string()),
   comparison_policy: z.string(),
+  allowed_comparisons: z.array(queryComparisonSchema).default([]),
   missing_policy: z.string(),
   required_capability: capabilitySchema,
   formula_reference: z.string(),
@@ -107,6 +108,7 @@ export const datasetDimensionSchema = z.object({
   label: z.string(),
   kind: z.enum(['string', 'number', 'integer', 'boolean', 'time']),
   role: z.enum(['key', 'label', 'value', 'comparison', 'target', 'metadata']).default('value'),
+  source_dimension: z.string().nullable().optional(),
 });
 
 export const queryDatasetSchema = z.object({
@@ -174,6 +176,7 @@ export const inspectResponseSchema = z.object({
   snapshot: analyticalSnapshotSchema,
   query: widgetQuerySchema,
   dataset: queryDatasetSchema,
+  meta: queryExecutionMetaSchema,
   page: z.number().int(),
   page_size: z.number().int(),
   total_rows: z.number().int(),

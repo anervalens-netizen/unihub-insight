@@ -1,6 +1,6 @@
 import type { GlobalSearch } from '../../lib/search';
 import { parseComparisons, rangeBounds } from '../../lib/search';
-import type { QueryBatchRequest, WidgetQuery } from '../query/schemas';
+import type { MetricDefinition, QueryBatchRequest, WidgetQuery } from '../query/schemas';
 import { resolveWidgetSearch } from './filter-resolution';
 import { type DashboardDocument, type DashboardWidget, dashboardWidgetDimensions } from './schemas';
 
@@ -19,18 +19,30 @@ const supportedTimeGrains = ['day', 'week', 'month', 'quarter', 'year'] as const
 function widgetComparisons(
   widget: DashboardWidget,
   search: GlobalSearch & { period: string },
+  metric?: MetricDefinition,
 ): WidgetQuery['comparisons'] {
+  if (!dashboardWidgetDimensions(widget).includes('time')) return [];
+  const metricAllowed: ReadonlySet<string> = metric
+    ? new Set(metric.allowed_comparisons)
+    : supportedComparisons;
   const configured = widget.comparisons.filter(
     (value): value is WidgetQuery['comparisons'][number] =>
-      supportedComparisons.has(value as WidgetQuery['comparisons'][number]),
+      supportedComparisons.has(value as WidgetQuery['comparisons'][number]) &&
+      metricAllowed.has(value),
   );
   if (configured.length > 0) return configured;
-  const selected = parseComparisons(search).filter((value) =>
-    supportedComparisons.has(value as WidgetQuery['comparisons'][number]),
+  const selected = parseComparisons(search).filter(
+    (value) =>
+      supportedComparisons.has(value as WidgetQuery['comparisons'][number]) &&
+      metricAllowed.has(value),
   );
   if (selected.length > 0) return selected;
-  if (search.comparison === 'previous-month') return ['previous-period'];
-  if (search.comparison === 'previous-year') return ['previous-year'];
+  if (search.comparison === 'previous-month' && metricAllowed.has('previous-period')) {
+    return ['previous-period'];
+  }
+  if (search.comparison === 'previous-year' && metricAllowed.has('previous-year')) {
+    return ['previous-year'];
+  }
   return [];
 }
 
@@ -47,6 +59,7 @@ function widgetFilters(widget: DashboardWidget, search: GlobalSearch & { period:
 export function toWidgetQuery(
   widget: DashboardWidget,
   search: GlobalSearch & { period: string },
+  metric?: MetricDefinition,
 ): WidgetQuery {
   const resolved = resolveWidgetSearch(search, widget);
   const bounds = rangeBounds(resolved);
@@ -64,7 +77,7 @@ export function toWidgetQuery(
       ? (widget.time_grain as WidgetQuery['time_grain'])
       : 'month',
     filters: widgetFilters(widget, search),
-    comparisons: widgetComparisons(widget, search),
+    comparisons: widgetComparisons(widget, search, metric),
     sort: widget.sort.flatMap((field) => {
       const [name, direction] = field.split(':', 2);
       if (!name) return [];
@@ -78,11 +91,13 @@ export function toWidgetQuery(
 export function dashboardBatchRequest(
   dashboard: DashboardDocument,
   search: GlobalSearch & { period: string },
+  metrics: readonly MetricDefinition[] = [],
 ): QueryBatchRequest {
+  const metricById = new Map(metrics.map((metric) => [metric.id, metric]));
   return {
     dashboard_id: dashboard.id,
     widgets: dashboard.widgets
       .slice(0, MAX_DASHBOARD_QUERY_WIDGETS)
-      .map((widget) => toWidgetQuery(widget, search)),
+      .map((widget) => toWidgetQuery(widget, search, metricById.get(widget.metric_id))),
   };
 }

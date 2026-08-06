@@ -70,8 +70,10 @@ export function buildInspectRequest(
   snapshotId: string,
   dashboardId: string | null,
   query: InspectRequest['query'],
+  page = 1,
+  pageSize = 100,
 ): InspectRequest {
-  return { snapshot_id: snapshotId, dashboard_id: dashboardId, query, page: 1, page_size: 100 };
+  return { snapshot_id: snapshotId, dashboard_id: dashboardId, query, page, page_size: pageSize };
 }
 
 export function buildExportRequest(
@@ -101,6 +103,19 @@ export function exportQueryCsv(
   signal?: AbortSignal,
 ): Promise<{ blob: Blob; filename: string | null }> {
   return requestBlob('/query/export.csv', analyticsParams(search), {
+    method: 'POST',
+    body: input,
+    ...(signal ? { signal } : {}),
+    timeoutMs: 8_000,
+  });
+}
+
+export function exportQueryXlsx(
+  input: InspectRequest,
+  search: GlobalSearch & { period: string },
+  signal?: AbortSignal,
+): Promise<{ blob: Blob; filename: string | null }> {
+  return requestBlob('/query/export.xlsx', analyticsParams(search), {
     method: 'POST',
     body: input,
     ...(signal ? { signal } : {}),

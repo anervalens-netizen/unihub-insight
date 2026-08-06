@@ -92,7 +92,9 @@ class MemoryDashboardStore:
                 (
                     item
                     for item in self._items.values()
-                    if item.owner_subject == subject or any(entry.subject == subject for entry in item.acl)
+                    if item.owner_subject == subject
+                    or item.visibility.value == "shared"
+                    or any(entry.subject == subject for entry in item.acl)
                 ),
                 key=lambda item: item.updated_at,
                 reverse=True,
@@ -311,6 +313,7 @@ class PostgresDashboardStore:
                        dashboard.created_at, dashboard.updated_at
                 FROM insight.dashboards dashboard
                 WHERE dashboard.owner_subject = $1
+                   OR dashboard.visibility = 'shared'
                    OR EXISTS (
                        SELECT 1 FROM insight.dashboard_acl acl
                        WHERE acl.dashboard_id = dashboard.id AND acl.subject = $1

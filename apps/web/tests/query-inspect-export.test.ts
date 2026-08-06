@@ -14,7 +14,7 @@ const query = widgetQuerySchema.parse({
 });
 
 describe('custom widget inspect/export request construction', () => {
-  it('reuses the batch snapshot and exact widget query for inspect and CSV export', () => {
+  it('reuses the batch snapshot and exact widget query for inspect and tabular exports', () => {
     const inspect = buildInspectRequest('snapshot-42', 'dash-1', query);
     const exportRequest = buildExportRequest('snapshot-42', 'dash-1', query);
     expect(inspect).toEqual({
@@ -34,5 +34,14 @@ describe('custom widget inspect/export request construction', () => {
       dashboard_id: null,
       query,
     });
+  });
+
+  it('builds deterministic inspector pages while exports retain the exact widget query', () => {
+    expect(buildInspectRequest('snapshot-42', 'dash-1', query, 2, 250)).toMatchObject({
+      page: 2,
+      page_size: 250,
+      query,
+    });
+    expect(buildExportRequest('snapshot-42', 'dash-1', query).query).toBe(query);
   });
 });

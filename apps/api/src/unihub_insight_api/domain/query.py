@@ -104,6 +104,7 @@ class DatasetDimension(BaseModel):
     label: str
     kind: str = Field(pattern=r"^(string|number|integer|boolean|time)$")
     role: str = Field(default="value", pattern=r"^(key|label|value|comparison|target|metadata)$")
+    source_dimension: str | None = None
 
 
 class QueryDataset(BaseModel):
@@ -163,6 +164,7 @@ class InspectResponse(BaseModel):
     snapshot: AnalyticalSnapshot
     query: WidgetQuery
     dataset: QueryDataset
+    meta: QueryExecutionMeta
     page: int
     page_size: int
     total_rows: int

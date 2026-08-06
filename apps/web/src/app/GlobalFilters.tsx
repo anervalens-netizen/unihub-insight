@@ -10,6 +10,7 @@ import {
 import { useIdentity } from '../features/identity/context';
 import { filterOptionsQuery } from '../features/overview/api';
 import type { FilterAgent, FilterStore } from '../features/overview/schemas';
+import { resetCrossFilterPatch, truncateCrossFilterPatch } from '../lib/cross-filter';
 import {
   activeFilterCount,
   analyticalComparisons,
@@ -20,7 +21,6 @@ import {
   parseStoreSelection,
   type rangePresets,
   serializeComparisons,
-  serializeDrillPath,
   serializeStoreSelection,
 } from '../lib/search';
 import { useGlobalSearch, useUpdateGlobalSearch } from './search-hooks';
@@ -599,17 +599,7 @@ export function GlobalFilters() {
               type="button"
               key={`${item.dimension}:${item.value}`}
               title={`Elimină ${item.label ?? item.value} și nivelurile următoare`}
-              onClick={() =>
-                updateSearch(
-                  {
-                    drill: serializeDrillPath(drillPath.slice(0, index)),
-                    ...(item.dimension === 'store' || item.dimension === 'site_code'
-                      ? { stores: undefined }
-                      : {}),
-                  },
-                  true,
-                )
-              }
+              onClick={() => updateSearch(truncateCrossFilterPatch(search.drill, index), true)}
             >
               <small>{item.dimension}</small>
               <strong>{item.label ?? item.value}</strong>
@@ -619,7 +609,7 @@ export function GlobalFilters() {
           <button
             type="button"
             className="drill-breadcrumb-reset"
-            onClick={() => updateSearch({ drill: undefined, stores: undefined }, true)}
+            onClick={() => updateSearch(resetCrossFilterPatch(search.drill), true)}
           >
             <RotateCcw size={12} /> Reset drill
           </button>

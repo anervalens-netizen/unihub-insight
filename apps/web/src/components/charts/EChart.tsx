@@ -158,8 +158,11 @@ export function EChart({
       resizeObserver.disconnect();
       window.clearTimeout(resizeTimer);
       cancelAnimationFrame(resizeFrame);
-      chart.dispose();
       chartRef.current = null;
+      if (!chart.isDisposed()) {
+        chart.clear();
+        chart.dispose();
+      }
     };
   }, []);
 
@@ -201,7 +204,7 @@ export function EChart({
     if (!chart || chart.isDisposed()) return;
     chart.setOption(designedOption, {
       notMerge: true,
-      lazyUpdate: true,
+      lazyUpdate: false,
       silent: false,
     });
     keyboardIndexRef.current = -1;

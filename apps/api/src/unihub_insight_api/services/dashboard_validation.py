@@ -8,6 +8,7 @@ from unihub_insight_api.domain import (
     ChartKind,
     DashboardCreateRequest,
     DashboardDocument,
+    DashboardVisibility,
     FilterMode,
     ModuleId,
     QueryBatchRequest,
@@ -213,7 +214,7 @@ def required_capabilities(
 def user_can_read(document: DashboardDocument, user: UserContext) -> bool:
     if document.owner_subject != user.subject and Capability.ADMIN not in user.capabilities:
         permission = next((entry.permission for entry in document.acl if entry.subject == user.subject), None)
-        if permission is None:
+        if permission is None and document.visibility is not DashboardVisibility.SHARED:
             return False
     return required_capabilities(document).issubset(user.capabilities)
 

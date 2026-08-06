@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  crossFilterPatch,
+  resetCrossFilterPatch,
+  truncateCrossFilterPatch,
+} from '../src/lib/cross-filter';
+import {
   globalSearchSchema,
   parseComparisons,
   parseDrillPath,
@@ -46,5 +51,51 @@ describe('analytical URL state', () => {
     expect(globalSearchSchema.parse({ range: 3 }).range).toBe('3');
     expect(globalSearchSchema.parse({ range: 6 }).range).toBe('6');
     expect(globalSearchSchema.parse({ range: 12 }).range).toBe('12');
+  });
+
+  it('applies semantic hierarchy and time cross-filters to URL state', () => {
+    const drill = 'firm:U/regional:N/asm:A/store:S/agent:I';
+    expect(crossFilterPatch(drill, { dimensionId: 'rm', value: 'Sud', label: 'Sud' })).toEqual({
+      drill: 'firm:U/regional:Sud:Sud',
+      regional: 'Sud',
+      asm: undefined,
+      stores: undefined,
+      agent: undefined,
+    });
+    expect(
+      crossFilterPatch(undefined, {
+        dimensionId: 'period',
+        value: '2026-07',
+        label: 'Iulie 2026',
+      }),
+    ).toEqual({
+      drill: 'time:2026-07:Iulie%202026',
+      period: '2026-07',
+      range: 'month',
+      start: undefined,
+      end: undefined,
+    });
+    expect(
+      crossFilterPatch(undefined, { dimensionId: 'category', value: 'device', label: 'Device' }),
+    ).toEqual({});
+  });
+
+  it('clears only filters represented by removed drill levels', () => {
+    const drill = 'time:2026-07/firm:U/regional:N/store:S';
+    expect(truncateCrossFilterPatch(drill, 2)).toEqual({
+      drill: 'time:2026-07/firm:U',
+      regional: undefined,
+      stores: undefined,
+    });
+    expect(resetCrossFilterPatch(drill)).toEqual({
+      drill: undefined,
+      period: undefined,
+      range: undefined,
+      start: undefined,
+      end: undefined,
+      firm: undefined,
+      regional: undefined,
+      stores: undefined,
+    });
   });
 });

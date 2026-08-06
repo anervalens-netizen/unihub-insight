@@ -127,3 +127,44 @@ def test_filter_preset_crud_and_optimistic_conflict(client: TestClient) -> None:
     assert updated.json()["version"] == 2
     assert client.put(f"/api/v1/dashboards/presets/{created['id']}", json=update).status_code == 409
     assert client.delete(f"/api/v1/dashboards/presets/{created['id']}").status_code == 204
+
+
+def test_shared_dashboard_is_read_only_visible_without_acl_but_private_remains_hidden() -> None:
+    settings = Settings(
+        environment="test",
+        data_mode="demo",
+        auth_mode="proxy",
+        trusted_proxy_secret="secret",
+    )
+    owner = {
+        "X-UniHub-Proxy-Secret": "secret",
+        "X-Authentik-Uid": "owner",
+        "X-Authentik-Groups": "unihub-manager",
+    }
+    reader = {
+        "X-UniHub-Proxy-Secret": "secret",
+        "X-Authentik-Uid": "reader",
+        "X-Authentik-Groups": "unihub-manager",
+    }
+    with TestClient(create_app(settings)) as client:
+        shared = client.post(
+            "/api/v1/dashboards",
+            json={**PAYLOAD, "name": "Shared", "visibility": "shared"},
+            headers=owner,
+        ).json()
+        private = client.post(
+            "/api/v1/dashboards",
+            json={**PAYLOAD, "name": "Private"},
+            headers=owner,
+        ).json()
+
+        listed = client.get("/api/v1/dashboards", headers=reader).json()["items"]
+        assert [item["id"] for item in listed] == [shared["id"]]
+        assert client.get(f"/api/v1/dashboards/{shared['id']}", headers=reader).status_code == 200
+        assert client.get(f"/api/v1/dashboards/{private['id']}", headers=reader).status_code == 404
+        denied_write = client.put(
+            f"/api/v1/dashboards/{shared['id']}",
+            json={**PAYLOAD, "visibility": "shared", "version": 1},
+            headers=reader,
+        )
+        assert denied_write.status_code == 403

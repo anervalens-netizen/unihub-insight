@@ -34,7 +34,10 @@ export function CustomDashboardPreview({
   onUrlStateReset?: () => void;
 }) {
   const catalogQuery = useQuery(analyticsCatalogQuery());
-  const batchRequest = useMemo(() => dashboardBatchRequest(dashboard, search), [dashboard, search]);
+  const batchRequest = useMemo(
+    () => dashboardBatchRequest(dashboard, search, catalogQuery.data?.metrics ?? []),
+    [catalogQuery.data?.metrics, dashboard, search],
+  );
   const hasWidgets = dashboard.widgets.length > 0;
   const batchQuery = useQuery({
     ...queryBatchOptions(batchRequest, search),

@@ -70,7 +70,7 @@ The API exposes:
 - `GET /api/v1/overview` — one coherent Overview payload;
 - `GET /api/v1/modules/{module}` — contractul nativ al modulului, cu interval finit și metadata explicită;
 - `POST /api/v1/query/batch` — maximum 12 widgeturi pe același snapshot eligibil;
-- `POST /api/v1/query/inspect` și `/query/export.csv` — exact query-ul widgetului și același snapshot;
+- `POST /api/v1/query/inspect`, `/query/export.csv` și `/query/export.xlsx` — exact query-ul widgetului și același snapshot;
 - `GET /api/v1/monthly-review` — raportul lunar istoric;
 - `GET /api/v1/catalog/metrics` — definiții canonice inițiale;
 - `/api/v1/dashboards` — CRUD metadata cu optimistic concurrency;

@@ -13,6 +13,7 @@ from unihub_insight_api.services.monthly_review_contract import (
 KPI_TABLE = (ChartKind.KPI, ChartKind.TABLE)
 TREND = (ChartKind.KPI, ChartKind.LINE, ChartKind.AREA, ChartKind.BAR, ChartKind.TABLE)
 TREND_MIX = (*TREND[:-1], ChartKind.DONUT, ChartKind.TREEMAP, ChartKind.TABLE)
+TEMPORAL_COMPARISONS = ("previous-period", "previous-year", "recent-average")
 
 
 def metric(
@@ -26,6 +27,7 @@ def metric(
     dimensions: tuple[str, ...] = ("firm", "regional", "asm", "store", "agent", "time"),
     grains: tuple[str, ...] = ("day", "month", "year"),
     comparison: str = "previous-period-or-year",
+    comparisons: tuple[str, ...] = TEMPORAL_COMPARISONS,
     missing: str = "covered-empty-is-zero",
     shapes: tuple[ChartKind, ...] = TREND,
     suppressible: bool = False,
@@ -40,6 +42,7 @@ def metric(
         allowed_dimensions=dimensions,
         allowed_grains=grains,
         comparison_policy=comparison,
+        allowed_comparisons=comparisons,
         missing_policy=missing,
         required_capability=capability,
         allowed_shapes=shapes,
@@ -55,6 +58,7 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         "Suma vânzărilor nete de accesorii.",
         MetricUnit.CURRENCY,
         dimensions=("firm", "regional", "asm", "store", "agent", "category", "time"),
+        comparisons=("target", *TEMPORAL_COMPARISONS),
         shapes=TREND_MIX,
     ),
     metric(
@@ -340,6 +344,7 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         MetricUnit.CURRENCY,
         aggregation="sum",
         capability=Capability.MANAGEMENT,
+        comparisons=("target", *TEMPORAL_COMPARISONS),
         shapes=(ChartKind.KPI, ChartKind.LINE, ChartKind.AREA, ChartKind.BAR, ChartKind.SCATTER, ChartKind.TABLE),
     ),
     metric(
@@ -368,6 +373,7 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         MetricUnit.CURRENCY,
         aggregation="sum",
         capability=Capability.MANAGEMENT,
+        comparisons=("forecast", "target", *TEMPORAL_COMPARISONS),
         missing="null-without-covered-actual",
         shapes=(ChartKind.KPI, ChartKind.LINE, ChartKind.BAR, ChartKind.TABLE),
     ),

@@ -37,6 +37,15 @@ ALLOWED_SORT_FIELDS = frozenset(
     {"id", "key", "label", "value", "comparison", "target", "secondary", "tertiary", "progress_pct", "risk"}
 )
 METRICS = {metric.id: metric for metric in METRIC_CATALOG}
+MODULE_ENTITY_DIMENSIONS: dict[ModuleId, str] = {
+    ModuleId.SALES: "store",
+    ModuleId.PERFORMANCE: "store",
+    ModuleId.CAMPAIGNS: "store",
+    ModuleId.WORKFORCE: "agent",
+    ModuleId.COMPENSATION: "firm",
+    ModuleId.FINANCE: "store",
+    ModuleId.PLANNING: "store",
+}
 MODULE_METRICS: dict[ModuleId, frozenset[str]] = {
     ModuleId.SALES: frozenset(
         {"sales.total", "target.progress_pct", "receipts.total", "receipts.average_value", "receipt_2plus_pct"}
@@ -74,7 +83,7 @@ MODULE_SOURCE_DOMAINS: dict[ModuleId, SourceDomain] = {
 
 def required_source_domains(query: WidgetQuery) -> tuple[SourceDomain, ...]:
     primary = MODULE_SOURCE_DOMAINS[query.module]
-    if query.metric_id in {"compensation.sales_ratio", "planning.actual"}:
+    if query.module in {ModuleId.COMPENSATION, ModuleId.PLANNING}:
         return (primary, SourceDomain.SALES)
     return (primary,)
 
@@ -131,6 +140,13 @@ def _metric_for(query: WidgetQuery, user: UserContext) -> MetricDefinition:
     unknown_sort = {item.field for item in query.sort} - ALLOWED_SORT_FIELDS
     if unknown_sort:
         raise QueryValidationFailure(f"Sortări neacceptate: {', '.join(sorted(unknown_sort))}.")
+    unknown_comparisons = {comparison.value for comparison in query.comparisons} - set(metric.allowed_comparisons)
+    if unknown_comparisons:
+        raise QueryValidationFailure(
+            f"Comparații neacceptate pentru metrică: {', '.join(sorted(unknown_comparisons))}."
+        )
+    if query.comparisons and "time" not in query.dimensions:
+        raise QueryValidationFailure("Comparațiile cer dimensiunea time.")
     if any(dimension not in metric.allowed_dimensions for dimension in query.dimensions):
         raise QueryValidationFailure("Combinația metrică × dimensiune nu este permisă.")
     if query.time_grain not in metric.allowed_grains:
@@ -313,7 +329,13 @@ def _dataset(
             y_label = "Y"
         return QueryDataset(
             dimensions=[
-                DatasetDimension(id="id", label="Cheie", kind="string", role="key"),
+                DatasetDimension(
+                    id="id",
+                    label="Cheie",
+                    kind="string",
+                    role="key",
+                    source_dimension=MODULE_ENTITY_DIMENSIONS[query.module],
+                ),
                 DatasetDimension(id="label", label="Entitate", kind="string", role="label"),
                 DatasetDimension(id="x", label=x_label, kind="number"),
                 DatasetDimension(id="y", label=y_label, kind="number", role="metadata"),
@@ -329,8 +351,14 @@ def _dataset(
         ]
         return QueryDataset(
             dimensions=[
-                DatasetDimension(id="x", label="Perioadă", kind="string", role="key"),
-                DatasetDimension(id="y", label="Entitate", kind="string", role="label"),
+                DatasetDimension(id="x", label="Perioadă", kind="string", role="key", source_dimension="time"),
+                DatasetDimension(
+                    id="y",
+                    label="Entitate",
+                    kind="string",
+                    role="label",
+                    source_dimension=MODULE_ENTITY_DIMENSIONS[query.module],
+                ),
                 DatasetDimension(id="value", label=query.metric_id, kind="number"),
                 DatasetDimension(id="label", label="Context", kind="string", role="metadata"),
             ],
@@ -388,7 +416,7 @@ def _dataset(
                 row for row in trend_rows if query.time_range.start <= str(row["key"]) <= query.time_range.end
             ]
         dimensions = [
-            DatasetDimension(id="key", label="Cheie", kind="string", role="key"),
+            DatasetDimension(id="key", label="Cheie", kind="string", role="key", source_dimension="time"),
             DatasetDimension(id="label", label="Perioadă", kind="string", role="label"),
             DatasetDimension(id="value", label=query.metric_id, kind="number"),
         ]
@@ -417,7 +445,13 @@ def _dataset(
     }:
         return QueryDataset(
             dimensions=[
-                DatasetDimension(id="id", label="Cheie", kind="string", role="key"),
+                DatasetDimension(
+                    id="id",
+                    label="Cheie",
+                    kind="string",
+                    role="key",
+                    source_dimension=query.dimensions[0],
+                ),
                 DatasetDimension(id="label", label="Categorie", kind="string", role="label"),
                 DatasetDimension(id="value", label=query.metric_id, kind="number"),
                 DatasetDimension(id="share_pct", label="Pondere", kind="number", role="metadata"),
@@ -451,7 +485,13 @@ def _dataset(
         )
     return QueryDataset(
         dimensions=[
-            DatasetDimension(id="id", label="Cheie", kind="string", role="key"),
+            DatasetDimension(
+                id="id",
+                label="Cheie",
+                kind="string",
+                role="key",
+                source_dimension=MODULE_ENTITY_DIMENSIONS[query.module],
+            ),
             DatasetDimension(id="label", label="Entitate", kind="string", role="label"),
             DatasetDimension(id="context", label="Context", kind="string", role="metadata"),
             DatasetDimension(id="value", label=query.metric_id, kind="number"),

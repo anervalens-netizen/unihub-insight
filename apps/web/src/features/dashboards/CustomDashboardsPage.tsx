@@ -6,7 +6,8 @@ import { useGlobalSearch, useUpdateGlobalSearch } from '../../app/search-hooks';
 import type { DashboardLayoutItem } from '../../components/dashboard/types';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { LoadingState } from '../../components/ui/LoadingState';
-import { currentBusinessMonth, updateDrillPath } from '../../lib/search';
+import { crossFilterPatch, resetCrossFilterPatch } from '../../lib/cross-filter';
+import { currentBusinessMonth } from '../../lib/search';
 import { useIdentity } from '../identity/context';
 import type { Capability } from '../identity/schemas';
 import type { ModuleId } from '../modules/schemas';
@@ -447,20 +448,9 @@ export function CustomDashboardsPage() {
                   resetToken={resetToken}
                   onLayoutChange={canEdit ? applyLayout : () => undefined}
                   onUrlStateChange={(event) => {
-                    updateSearch({
-                      drill: updateDrillPath(search.drill, {
-                        dimension: event.dimensionId,
-                        value: event.value,
-                        label: event.label,
-                      }),
-                      ...(event.dimensionId === 'store' ||
-                      event.dimensionId === 'site_code' ||
-                      event.dimensionId === 'id'
-                        ? { stores: event.value }
-                        : {}),
-                    });
+                    updateSearch(crossFilterPatch(search.drill, event));
                   }}
-                  onUrlStateReset={() => updateSearch({ drill: undefined, stores: undefined })}
+                  onUrlStateReset={() => updateSearch(resetCrossFilterPatch(search.drill))}
                 />
               </>
             ) : canEdit ? (

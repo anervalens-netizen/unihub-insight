@@ -19,6 +19,10 @@ from unihub_insight_api.domain import (
     UserContext,
 )
 from unihub_insight_api.services import ANALYTICS_CATALOG, METRIC_CATALOG
+from unihub_insight_api.services.module_availability import (
+    unavailable_module_response,
+    unavailable_source_domains,
+)
 from unihub_insight_api.services.module_window import apply_module_window
 
 router = APIRouter(prefix="/api/v1", tags=["analytics"])
@@ -79,6 +83,10 @@ async def module_analytics(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Filtrul Agent nu este compatibil cu modulul {module.value}.",
         )
+    snapshot = await repository.resolve_snapshot(scope)
+    unavailable_domains = unavailable_source_domains(module, snapshot)
+    if unavailable_domains:
+        return unavailable_module_response(module, scope, snapshot, unavailable_domains)
     base_task = asyncio.create_task(repository.get_module(module, scope))
     temporal_tasks = {
         comparison: asyncio.create_task(

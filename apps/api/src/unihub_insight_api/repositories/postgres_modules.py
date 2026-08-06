@@ -277,10 +277,17 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         }
         return await dispatch[module](scope)
 
-    async def _meta(self, module: ModuleId, scope: AnalyticsScope, source: str) -> OverviewMeta:
+    async def _meta(
+        self,
+        module: ModuleId,
+        scope: AnalyticsScope,
+        source: str,
+        additional_domains: tuple[SourceDomain, ...] = (),
+    ) -> OverviewMeta:
         snapshot = await self.resolve_snapshot(scope)
         domain = MODULE_SOURCE_DOMAINS[module]
         source_meta = snapshot.sources.get(domain.value)
+        domains = (domain, *additional_domains)
         return OverviewMeta(
             period=scope.period,
             comparison=scope.comparison,
@@ -292,7 +299,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             source=source_meta.source if source_meta else source,
             analytical_snapshot_id=snapshot.id,
             snapshot_contract_version=snapshot.contract_version,
-            sources={domain: source_meta} if source_meta else {},
+            sources={item: metadata for item in domains if (metadata := snapshot.sources.get(item.value)) is not None},
         )
 
     @staticmethod
@@ -1078,7 +1085,12 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         compensation_rows, sales_rows, meta = await asyncio.gather(
             self._compensation_rows(scope),
             self._sales_history(scope, start=shift_month(scope.period, -11), end=scope.period),
-            self._meta(ModuleId.COMPENSATION, scope, "reporting_compensation_month_v1"),
+            self._meta(
+                ModuleId.COMPENSATION,
+                scope,
+                "reporting_compensation_month_v1",
+                (SourceDomain.SALES,),
+            ),
         )
         selected_company = scope.firm or "__ALL__"
         current = [
@@ -1389,7 +1401,17 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                            SUM(scenario.forecast_value)
                                FILTER (WHERE scenario.authority_kind = 'forecast') AS forecast_sales,
                            SUM(scenario.target_value)
-                               FILTER (WHERE scenario.authority_kind = 'target') AS target_value
+                               FILTER (
+                                   WHERE scenario.authority_kind = 'target'
+                                     AND scenario.rule_set_hash ~ '^[0-9a-f]{64}$'
+                               ) AS target_value,
+                           BOOL_OR(
+                               scenario.authority_kind = 'target'
+                               AND (
+                                   scenario.rule_set_hash IS NULL
+                                   OR scenario.rule_set_hash !~ '^[0-9a-f]{64}$'
+                               )
+                           ) AS target_contract_invalid
                     FROM reporting_planning_scenario_v1 scenario
                     WHERE scenario.period BETWEEN $1 AND $2
                       AND {scope_sql}
@@ -1414,11 +1436,17 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
     async def _planning(self, scope: AnalyticsScope) -> ModuleAnalyticsResponse:
         rows, meta = await asyncio.gather(
             self._planning_rows(scope),
-            self._meta(ModuleId.PLANNING, scope, "reporting_planning_scenario_v1"),
+            self._meta(
+                ModuleId.PLANNING,
+                scope,
+                "reporting_planning_scenario_v1",
+                (SourceDomain.SALES,),
+            ),
         )
         current = [row for row in rows if str(row["forecast_month"]) == scope.period]
         forecast = sum((_money(row["forecast_sales"]) for row in current), Decimal(0))
         has_target = any(row["target_value"] is not None for row in current)
+        invalid_target = any(bool(row["target_contract_invalid"]) for row in current)
         target = sum(
             (_money(row["target_value"]) for row in current if row["target_value"] is not None),
             Decimal(0),
@@ -1517,6 +1545,19 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                     description=f"Gap-ul proiectat este {_money(forecast - target)} RON.",
                 )
             )
+        if invalid_target:
+            warning = (
+                "Targetul finalizat nu are rule_set_hash verificabil; valorile Target și gap-ul rămân indisponibile."
+            )
+            alerts.append(
+                InsightAlert(
+                    id="planning-target-unversioned",
+                    severity=AlertSeverity.WARNING,
+                    title="Target neversionat indisponibil",
+                    description=warning,
+                )
+            )
+            meta = meta.model_copy(update={"warnings": (*meta.warnings, warning)})
         kpis: list[KpiMetric] = []
         if current:
             kpis.append(

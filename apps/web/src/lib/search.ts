@@ -47,6 +47,19 @@ export interface DrillPathItem {
   label?: string | null;
 }
 
+const drillDimensionAliases: Readonly<Record<string, string>> = {
+  period: 'time',
+  site_code: 'store',
+  rm: 'regional',
+  company: 'firm',
+};
+
+const drillHierarchy = ['firm', 'regional', 'asm', 'store', 'agent'] as const;
+
+export function normalizeDrillDimension(dimension: string): string {
+  return drillDimensionAliases[dimension] ?? dimension;
+}
+
 export function currentBusinessMonth(now = new Date()): string {
   const formatter = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Europe/Bucharest',
@@ -164,9 +177,22 @@ export function updateDrillPath(
   current: string | undefined,
   next: DrillPathItem,
 ): string | undefined {
-  const items = parseDrillPath(current);
-  const existingIndex = items.findIndex((item) => item.dimension === next.dimension);
-  if (existingIndex >= 0) items[existingIndex] = next;
-  else items.push(next);
+  const normalizedNext = { ...next, dimension: normalizeDrillDimension(next.dimension) };
+  let items = parseDrillPath(current).map((item) => ({
+    ...item,
+    dimension: normalizeDrillDimension(item.dimension),
+  }));
+  const hierarchyIndex = drillHierarchy.indexOf(
+    normalizedNext.dimension as (typeof drillHierarchy)[number],
+  );
+  if (hierarchyIndex >= 0) {
+    items = items.filter((item) => {
+      const itemIndex = drillHierarchy.indexOf(item.dimension as (typeof drillHierarchy)[number]);
+      return itemIndex < 0 || itemIndex < hierarchyIndex;
+    });
+  }
+  const existingIndex = items.findIndex((item) => item.dimension === normalizedNext.dimension);
+  if (existingIndex >= 0) items[existingIndex] = normalizedNext;
+  else items.push(normalizedNext);
   return serializeDrillPath(items);
 }

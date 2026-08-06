@@ -25,6 +25,7 @@ import { EChart, type EChartEvent } from '../../components/charts/EChart';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { formatCurrency, formatInteger, formatPercent } from '../../lib/format';
 import { useModuleData, useModuleUrlStateChange, useModuleUrlStateReset } from './context';
+import { moduleEntityDimension } from './interactions';
 import type { BreakdownRow, ChartKind, ModuleKpi } from './schemas';
 
 const analyticalComparisonLabels: Record<string, string> = {
@@ -248,7 +249,7 @@ export function ModuleTrendWidget() {
   const handlePointEvent = (event: EChartEvent) => {
     const point = event.dataIndex === undefined ? undefined : data.trend[event.dataIndex];
     if (point) {
-      onUrlStateChange?.({ dimensionId: 'period', value: point.key, label: point.label });
+      onUrlStateChange?.({ dimensionId: 'time', value: point.key, label: point.label });
     }
   };
   return (
@@ -277,7 +278,6 @@ export function ModuleTrendWidget() {
 
 export function ModuleDistributionWidget() {
   const data = useModuleData();
-  const onUrlStateChange = useModuleUrlStateChange();
   const onUrlStateReset = useModuleUrlStateReset();
   const choices: Array<'donut' | 'bar'> = data.supported_charts.includes('donut')
     ? ['donut', 'bar']
@@ -322,16 +322,6 @@ export function ModuleDistributionWidget() {
   );
   if (data.distribution.length === 0)
     return <EmptyState message="Nu există distribuție pentru scope-ul curent." />;
-  const handleDistributionEvent = (event: EChartEvent) => {
-    const item = event.dataIndex === undefined ? undefined : data.distribution[event.dataIndex];
-    if (item) {
-      onUrlStateChange?.({
-        dimensionId: `${data.module}.distribution`,
-        value: item.id,
-        label: item.label,
-      });
-    }
-  };
   return (
     <div className="chart-widget">
       <ChartToggle options={choices} value={kind} onChange={setKind} />
@@ -340,8 +330,6 @@ export function ModuleDistributionWidget() {
         className="chart--fill"
         ariaLabel={`Distribuție ${data.title}`}
         pngExport={{ filename: `${data.module}-${data.meta.period}-distribution`, pixelRatio: 2 }}
-        onEvent={handleDistributionEvent}
-        onDoubleEvent={handleDistributionEvent}
         {...(onUrlStateReset ? { onBlankReset: onUrlStateReset } : {})}
       />
     </div>
@@ -404,10 +392,20 @@ export function ModuleMatrixWidget() {
   const handleMatrixEvent = (event: EChartEvent) => {
     const cell = event.dataIndex === undefined ? undefined : data.matrix[event.dataIndex];
     if (cell) {
+      const entity = data.breakdown.find((item) => item.id === cell.y || item.label === cell.y);
+      if (entity) {
+        onUrlStateChange?.({
+          dimensionId: moduleEntityDimension[data.module],
+          value: entity.id,
+          label: entity.label,
+        });
+        return;
+      }
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(cell.x)) return;
       onUrlStateChange?.({
-        dimensionId: `${data.module}.matrix`,
-        value: `${cell.x}|${cell.y}`,
-        label: cell.label ?? `${cell.y} · ${cell.x}`,
+        dimensionId: 'time',
+        value: cell.x,
+        label: cell.x,
       });
     }
   };
@@ -447,7 +445,7 @@ export function ModuleBreakdownWidget() {
                 className="table-sort"
                 onClick={() =>
                   onUrlStateChange?.({
-                    dimensionId: `${data.module}.entity`,
+                    dimensionId: moduleEntityDimension[data.module],
                     value: row.original.id,
                     label: row.original.label,
                   })

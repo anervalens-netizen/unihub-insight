@@ -18,6 +18,7 @@ const metric: MetricDefinition = {
   allowed_dimensions: ['store', 'time'],
   allowed_grains: ['month'],
   comparison_policy: 'previous-year',
+  allowed_comparisons: ['previous-year'],
   missing_policy: 'null',
   required_capability: 'insight:analytics',
   formula_reference: 'retail',
@@ -31,7 +32,7 @@ const metric: MetricDefinition = {
 
 const dataset: QueryDataset = {
   dimensions: [
-    { id: 'id', label: 'Magazin', kind: 'string', role: 'key' },
+    { id: 'id', label: 'Magazin', kind: 'string', role: 'key', source_dimension: 'store' },
     { id: 'label', label: 'Etichetă', kind: 'string', role: 'label' },
     { id: 'value', label: 'Vânzări', kind: 'number', role: 'value' },
   ],
@@ -98,7 +99,7 @@ describe('ChartSpec registry', () => {
     expect(
       chartEventToUrlState(dataset, { data: { id: 'S001', label: 'Magazin 1', value: 1250 } }),
     ).toEqual({
-      dimensionId: 'id',
+      dimensionId: 'store',
       value: 'S001',
       label: 'Magazin 1',
     });

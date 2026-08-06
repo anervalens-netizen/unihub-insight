@@ -34,7 +34,7 @@ The linear forecast is explicitly labeled run-rate; it is not the persisted AI f
 - `target`: the approved target carried by the same analytical row.
 - `forecast`: the approved Planning forecast and only for catalog combinations that expose it; it is never synthesized from a missing authority.
 
-The five tokens may be requested simultaneously where the metric catalog permits them. Each becomes a separate typed dataset dimension/series; one token never overwrites another. Temporal references execute with the same scope and eligible snapshot as the primary query. A source that is missing or `unavailable` is classified before repository fetch and remains unavailable.
+The five tokens may be requested simultaneously only when the metric's versioned `allowed_comparisons` permits them and the query has the `time` dimension. Each becomes a separate typed dataset dimension/series; one token never overwrites another. Unsupported combinations fail per widget instead of returning a silently null or semantically different series. Temporal references execute with the same scope and eligible snapshot as the primary query. A source that is missing or `unavailable` is classified before repository fetch and remains unavailable, including native module routes.
 
 For a wider range, the range bounds the time-series and matrix rows. Current KPI, mix and ranking cards remain explicitly labeled for the selected end period; they are not presented as range aggregates unless their metric contract defines that aggregation.
 
@@ -77,4 +77,4 @@ XLSX/CSV/PNG apply the same capability, scope ceiling, ACL, snapshot and suppres
 
 ## Metric catalog fields
 
-`id`, `version`, display name, description, unit, aggregation, formula reference, allowed dimensions/grains, compatible analytical shapes/`ChartSpec`, comparison policy, missing policy, suppressibility, capability, source authority and effective dates.
+`id`, `version`, display name, description, unit, aggregation, formula reference, allowed dimensions/grains, compatible analytical shapes/`ChartSpec`, comparison policy, `allowed_comparisons`, missing policy, suppressibility, capability, source authority and effective dates.

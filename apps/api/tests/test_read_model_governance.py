@@ -28,6 +28,8 @@ def test_sensitive_modules_read_only_versioned_reporting_contracts() -> None:
     assert "reporting_planning_scenario_v1" in planning
     assert "ai_forecast_runs" not in planning
     assert "target_scenarios" not in planning
+    assert "scenario.rule_set_hash ~ '^[0-9a-f]{64}$'" in planning
+    assert "target_contract_invalid" in planning
 
 
 def test_compensation_rejects_direct_differentiating_scope_and_export() -> None:
@@ -71,3 +73,11 @@ def test_bootstrap_uses_view_only_sensitive_acl_and_audit_is_append_only() -> No
     assert "ai_forecast_runs," not in roles
     assert "GRANT INSERT ON TABLE insight.query_audit" in migration
     assert "GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE insight.query_audit" not in migration
+
+
+def test_widget_xlsx_audit_migration_remains_append_only() -> None:
+    migration = (ROOT / "apps/api/migrations/004_query_audit_xlsx.sql").read_text()
+
+    assert "'export.xlsx'" in migration
+    assert "'export.module.xlsx'" in migration
+    assert "GRANT" not in migration

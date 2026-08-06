@@ -262,6 +262,7 @@ class MetricDefinition(BaseModel):
     allowed_grains: tuple[str, ...]
     comparison_policy: str
     missing_policy: str
+    allowed_comparisons: tuple[str, ...] = ()
     required_capability: Capability = Capability.ANALYTICS
     formula_reference: str = "retail-reporting-contract"
     allowed_shapes: tuple[ChartKind, ...] = (ChartKind.KPI, ChartKind.TABLE)

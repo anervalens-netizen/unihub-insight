@@ -7,19 +7,16 @@ import { DashboardCanvas } from '../../components/dashboard/DashboardCanvas';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { ExcelExportButton } from '../../components/ui/ExcelExportButton';
 import { LoadingState } from '../../components/ui/LoadingState';
+import { crossFilterPatch, resetCrossFilterPatch } from '../../lib/cross-filter';
 import { analyticsSearchParams } from '../../lib/download';
 import { formatDate, formatMonth } from '../../lib/format';
-import {
-  currentBusinessMonth,
-  parseComparisons,
-  rangeBounds,
-  updateDrillPath,
-} from '../../lib/search';
+import { currentBusinessMonth, parseComparisons, rangeBounds } from '../../lib/search';
 import { useIdentity } from '../identity/context';
 import { analyticsCatalogQuery } from '../query/api';
 import type { MetricDefinition, WidgetQuery } from '../query/schemas';
 import { moduleAnalyticsQuery } from './api';
 import { ModuleProvider } from './context';
+import { moduleDistributionDimension, moduleEntityDimension } from './interactions';
 import type { ModuleAnalytics, ModuleId } from './schemas';
 import { type ModuleSubview, moduleSubviewConfig, subviewForId, subviewStatus } from './subviews';
 import { moduleWidgetQuerySpec, moduleWidgets } from './widget-catalog';
@@ -29,23 +26,6 @@ const QueryInspector = lazy(() =>
 );
 
 const businessFilterKeys = ['firm', 'regional', 'asm', 'stores', 'agent'] as const;
-const entityDimension: Record<ModuleId, string> = {
-  sales: 'store',
-  performance: 'store',
-  campaigns: 'store',
-  workforce: 'store',
-  compensation: 'firm',
-  finance: 'store',
-  planning: 'store',
-};
-const distributionDimension: Partial<Record<ModuleId, string>> = {
-  sales: 'category',
-  campaigns: 'category',
-  workforce: 'tenure',
-  compensation: 'firm',
-  finance: 'category',
-};
-
 function nativeWidgetQuery(
   module: ModuleId,
   widgetId: string,
@@ -64,15 +44,15 @@ function nativeWidgetQuery(
     dimensions = ['time'];
   } else if (spec.kind === 'distribution') {
     visualization = 'donut';
-    const dimension = distributionDimension[module];
+    const dimension = moduleDistributionDimension[module];
     if (!dimension) return null;
     dimensions = [dimension];
   } else if (spec.kind === 'matrix') {
     visualization = 'heatmap';
-    dimensions = [entityDimension[module], 'time'];
+    dimensions = [moduleEntityDimension[module], 'time'];
   } else {
     visualization = 'table';
-    dimensions = [entityDimension[module]];
+    dimensions = [moduleEntityDimension[module]];
   }
   if (
     !metric.allowed_shapes.includes(visualization) ||
@@ -261,22 +241,13 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
   const inspectedQuery = inspectWidget ? widgetQueries.get(inspectWidget) : undefined;
   const inspectedMetric = inspectedQuery ? catalogMetrics.get(inspectedQuery.metric_id) : undefined;
   const handleUrlState = (event: { dimensionId: string; value: string; label: string | null }) => {
-    updateSearch({
-      drill: updateDrillPath(search.drill, {
-        dimension: event.dimensionId,
-        value: event.value,
-        label: event.label,
-      }),
-      ...(event.dimensionId === 'store' || event.dimensionId === 'site_code'
-        ? { stores: event.value }
-        : {}),
-    });
+    updateSearch(crossFilterPatch(search.drill, event));
   };
   return (
     <ModuleProvider
       data={data}
       onUrlStateChange={handleUrlState}
-      onUrlStateReset={() => updateSearch({ drill: undefined, stores: undefined })}
+      onUrlStateReset={() => updateSearch(resetCrossFilterPatch(search.drill))}
     >
       <SubviewNavigation
         views={views}

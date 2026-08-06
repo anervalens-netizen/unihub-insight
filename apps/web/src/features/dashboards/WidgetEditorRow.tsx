@@ -20,6 +20,10 @@ const comparisonOptions = [
   ['recent-average', 'Media recentă'],
 ] as const;
 
+function metricAllowsComparison(metric: MetricDefinition | undefined, comparison: string): boolean {
+  return metric?.allowed_comparisons.some((allowed) => allowed === comparison) ?? false;
+}
+
 export function WidgetEditorRow({
   widget,
   availableModules,
@@ -43,10 +47,17 @@ export function WidgetEditorRow({
   const availableGrains = metric?.allowed_grains ?? ['month'];
   const availableVisualizations = metric?.allowed_shapes ?? ['table'];
   const selectedDimensions = dashboardWidgetDimensions(widget);
+  const allowedComparisons: ReadonlySet<string> = new Set(metric?.allowed_comparisons ?? []);
+  const availableComparisonOptions = selectedDimensions.includes('time')
+    ? comparisonOptions.filter(([value]) => allowedComparisons.has(value))
+    : [];
 
   const dimensionPatch = (dimensions: string[]): Partial<DashboardWidget> => ({
     dimensions,
     dimension: dimensions[0] ?? null,
+    comparisons: dimensions.includes('time')
+      ? widget.comparisons.filter((comparison) => allowedComparisons.has(comparison))
+      : [],
   });
 
   return (
@@ -85,6 +96,9 @@ export function WidgetEditorRow({
               time_grain: nextMetric?.allowed_grains.includes(widget.time_grain)
                 ? widget.time_grain
                 : (nextMetric?.allowed_grains[0] ?? 'month'),
+              comparisons: widget.comparisons.filter((comparison) =>
+                metricAllowsComparison(nextMetric, comparison),
+              ),
               filters,
             });
           }}
@@ -136,7 +150,7 @@ export function WidgetEditorRow({
             })
           }
         >
-          {comparisonOptions.map(([value, label]) => (
+          {availableComparisonOptions.map(([value, label]) => (
             <option key={value} value={value}>
               {label}
             </option>
@@ -193,6 +207,11 @@ export function WidgetEditorRow({
               time_grain: nextMetric.allowed_grains.includes(widget.time_grain)
                 ? widget.time_grain
                 : (nextMetric.allowed_grains[0] ?? 'month'),
+              comparisons: dimensions.includes('time')
+                ? widget.comparisons.filter((comparison) =>
+                    metricAllowsComparison(nextMetric, comparison),
+                  )
+                : [],
             });
           }}
         >

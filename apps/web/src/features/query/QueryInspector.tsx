@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Download, LoaderCircle, X } from 'lucide-react';
+import { Download, FileSpreadsheet, LoaderCircle, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -8,6 +8,7 @@ import {
   buildExportRequest,
   buildInspectRequest,
   exportQueryCsv,
+  exportQueryXlsx,
   inspectQueryOptions,
 } from './api';
 import type {
@@ -74,16 +75,18 @@ export function QueryInspector({
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLElement>(null);
-  const [exporting, setExporting] = useState(false);
+  const [exporting, setExporting] = useState<'csv' | 'xlsx' | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const pageSize = 100;
   const request = useMemo(
-    () => buildInspectRequest(snapshotId, dashboardId, result.query),
-    [dashboardId, result.query, snapshotId],
+    () => buildInspectRequest(snapshotId, dashboardId, result.query, page, pageSize),
+    [dashboardId, page, result.query, snapshotId],
   );
   const inspectQuery = useMemo(() => inspectQueryOptions(request, search, true), [request, search]);
   const inspection = useQuery(inspectQuery);
   const sources = inspection.data
-    ? Object.values(inspection.data.snapshot.sources)
+    ? Object.values(inspection.data.meta.sources)
     : result.meta?.source
       ? [result.meta.source]
       : [];
@@ -126,17 +129,18 @@ export function QueryInspector({
     };
   }, [onClose]);
 
-  const exportCsv = (): void => {
-    setExporting(true);
+  const exportDataset = (format: 'csv' | 'xlsx'): void => {
+    setExporting(format);
     setExportError(null);
-    void exportQueryCsv(buildExportRequest(snapshotId, dashboardId, result.query), search)
+    const exporter = format === 'csv' ? exportQueryCsv : exportQueryXlsx;
+    void exporter(buildExportRequest(snapshotId, dashboardId, result.query), search)
       .then(({ blob, filename }) => {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
         link.download = filenameFromDisposition(
           filename,
-          `${result.widget_id}-${search.period}.csv`,
+          `${result.widget_id}-${search.period}.${format}`,
         );
         link.click();
         window.setTimeout(() => URL.revokeObjectURL(url), 0);
@@ -144,7 +148,7 @@ export function QueryInspector({
       .catch((error: unknown) =>
         setExportError(error instanceof Error ? error.message : 'Exportul a eșuat.'),
       )
-      .finally(() => setExporting(false));
+      .finally(() => setExporting(null));
   };
 
   return createPortal(
@@ -171,11 +175,28 @@ export function QueryInspector({
             <button
               type="button"
               className="button button--secondary"
-              disabled={exporting}
-              onClick={exportCsv}
+              disabled={exporting !== null}
+              onClick={() => exportDataset('csv')}
             >
-              {exporting ? <LoaderCircle className="spin" size={15} /> : <Download size={15} />}
+              {exporting === 'csv' ? (
+                <LoaderCircle className="spin" size={15} />
+              ) : (
+                <Download size={15} />
+              )}
               CSV server-side
+            </button>
+            <button
+              type="button"
+              className="button button--secondary"
+              disabled={exporting !== null}
+              onClick={() => exportDataset('xlsx')}
+            >
+              {exporting === 'xlsx' ? (
+                <LoaderCircle className="spin" size={15} />
+              ) : (
+                <FileSpreadsheet size={15} />
+              )}
+              XLSX server-side
             </button>
             <button type="button" className="icon-button" aria-label="Închide" onClick={onClose}>
               <X size={17} />
@@ -220,7 +241,31 @@ export function QueryInspector({
           {inspection.data ? (
             <>
               <div className="query-inspect-summary">
-                {inspection.data.total_rows} rânduri · pagina {inspection.data.page}
+                <span>
+                  {inspection.data.total_rows} rânduri · pagina {inspection.data.page} /{' '}
+                  {Math.max(1, Math.ceil(inspection.data.total_rows / inspection.data.page_size))}
+                </span>
+                <div>
+                  <button
+                    type="button"
+                    className="button button--ghost"
+                    disabled={inspection.data.page <= 1 || inspection.isFetching}
+                    onClick={() => setPage((value) => Math.max(1, value - 1))}
+                  >
+                    Anterior
+                  </button>
+                  <button
+                    type="button"
+                    className="button button--ghost"
+                    disabled={
+                      inspection.data.page * inspection.data.page_size >=
+                        inspection.data.total_rows || inspection.isFetching
+                    }
+                    onClick={() => setPage((value) => value + 1)}
+                  >
+                    Următor
+                  </button>
+                </div>
               </div>
               <DatasetTable dataset={inspection.data.dataset} />
             </>

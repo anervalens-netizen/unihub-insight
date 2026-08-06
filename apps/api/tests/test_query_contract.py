@@ -1,3 +1,6 @@
+from io import BytesIO
+from zipfile import ZipFile
+
 from fastapi.testclient import TestClient
 
 from unihub_insight_api.api.routes.query import _safe_csv_value
@@ -11,16 +14,17 @@ def widget(
     visualization: str = "line",
     dimensions: list[str] | None = None,
 ) -> dict[str, object]:
+    resolved_dimensions = dimensions if dimensions is not None else ["time"]
     return {
         "widget_id": widget_id,
         "module": module,
         "metric_id": metric_id,
         "metric_version": 1,
         "query_contract_version": 1,
-        "dimensions": dimensions or ["time"],
+        "dimensions": resolved_dimensions,
         "time_grain": "month",
         "filters": {},
-        "comparisons": ["previous-year", "target"],
+        "comparisons": ["previous-year"] if "time" in resolved_dimensions else [],
         "sort": [],
         "limit": 30,
         "visualization": visualization,
@@ -119,6 +123,40 @@ def test_trend_returns_all_requested_comparisons_in_one_dataset(client: TestClie
         row["previous_period"] is not None and row["previous_year"] is not None and row["recent_average"] is not None
         for row in result["dataset"]["rows"]
     )
+
+
+def test_metric_comparison_allowlist_rejects_semantically_empty_forecast(client: TestClient) -> None:
+    query = widget("sales-forecast")
+    query["comparisons"] = ["forecast"]
+    response = client.post(
+        "/api/v1/query/batch",
+        params={"period": "2026-08"},
+        json={"widgets": [query]},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["results"][0]["error"]["code"] == "invalid-query"
+
+
+def test_planning_actual_exposes_only_its_approved_forecast_comparison(client: TestClient) -> None:
+    query = widget(
+        "planning-actual-forecast",
+        module="planning",
+        metric_id="planning.actual",
+        visualization="line",
+    )
+    query["comparisons"] = ["forecast"]
+    response = client.post(
+        "/api/v1/query/batch",
+        params={"period": "2026-08"},
+        json={"widgets": [query]},
+    )
+
+    assert response.status_code == 200
+    result = response.json()["results"][0]
+    assert result["error"] is None
+    assert any(dimension["id"] == "forecast" for dimension in result["dataset"]["dimensions"])
+    assert any(row["forecast"] is not None for row in result["dataset"]["rows"])
 
 
 def test_waterfall_dataset_carries_reconciliation_roles(client: TestClient) -> None:
@@ -266,8 +304,8 @@ def test_cross_domain_metrics_publish_all_source_provenance(client: TestClient) 
         module="compensation",
         metric_id="compensation.sales_ratio",
         visualization="kpi",
+        dimensions=[],
     )
-    query["dimensions"] = []
     response = client.post(
         "/api/v1/query/batch",
         params={"period": "2026-08"},
@@ -277,6 +315,20 @@ def test_cross_domain_metrics_publish_all_source_provenance(client: TestClient) 
     assert response.status_code == 200
     meta = response.json()["results"][0]["meta"]
     assert set(meta["sources"]) == {"compensation", "sales"}
+
+    planning_query = widget(
+        "planning-forecast",
+        module="planning",
+        metric_id="planning.forecast",
+        visualization="kpi",
+        dimensions=[],
+    )
+    planning = client.post(
+        "/api/v1/query/batch",
+        params={"period": "2026-08"},
+        json={"widgets": [planning_query]},
+    ).json()["results"][0]
+    assert set(planning["meta"]["sources"]) == {"planning", "sales"}
 
 
 def test_csv_export_reuses_snapshot_carries_metadata_and_is_audited(client: TestClient) -> None:
@@ -304,7 +356,39 @@ def test_csv_export_reuses_snapshot_carries_metadata_and_is_audited(client: Test
     assert batch["snapshot"]["id"] in content
     store = client.app.state.dashboard_store
     assert store._query_audit[-1]["action"] == "export.csv"
-    assert store._query_audit[-1]["row_count"] <= 5
+    assert store._query_audit[-1]["row_count"] == len(batch["results"][0]["dataset"]["rows"])
+
+
+def test_xlsx_export_reuses_snapshot_carries_metadata_and_is_audited(client: TestClient) -> None:
+    batch = client.post(
+        "/api/v1/query/batch",
+        params={"period": "2026-08"},
+        json={"widgets": [widget("sales-table", visualization="table", dimensions=["store"])]},
+    ).json()
+    response = client.post(
+        "/api/v1/query/export.xlsx",
+        params={"period": "2026-08"},
+        json={
+            "snapshot_id": batch["snapshot"]["id"],
+            "query": batch["results"][0]["query"],
+            "page": 1,
+            "page_size": 5,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "private, no-store"
+    assert "unihub-insight-sales-table-2026-08.xlsx" in response.headers["content-disposition"]
+    with ZipFile(BytesIO(response.content)) as workbook:
+        names = set(workbook.namelist())
+        assert "xl/worksheets/sheet1.xml" in names
+        assert "xl/worksheets/sheet2.xml" in names
+        xml = b"".join(workbook.read(name) for name in names if name.endswith(".xml"))
+        assert batch["snapshot"]["id"].encode() in xml
+        assert b"sales.total" in xml
+    store = client.app.state.dashboard_store
+    assert store._query_audit[-1]["action"] == "export.xlsx"
+    assert store._query_audit[-1]["row_count"] == len(batch["results"][0]["dataset"]["rows"])
 
 
 def test_csv_formula_injection_is_neutralized() -> None:

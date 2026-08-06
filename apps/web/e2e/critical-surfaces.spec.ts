@@ -240,7 +240,7 @@ test('native chart supports keyboard drill and reset', async ({ page }) => {
   await chart.focus();
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/(?:\?|&)drill=period%3A/);
+  await expect(page).toHaveURL(/(?:\?|&)drill=time%3A/);
   await chart.focus();
   await page.keyboard.press('Escape');
   await expect(page).not.toHaveURL(/(?:\?|&)drill=/);
@@ -360,7 +360,7 @@ test('custom dashboard blank, widget duplication, versioning and clone lifecycle
     .locator('.widget-editor-card')
     .first()
     .getByRole('listbox', { name: 'Comparații' })
-    .selectOption(['target', 'previous-year']);
+    .selectOption(['previous-year']);
   await page.getByRole('button', { name: 'Salvează configurația' }).click();
   await expect(page.locator('.save-message')).toContainText('Dashboard salvat');
   await expect(page.locator('.dashboard-version-picker select')).toHaveValue('2');
@@ -408,6 +408,9 @@ test('custom dashboard template executes batch and exports inspected rows', asyn
   const csv = page.waitForEvent('download');
   await dialog.getByRole('button', { name: 'CSV' }).click();
   await expect((await csv).suggestedFilename()).toMatch(/\.csv$/);
+  const xlsx = page.waitForEvent('download');
+  await dialog.getByRole('button', { name: 'XLSX' }).click();
+  await expect((await xlsx).suggestedFilename()).toMatch(/\.xlsx$/);
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
   await expect(inspect).toBeFocused();
@@ -552,7 +555,6 @@ test('canvas POC bounds 10 widgets, heatmap 100x36, scatter 5000 and repeated na
   const orderedFrameGaps = [...resizeMeasurement.maxFrameGaps].sort((left, right) => left - right);
   const resizeP95 =
     orderedFrameGaps[Math.ceil(orderedFrameGaps.length * 0.95) - 1] ?? Number.POSITIVE_INFINITY;
-  await page.unrouteAll({ behavior: 'wait' });
   await cdp.send('HeapProfiler.collectGarbage');
   const memoryBefore = await page.evaluate(
     () =>
@@ -596,6 +598,7 @@ test('canvas POC bounds 10 widgets, heatmap 100x36, scatter 5000 and repeated na
   if (memoryBefore && memoryAfter)
     expect(memoryAfter - memoryBefore).toBeLessThan(64 * 1024 * 1024);
 
+  await page.unrouteAll({ behavior: 'wait' });
   await page.getByRole('button', { name: 'Configurare' }).click();
   page.once('dialog', (confirmation) => confirmation.accept());
   await page.getByRole('button', { name: 'Șterge dashboard' }).click();
