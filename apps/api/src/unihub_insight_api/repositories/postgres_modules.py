@@ -339,6 +339,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         alerts: list[InsightAlert],
         visits: ModuleAnalyticsSlice | None = None,
         campaigns: dict[str, ModuleAnalyticsSlice] | None = None,
+        portfolio: dict[str, ModuleAnalyticsSlice] | None = None,
     ) -> ModuleAnalyticsResponse:
         title, description, capability, axes, charts = MODULE_DEFINITIONS[module]
         return ModuleAnalyticsResponse(
@@ -358,6 +359,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             alerts=alerts,
             visits=visits,
             campaigns=campaigns or {},
+            portfolio=portfolio or {},
         )
 
     async def _sales_history(
@@ -438,6 +440,284 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                 """,
                 *params,
             )
+
+    async def _portfolio_category_rows(
+        self,
+        scope: AnalyticsScope,
+        *,
+        dimension: str,
+    ) -> Sequence[asyncpg.Record]:
+        if dimension not in {"category", "subcategory"}:
+            raise ValueError(f"Unsupported category portfolio dimension: {dimension}")
+
+        params: list[Any] = [scope.period]
+        clauses = ["agg.import_month = $1"]
+        clauses.extend(append_reporting_scope(scope, alias="agg", params=params))
+        if dimension == "category":
+            identifier = "agg.category"
+            label = "agg.category"
+            context = "'Categorie'"
+            grouping = "agg.category"
+        else:
+            identifier = "CONCAT(agg.category, ':', agg.subcategory)"
+            label = "agg.subcategory"
+            context = "agg.category"
+            grouping = "agg.category, agg.subcategory"
+        async with self.pool.acquire() as connection:
+            return await connection.fetch(
+                f"""
+                SELECT
+                    {identifier} AS id,
+                    {label} AS label,
+                    {context} AS context,
+                    SUM(agg.total_sales) AS total_sales,
+                    SUM(agg.total_quantity)::BIGINT AS net_quantity,
+                    NULL::BIGINT AS return_quantity,
+                    NULL::BIGINT AS receipt_count,
+                    1::INT AS label_variants,
+                    1::INT AS attribute_variants
+                FROM reporting_category_month agg
+                WHERE {" AND ".join(clauses)}
+                GROUP BY {grouping}
+                ORDER BY ABS(SUM(agg.total_sales)) DESC, id
+                LIMIT 5000
+                """,
+                *params,
+            )
+
+    async def _portfolio_item_rows(
+        self,
+        scope: AnalyticsScope,
+        *,
+        dimension: str,
+    ) -> Sequence[asyncpg.Record]:
+        if dimension not in {"brand", "product"}:
+            raise ValueError(f"Unsupported item portfolio dimension: {dimension}")
+
+        params: list[Any] = [scope.period]
+        clauses = ["item.import_month = $1"]
+        clauses.extend(append_reporting_scope(scope, alias="item", params=params))
+        if dimension == "brand":
+            identifier = "COALESCE(scoped.brand, 'Necunoscut')"
+            label = "COALESCE(scoped.brand, 'Necunoscut')"
+            context = "'Brand real din Monthly Review'"
+            grouping = "COALESCE(scoped.brand, 'Necunoscut')"
+        else:
+            identifier = "scoped.item_code"
+            label = "MAX(scoped.item_name)"
+            context = "CONCAT('SKU ', scoped.item_code, ' · ', COALESCE(MAX(scoped.brand), 'Necunoscut'), ' · ', COALESCE(MAX(scoped.category), 'Necategorizat'))"
+            grouping = "scoped.item_code"
+        async with self.pool.acquire() as connection:
+            return await connection.fetch(
+                f"""
+                WITH attributes AS (
+                    SELECT
+                        supplement.import_month,
+                        supplement.site_code,
+                        supplement.agent,
+                        supplement.item_code,
+                        MAX(NULLIF(BTRIM(supplement.brand), '')) AS brand,
+                        MAX(NULLIF(BTRIM(supplement.category), '')) AS category
+                    FROM insight.monthly_review_item_month supplement
+                    WHERE supplement.import_month = $1
+                    GROUP BY supplement.import_month, supplement.site_code, supplement.agent, supplement.item_code
+                ), scoped AS (
+                    SELECT
+                        item.import_month,
+                        item.site_code,
+                        item.agent,
+                        item.item_code,
+                        MAX(item.item_name) AS item_name,
+                        SUM(item.total_sales) AS total_sales,
+                        SUM(item.net_quantity)::BIGINT AS net_quantity,
+                        SUM(item.return_quantity)::BIGINT AS return_quantity,
+                        SUM(item.receipt_count)::BIGINT AS receipt_count,
+                        MAX(attributes.brand) AS brand,
+                        MAX(attributes.category) AS category
+                    FROM reporting_item_month item
+                    LEFT JOIN attributes
+                        ON attributes.import_month = item.import_month
+                       AND attributes.site_code IS NOT DISTINCT FROM item.site_code
+                       AND attributes.agent IS NOT DISTINCT FROM item.agent
+                       AND attributes.item_code = item.item_code
+                    WHERE {" AND ".join(clauses)}
+                    GROUP BY item.import_month, item.site_code, item.agent, item.item_code
+                )
+                SELECT
+                    {identifier} AS id,
+                    {label} AS label,
+                    {context} AS context,
+                    SUM(scoped.total_sales) AS total_sales,
+                    SUM(scoped.net_quantity)::BIGINT AS net_quantity,
+                    SUM(scoped.return_quantity)::BIGINT AS return_quantity,
+                    SUM(scoped.receipt_count)::BIGINT AS receipt_count,
+                    COUNT(DISTINCT scoped.item_name)::INT AS label_variants,
+                    COUNT(DISTINCT CONCAT(COALESCE(scoped.brand, ''), '|', COALESCE(scoped.category, '')))::INT
+                        AS attribute_variants
+                FROM scoped
+                GROUP BY {grouping}
+                ORDER BY ABS(SUM(scoped.total_sales)) DESC, id
+                LIMIT 5000
+                """,
+                *params,
+            )
+
+    @staticmethod
+    def _portfolio_number(row: Any, key: str) -> Decimal:
+        value = row[key]
+        return Decimal(str(value)) if value is not None else Decimal(0)
+
+    @classmethod
+    def _portfolio_slice(
+        cls,
+        *,
+        dimension: str,
+        rows: Sequence[Any],
+        item_detail: bool,
+        include_receipt_incidence: bool = False,
+    ) -> ModuleAnalyticsSlice:
+        total_sales = sum((cls._portfolio_number(row, "total_sales") for row in rows), Decimal(0))
+        total_quantity = sum((cls._portfolio_number(row, "net_quantity") for row in rows), Decimal(0))
+        total_returns = sum((cls._portfolio_number(row, "return_quantity") for row in rows), Decimal(0))
+        total_receipts = sum((cls._portfolio_number(row, "receipt_count") for row in rows), Decimal(0))
+        positive_sales = sum(
+            (
+                cls._portfolio_number(row, "total_sales")
+                for row in rows
+                if cls._portfolio_number(row, "total_sales") > 0
+            ),
+            Decimal(0),
+        )
+        distribution = [
+            DimensionShare(
+                id=str(row["id"]),
+                label=str(row["label"]),
+                value=_money(cls._portfolio_number(row, "total_sales")),
+                share_pct=_percent(cls._portfolio_number(row, "total_sales") * Decimal("100") / positive_sales),
+            )
+            for row in rows
+            if cls._portfolio_number(row, "total_sales") > 0 and positive_sales > 0
+        ]
+        breakdown = [
+            BreakdownRow(
+                id=str(row["id"]),
+                label=str(row["label"]),
+                context=str(row["context"]),
+                primary=_money(cls._portfolio_number(row, "total_sales")),
+                secondary=cls._portfolio_number(row, "net_quantity"),
+                tertiary=cls._portfolio_number(row, "return_quantity") if item_detail else None,
+                quaternary=cls._portfolio_number(row, "receipt_count") if include_receipt_incidence else None,
+                risk=RiskLevel.HEALTHY,
+            )
+            for row in rows
+        ]
+        kpis = [
+            KpiMetric(
+                id="sales.portfolio_sales",
+                label="Vânzări nete",
+                value=_money(total_sales),
+                unit=MetricUnit.CURRENCY,
+            ),
+            KpiMetric(
+                id="sales.portfolio_net_quantity",
+                label="Cantitate netă",
+                value=total_quantity,
+                unit=MetricUnit.INTEGER,
+            ),
+        ]
+        axes = [
+            ValueAxis(key="primary", label="Vânzări nete", unit=MetricUnit.CURRENCY),
+            ValueAxis(key="secondary", label="Cantitate netă", unit=MetricUnit.INTEGER),
+        ]
+        if item_detail:
+            kpis.append(
+                KpiMetric(
+                    id="sales.portfolio_return_quantity",
+                    label="Cantitate retur semnată",
+                    value=total_returns,
+                    unit=MetricUnit.INTEGER,
+                )
+            )
+            axes.append(ValueAxis(key="tertiary", label="Cantitate retur semnată", unit=MetricUnit.INTEGER))
+        if include_receipt_incidence:
+            kpis.append(
+                KpiMetric(
+                    id="sales.portfolio_receipt_incidence",
+                    label="Incidențe SKU în bonuri",
+                    value=total_receipts,
+                    unit=MetricUnit.INTEGER,
+                )
+            )
+            axes.append(ValueAxis(key="quaternary", label="Incidențe SKU în bonuri", unit=MetricUnit.INTEGER))
+        alerts: list[InsightAlert] = []
+        non_positive = sum(1 for row in rows if cls._portfolio_number(row, "total_sales") <= 0)
+        if non_positive:
+            alerts.append(
+                InsightAlert(
+                    id=f"portfolio-{dimension}-non-positive-sales",
+                    severity=AlertSeverity.INFO,
+                    title="Rânduri return-only păstrate în tabel",
+                    description=(
+                        "Ponderea graficului este calculată numai din vânzări nete pozitive; "
+                        "rândurile cu vânzări zero sau negative rămân în tabel și în totalul metricii."
+                    ),
+                )
+            )
+        if dimension == "product":
+            conflicts = sum(
+                1
+                for row in rows
+                if cls._portfolio_number(row, "label_variants") > 1
+                or cls._portfolio_number(row, "attribute_variants") > 1
+            )
+            if conflicts:
+                alerts.append(
+                    InsightAlert(
+                        id="portfolio-product-identity-conflict",
+                        severity=AlertSeverity.INFO,
+                        title="SKU cu denumiri sau atribute multiple",
+                        description=(
+                            f"{conflicts} SKU au variante în sursă; identitatea și totalurile rămân consolidate pe item_code, "
+                            "iar eticheta/contextul folosesc MAX stabil."
+                        ),
+                    )
+                )
+        supported_charts = (
+            (ChartKind.KPI, ChartKind.TABLE)
+            if dimension == "product"
+            else (ChartKind.KPI, ChartKind.BAR, ChartKind.DONUT, ChartKind.TREEMAP, ChartKind.TABLE)
+        )
+        return ModuleAnalyticsSlice(
+            axes=tuple(axes),
+            supported_charts=supported_charts,
+            kpis=kpis,
+            trend=[],
+            distribution=distribution,
+            breakdown=breakdown,
+            matrix=[],
+            alerts=alerts,
+            entity_dimension=dimension,
+            distribution_dimension=dimension,
+        )
+
+    async def _sales_portfolio(self, scope: AnalyticsScope) -> dict[str, ModuleAnalyticsSlice]:
+        category_rows, subcategory_rows, brand_rows, product_rows = await asyncio.gather(
+            self._portfolio_category_rows(scope, dimension="category"),
+            self._portfolio_category_rows(scope, dimension="subcategory"),
+            self._portfolio_item_rows(scope, dimension="brand"),
+            self._portfolio_item_rows(scope, dimension="product"),
+        )
+        return {
+            "category": self._portfolio_slice(dimension="category", rows=category_rows, item_detail=False),
+            "subcategory": self._portfolio_slice(dimension="subcategory", rows=subcategory_rows, item_detail=False),
+            "brand": self._portfolio_slice(dimension="brand", rows=brand_rows, item_detail=True),
+            "product": self._portfolio_slice(
+                dimension="product",
+                rows=product_rows,
+                item_detail=True,
+                include_receipt_incidence=True,
+            ),
+        }
 
     async def _sales_calendar(self, scope: AnalyticsScope) -> list[CalendarCell]:
         params: list[Any] = [scope.period]
@@ -530,11 +810,12 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
 
     async def _sales(self, scope: AnalyticsScope) -> ModuleAnalyticsResponse:
         start = shift_month(scope.period, -23)
-        history, categories, calendar_rows, meta = await asyncio.gather(
+        history, categories, calendar_rows, meta, portfolio = await asyncio.gather(
             self._sales_history(scope, start=start, end=scope.period),
             self._category_distribution(scope),
             self._sales_calendar(scope),
             self._meta(ModuleId.SALES, scope, "reporting_agent_month/reporting_category_month"),
+            self._sales_portfolio(scope),
         )
         current = [row for row in history if str(row["import_month"]) == scope.period]
         total_sales = sum((_money(row["total_sales"]) for row in current), Decimal(0))
@@ -643,6 +924,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             matrix=self._store_matrix(history, matrix_periods),
             calendar=calendar_rows,
             alerts=alerts,
+            portfolio=portfolio,
         )
 
     async def _visit_rows(

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 import inspect
+from collections.abc import Sequence
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-from unihub_insight_api.domain import AnalyticsScope, ReviewStatus
+from unihub_insight_api.domain import AnalyticsScope, DataMode, OverviewMeta, ReviewStatus
 from unihub_insight_api.main import create_app
 from unihub_insight_api.repositories.monthly_review import (
     Aggregate,
@@ -15,6 +18,7 @@ from unihub_insight_api.repositories.monthly_review import (
     score_entity,
 )
 from unihub_insight_api.repositories.monthly_review_reporting import (
+    MAX_PRODUCT_CANDIDATES,
     MAX_REVIEW_PERIODS,
     ReportingMonthlyReviewRepository,
     validate_review_periods,
@@ -95,10 +99,12 @@ def test_active_repository_uses_reporting_models_not_raw_transactions() -> None:
         ReportingMonthlyReviewRepository._review_store_rows,
         ReportingMonthlyReviewRepository._review_agent_rows,
         ReportingMonthlyReviewRepository._review_product_rows,
+        ReportingMonthlyReviewRepository._review_category_rows,
     )
     source = "\n".join(inspect.getsource(method) for method in methods)
     assert "FROM reporting_agent_month" in source
     assert "FROM reporting_item_month" in source
+    assert "FROM reporting_category_month" in source
     assert "insight.monthly_review_item_month" in source
     assert "sales_transactions" not in source
 
@@ -144,3 +150,83 @@ def test_reporting_scope_contract_remains_store_dominant() -> None:
     assert "site_code = ANY" in sql
     assert ".firma" not in sql
     assert ".regional" not in sql
+
+
+def test_category_sales_use_the_complete_reporting_universe_not_bounded_products() -> None:
+    class ReviewRepository(ReportingMonthlyReviewRepository):
+        async def _review_store_rows(self, scope: AnalyticsScope, periods: Sequence[str]) -> Sequence[Any]:
+            return [
+                {
+                    "import_month": scope.period,
+                    "site_code": "S001",
+                    "locatie": "Magazin test",
+                    "firma": "MOBIUP",
+                    "regional": "Sud",
+                    "asm": "A",
+                    "sales": Decimal(MAX_PRODUCT_CANDIDATES + 1),
+                    "units": Decimal(MAX_PRODUCT_CANDIDATES + 1),
+                }
+            ]
+
+        async def _review_agent_rows(self, scope: AnalyticsScope, periods: Sequence[str]) -> Sequence[Any]:
+            return []
+
+        async def _review_product_rows(self, scope: AnalyticsScope, periods: Sequence[str]) -> Sequence[Any]:
+            return [
+                {
+                    "import_month": scope.period,
+                    "item_code": f"SKU-{index:03d}",
+                    "item_name": f"SKU {index}",
+                    "brand": "Brand",
+                    "category": "Categorie A" if index < MAX_PRODUCT_CANDIDATES else "Categorie B",
+                    "sales": Decimal(1),
+                    "units": Decimal(1),
+                    "distribution": 1,
+                }
+                for index in range(MAX_PRODUCT_CANDIDATES + 1)
+            ]
+
+        async def _review_category_rows(self, scope: AnalyticsScope, periods: Sequence[str]) -> Sequence[Any]:
+            return [
+                {
+                    "import_month": scope.period,
+                    "category": "Categorie A",
+                    "sales": Decimal(MAX_PRODUCT_CANDIDATES),
+                    "units": Decimal(MAX_PRODUCT_CANDIDATES),
+                },
+                {
+                    "import_month": scope.period,
+                    "category": "Categorie B",
+                    "sales": Decimal(1),
+                    "units": Decimal(1),
+                },
+            ]
+
+        async def _meta_for_review(self, scope: AnalyticsScope) -> OverviewMeta:
+            return OverviewMeta(
+                period=scope.period,
+                comparison=scope.comparison,
+                as_of=None,
+                is_final=True,
+                data_mode=DataMode.POSTGRES,
+                scope_label="Toată rețeaua",
+                generated_at="2026-06-30T00:00:00Z",
+                source="test",
+            )
+
+    response = asyncio.run(
+        ReviewRepository(pool=None).get_monthly_review(
+            AnalyticsScope(period="2026-06"),
+            recent_months=3,
+        )
+    )
+
+    assert sum(category.sales for category in response.categories) == Decimal(MAX_PRODUCT_CANDIDATES + 1)
+    assert next(metric.current for metric in response.executive if metric.id == "sales") == Decimal(
+        MAX_PRODUCT_CANDIDATES + 1
+    )
+    assert len(response.products) == 150
+    category_source = inspect.getsource(ReportingMonthlyReviewRepository._review_category_rows)
+    assert "reporting_category_month" in category_source
+    assert "ranked_items" not in category_source
+    assert "LIMIT {MAX_PRODUCT_CANDIDATES}" in inspect.getsource(ReportingMonthlyReviewRepository._review_product_rows)

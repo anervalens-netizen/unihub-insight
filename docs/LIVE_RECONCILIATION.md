@@ -16,6 +16,27 @@ Workforce and Planning are `partial`, Finance and Compensation are
 where eligible. Missing/partial sources and missing samples are never converted
 to success.
 
+The next integrated candidate is `1.0.0-rc.2`; it carries the Sales Portfolio
+contract below and is not a relabeling of `1.0.0-rc.1`.
+
+### Sales Portfolio control — entire network, 2026-06
+
+All four Portfolio API roll-ups have exact zero difference from their approved
+Retail reporting controls: **3,223,513.13 RON** and **33,279 net units**. The
+checks include both aggregate conservation and the displayed entity count.
+
+| Dimension | Accounting control | Entity control | Exact result |
+| --- | --- | ---: | --- |
+| Category | `reporting_category_month` | 6 categories | 3,223,513.13 RON; 33,279 net units |
+| Subcategory | `reporting_category_month` | 20 category/subcategory pairs | 3,223,513.13 RON; 33,279 net units |
+| Brand | `reporting_item_month`, with real-brand attributes from `insight.monthly_review_item_month` | 19 actual brands | 3,223,513.13 RON; 33,279 net units |
+| Product | `reporting_item_month` | 1,099 SKU (`item_code`) | 3,223,513.13 RON; 33,279 net units |
+
+Brand enrichment does not change the item accounting authority. Returns remain
+signed in the brand/product controls. Product receipt incidence is reconciled
+only as SKU–receipt incidence; it is deliberately not compared with, or named
+as, a distinct-receipt total.
+
 Campaign publication v2 also reconciles June 2026 exactly. The source remains
 `partial`, rather than `unavailable`, because the legacy completed-sales head
 does not prove final sales authority. That status does not alter the canonical
@@ -63,6 +84,13 @@ Use one finalized month and the current open month. For each, test:
 
 Compare net sales, net quantity, receipts, 2+ accessory receipts, cutoff date and distinct stores/agents. `Cartele` and `TR %` locations must remain outside normal KPIs.
 
+For Sales Portfolio, compare category, subcategory, brand and product
+independently. All four must conserve net sales and net quantity; brand/product
+must also conserve signed returns, and product alone conserves SKU–receipt
+incidence. Reconcile entity cardinality at the same time. Product is keyed only
+by `item_code`; a label or Monthly Review attribute conflict is evidence, not a
+new SKU. Never use the SKU incidence as a distinct receipt control.
+
 ### Targets
 
 - Network/store scope: sum canonical `store_targets` for represented stores.
@@ -76,6 +104,11 @@ Incentive additionally compare mechanism existence, sales, signed net quantity,
 distinct published product codes, participating stores and canonical
 discount/reward from `reporting_campaign_month_v2`. Promo, Incentive and Concurs
 remain separate metrics and are not merged into Focus.
+
+Concurs has two Retail mechanisms in 2026-06 but no eligible official
+head/read-model for Insight, so it is unavailable rather than zero or partial
+reconciliation evidence. The current Retail `promo_bonuri` aggregate sums
+excluded units and is not a distinct-receipt control.
 
 ### Workforce
 
@@ -117,4 +150,4 @@ Compare completed forecast run IDs, actuals, forecast values, target gap and acc
 
 ## No-go conditions
 
-Promotion remains blocked by any missing required sample, non-official required source, write privilege on the analytics role, unexplained total difference, an agent receiving a store target, sensitive values visible below the suppression threshold, P&L actual/estimate overlap, stale migration checksum or non-finite query scope.
+Promotion remains blocked by any missing required sample, non-official required source, write privilege on the analytics role, unexplained total difference, a Portfolio dimension that does not conserve its required values/cardinality, an SKU incidence presented as distinct receipts, an agent receiving a store target, sensitive values visible below the suppression threshold, P&L actual/estimate overlap, stale migration checksum or non-finite query scope.

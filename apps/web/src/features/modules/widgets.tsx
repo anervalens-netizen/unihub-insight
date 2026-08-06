@@ -362,6 +362,7 @@ export function ModuleDistributionWidget() {
     ? ['donut', 'bar']
     : ['bar'];
   const [kind, setKind] = useState<'donut' | 'bar'>(choices[0] ?? 'bar');
+  const dimensionId = data.distribution_dimension ?? moduleDistributionDimension[data.module];
   const option = useMemo<EChartsCoreOption>(
     () =>
       kind === 'donut'
@@ -403,7 +404,6 @@ export function ModuleDistributionWidget() {
     return <EmptyState message="Nu există distribuție pentru scope-ul curent." />;
   const distributionEvent = (event: EChartEvent) => {
     const item = event.dataIndex === undefined ? undefined : data.distribution[event.dataIndex];
-    const dimensionId = moduleDistributionDimension[data.module];
     return item && dimensionId ? { dimensionId, value: item.id, label: item.label } : undefined;
   };
   return (
@@ -434,6 +434,7 @@ export function ModuleMatrixWidget() {
   const onUrlStateChange = useModuleUrlStateChange();
   const onUrlStateChanges = useModuleUrlStateChanges();
   const onUrlStateReset = useModuleUrlStateReset();
+  const entityDimension = data.entity_dimension ?? moduleEntityDimension[data.module];
   const xValues = useMemo(() => [...new Set(data.matrix.map((cell) => cell.x))], [data.matrix]);
   const yValues = useMemo(() => [...new Set(data.matrix.map((cell) => cell.y))], [data.matrix]);
   const values = data.matrix.map((cell) => cell.value);
@@ -489,7 +490,7 @@ export function ModuleMatrixWidget() {
       const entity = data.breakdown.find((item) => item.id === cell.y || item.label === cell.y);
       if (entity) {
         const entityEvent = {
-          dimensionId: moduleEntityDimension[data.module],
+          dimensionId: entityDimension,
           value: entity.id,
           label: entity.label,
         };
@@ -514,7 +515,7 @@ export function ModuleMatrixWidget() {
     const entity = data.breakdown.find((item) => item.id === cell.y || item.label === cell.y);
     if (entity) {
       onEntityOpen?.({
-        dimensionId: moduleEntityDimension[data.module],
+        dimensionId: entityDimension,
         value: entity.id,
         label: entity.label,
       });
@@ -553,8 +554,9 @@ export function ModuleBreakdownWidget() {
   );
   const [sorting, setSorting] = useState<SortingState>([{ id: 'primary', desc: true }]);
   const axes = data.axes;
-  const columns = useMemo<ColumnDef<BreakdownRow>[]>(
-    () => [
+  const entityDimension = data.entity_dimension ?? moduleEntityDimension[data.module];
+  const columns = useMemo<ColumnDef<BreakdownRow>[]>(() => {
+    const next: ColumnDef<BreakdownRow>[] = [
       {
         accessorKey: 'label',
         header: 'Entitate',
@@ -571,7 +573,7 @@ export function ModuleBreakdownWidget() {
                   entityClickTimer.current = window.setTimeout(() => {
                     entityClickTimer.current = null;
                     onUrlStateChange?.({
-                      dimensionId: moduleEntityDimension[data.module],
+                      dimensionId: entityDimension,
                       value: row.original.id,
                       label: row.original.label,
                     });
@@ -583,7 +585,7 @@ export function ModuleBreakdownWidget() {
                     entityClickTimer.current = null;
                   }
                   onEntityOpen?.({
-                    dimensionId: moduleEntityDimension[data.module],
+                    dimensionId: entityDimension,
                     value: row.original.id,
                     label: row.original.label,
                   });
@@ -613,6 +615,16 @@ export function ModuleBreakdownWidget() {
         cell: ({ getValue }) =>
           formatValue(getValue<number | null>(), axes[2]?.unit ?? 'decimal', true),
       },
+    ];
+    if (axes[3]) {
+      next.push({
+        accessorKey: 'quaternary',
+        header: axes[3].label,
+        cell: ({ getValue }) =>
+          formatValue(getValue<number | null>(), axes[3]?.unit ?? 'decimal', true),
+      });
+    }
+    next.push(
       {
         accessorKey: 'progress_pct',
         header: 'Progres',
@@ -623,9 +635,9 @@ export function ModuleBreakdownWidget() {
         header: 'Status',
         cell: ({ getValue }) => <RiskBadge risk={getValue<BreakdownRow['risk']>()} />,
       },
-    ],
-    [axes, data.module, onEntityOpen, onUrlStateChange],
-  );
+    );
+    return next;
+  }, [axes, entityDimension, onEntityOpen, onUrlStateChange]);
   const table = useReactTable({
     data: data.breakdown,
     columns,

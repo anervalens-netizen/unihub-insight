@@ -97,6 +97,7 @@ const moduleAnalyticsBaseSchema = z.object({
       primary: numeric,
       secondary: nullableNumeric.optional(),
       tertiary: nullableNumeric.optional(),
+      quaternary: nullableNumeric.optional(),
       progress_pct: nullableNumeric.optional(),
       delta_pct: nullableNumeric.optional(),
       risk,
@@ -135,6 +136,8 @@ const moduleAnalyticsBaseSchema = z.object({
       entity_label: z.string().nullable().optional(),
     }),
   ),
+  entity_dimension: z.string().nullable().optional(),
+  distribution_dimension: z.string().nullable().optional(),
 });
 
 export const moduleAnalyticsSliceSchema = moduleAnalyticsBaseSchema.pick({
@@ -147,11 +150,14 @@ export const moduleAnalyticsSliceSchema = moduleAnalyticsBaseSchema.pick({
   matrix: true,
   calendar: true,
   alerts: true,
+  entity_dimension: true,
+  distribution_dimension: true,
 });
 
 export const moduleAnalyticsSchema = moduleAnalyticsBaseSchema.extend({
   visits: moduleAnalyticsSliceSchema.nullable().optional(),
   campaigns: z.record(z.string(), moduleAnalyticsSliceSchema).optional(),
+  portfolio: z.record(z.string(), moduleAnalyticsSliceSchema).default({}),
 });
 
 export type ModuleAnalytics = z.infer<typeof moduleAnalyticsSchema>;

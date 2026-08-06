@@ -5,6 +5,10 @@ export type ModuleSubviewId =
   | 'pace'
   | 'trend'
   | 'mix'
+  | 'portfolio-category'
+  | 'portfolio-subcategory'
+  | 'portfolio-brand'
+  | 'portfolio-product'
   | 'drivers'
   | 'transactions'
   | 'calendar'
@@ -62,6 +66,30 @@ export const moduleSubviewConfig: Record<ModuleId, readonly ModuleSubview[]> = {
       id: 'mix',
       label: 'Mix',
       description: 'Contribuție pe dimensiunile livrate de API.',
+      sourceDomain: 'sales',
+    },
+    {
+      id: 'portfolio-category',
+      label: 'Categorii',
+      description: 'Portofoliu pe categorie: vânzări, cantitate netă și contribuție pozitivă.',
+      sourceDomain: 'sales',
+    },
+    {
+      id: 'portfolio-subcategory',
+      label: 'Subcategorii',
+      description: 'Portofoliu pe subcategorie, păstrând categoria în context.',
+      sourceDomain: 'sales',
+    },
+    {
+      id: 'portfolio-brand',
+      label: 'Branduri',
+      description: 'Portofoliu pe brand, cu retururi semnate de sursa Retail.',
+      sourceDomain: 'sales',
+    },
+    {
+      id: 'portfolio-product',
+      label: 'Produse',
+      description: 'Portofoliu pe SKU, cu retururi și incidențe SKU în bonuri.',
       sourceDomain: 'sales',
     },
     {
@@ -139,7 +167,8 @@ export const moduleSubviewConfig: Record<ModuleId, readonly ModuleSubview[]> = {
     {
       id: 'contest',
       label: 'Concurs',
-      description: 'Identitatea și participarea trebuie livrate de contractul Concurs.',
+      description:
+        'Retail poate avea mecanismul, dar Insight nu are head/read-model oficial eligibil; Focus nu îl substituie.',
       sourceDomain: 'campaigns',
       mechanism: ['contest', 'concurs'],
     },
@@ -309,6 +338,38 @@ export interface SubviewStatus {
   availability: SubviewAvailability;
   reason: string;
   source: SourceMetadata | undefined;
+}
+
+const portfolioDimensions: Partial<Record<ModuleSubviewId, string>> = {
+  'portfolio-category': 'category',
+  'portfolio-subcategory': 'subcategory',
+  'portfolio-brand': 'brand',
+  'portfolio-product': 'product',
+};
+
+export function portfolioDimensionForSubview(id: ModuleSubviewId): string | undefined {
+  return portfolioDimensions[id];
+}
+
+export function specializedSubviewActions(availability: SubviewAvailability): {
+  showRetailLink: true;
+  showRefresh: true;
+  showExport: boolean;
+  showLayout: boolean;
+} {
+  return {
+    showRetailLink: true,
+    showRefresh: true,
+    showExport: availability !== 'unavailable',
+    showLayout: availability !== 'unavailable',
+  };
+}
+
+export function unavailableSubviewCopy(view: ModuleSubview): string {
+  if (view.id === 'contest') {
+    return 'Retail poate avea mecanismul Concurs, dar Insight nu are un head/read-model oficial eligibil pentru acest mecanism. Cifrele Focus nu sunt folosite ca substitut.';
+  }
+  return 'Contractul lipsă nu este înlocuit cu cifre din alt mecanism sau din altă generație.';
 }
 
 export function subviewForId(module: ModuleId, id: string | undefined): ModuleSubview {

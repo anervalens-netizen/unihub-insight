@@ -14,7 +14,12 @@ from unihub_insight_api.domain import (
     QueryBatchRequest,
     UserContext,
 )
-from unihub_insight_api.services.metric_catalog import METRIC_CATALOG, metric_entity_dimension
+from unihub_insight_api.services.metric_catalog import (
+    METRIC_CATALOG,
+    PORTFOLIO_DIMENSIONS,
+    PORTFOLIO_METRIC_IDS,
+    metric_entity_dimension,
+)
 
 CATALOG_METRICS = {metric.id: metric for metric in METRIC_CATALOG}
 COMMERCIAL_CAMPAIGN_METRICS = frozenset(
@@ -49,6 +54,7 @@ MODULE_METRICS: dict[ModuleId, frozenset[str]] = {
             "receipts.average_value",
             "receipts.total",
             "receipt_2plus_pct",
+            *PORTFOLIO_METRIC_IDS,
         }
     ),
     ModuleId.PERFORMANCE: frozenset(
@@ -324,6 +330,10 @@ def validate_dashboard(request: DashboardCreateRequest, user: UserContext) -> No
             errors.append(f"{prefix}.time_grain is incompatible with {widget.metric_id}")
         if widget.metric_id in SCALAR_ONLY_METRICS and dimensions:
             errors.append(f"{prefix}.metric_id supports only an aggregate without dimension")
+        if widget.metric_id in PORTFOLIO_METRIC_IDS and (
+            len(dimensions) != 1 or dimensions[0] not in PORTFOLIO_DIMENSIONS
+        ):
+            errors.append(f"{prefix}.portfolio requires exactly one taxonomy dimension")
         if widget.visualization in {ChartKind.LINE, ChartKind.AREA} and dimensions != ("time",):
             errors.append(f"{prefix}.visualization requires dimensions=[time]")
         mix_dimensions = {
@@ -337,10 +347,12 @@ def validate_dashboard(request: DashboardCreateRequest, user: UserContext) -> No
             "compensation.payroll": "firm",
             "finance.operating_costs": "category",
         }
-        if widget.visualization in {ChartKind.DONUT, ChartKind.TREEMAP} and dimensions != (
-            mix_dimensions.get(widget.metric_id),
-        ):
-            errors.append(f"{prefix}.visualization requires the approved aggregate dimension")
+        if widget.visualization in {ChartKind.DONUT, ChartKind.TREEMAP}:
+            if widget.metric_id in PORTFOLIO_METRIC_IDS:
+                if metric is None or len(dimensions) != 1 or dimensions[0] not in metric.allowed_dimensions:
+                    errors.append(f"{prefix}.visualization requires the portfolio metric dimension")
+            elif dimensions != (mix_dimensions.get(widget.metric_id),):
+                errors.append(f"{prefix}.visualization requires the approved aggregate dimension")
         if widget.visualization is ChartKind.WATERFALL and (
             widget.metric_id != "finance.ebit" or dimensions != ("category",)
         ):

@@ -1409,6 +1409,106 @@ button {
   font-size: 8px;
 }
 
+.portfolio-table-widget {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.portfolio-table-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.portfolio-search {
+  display: flex;
+  min-width: 220px;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.portfolio-search > span {
+  color: var(--text-muted);
+  font-size: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.portfolio-search input {
+  min-height: 29px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--text);
+  font-size: 9px;
+}
+
+.portfolio-sort-controls {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  gap: 4px;
+}
+
+.portfolio-sort-controls .button {
+  height: 29px;
+  padding: 0 8px;
+  font-size: 8px;
+}
+
+.portfolio-sort-controls .button.is-active {
+  border-color: color-mix(in srgb, var(--indigo) 30%, var(--border));
+  background: var(--indigo-soft);
+  color: var(--indigo-strong);
+}
+
+.portfolio-table-scroll {
+  flex: 1;
+  min-height: 0;
+}
+
+.portfolio-table {
+  min-width: 760px;
+}
+
+.portfolio-entity-cell {
+  min-width: 250px;
+}
+
+.portfolio-entity-cell small {
+  overflow: hidden;
+  color: var(--text-soft);
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portfolio-table-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 8px;
+}
+
+.portfolio-table-footer > div {
+  display: flex;
+  gap: 3px;
+}
+
+.portfolio-table-footer .icon-button:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
 .risk-badge {
   display: inline-flex;
   min-width: 54px;

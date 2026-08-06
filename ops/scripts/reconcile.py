@@ -25,6 +25,7 @@ from unihub_insight_api.services import scope_label
 
 
 TOLERANCE = Decimal("0.01")
+PORTFOLIO_DIMENSIONS = ("category", "subcategory", "brand", "product")
 
 
 @dataclass(frozen=True)
@@ -113,6 +114,45 @@ def visit_metric_differences(
     return differences
 
 
+def portfolio_metric_differences(
+    control: dict[str, dict[str, Decimal]],
+    sales: Any,
+) -> dict[str, Decimal]:
+    """Compare each Sales Portfolio roll-up with its authoritative control total."""
+    differences: dict[str, Decimal] = {}
+    for dimension in PORTFOLIO_DIMENSIONS:
+        prefix = f"sales.portfolio.{dimension}"
+        portfolio = sales.portfolio.get(dimension)
+        if portfolio is None:
+            differences[f"{prefix}.presence"] = Decimal(-1)
+            continue
+        metrics = portfolio.kpis
+        expected = control[dimension]
+        differences.update(
+            {
+                f"{prefix}.sales": metric_value(
+                    metrics, "sales.portfolio_sales"
+                )
+                - expected["sales"],
+                f"{prefix}.net_quantity": metric_value(
+                    metrics, "sales.portfolio_net_quantity"
+                )
+                - expected["net_quantity"],
+                f"{prefix}.entities": Decimal(len(portfolio.breakdown))
+                - expected["entities"],
+            }
+        )
+        if dimension in {"brand", "product"}:
+            differences[f"{prefix}.return_quantity"] = metric_value(
+                metrics, "sales.portfolio_return_quantity"
+            ) - expected["return_quantity"]
+        if dimension == "product":
+            differences[f"{prefix}.receipt_incidence"] = metric_value(
+                metrics, "sales.portfolio_receipt_incidence"
+            ) - expected["receipt_incidence"]
+    return differences
+
+
 async def control_totals(
     pool: asyncpg.Pool,
     scope: AnalyticsScope,
@@ -195,6 +235,110 @@ async def control_totals(
     return {**dict(row), "total_target": decimal(target)}
 
 
+async def portfolio_control_totals(
+    pool: asyncpg.Pool,
+    scope: AnalyticsScope,
+) -> dict[str, dict[str, Decimal]]:
+    """Read Sales Portfolio controls independently of the API aggregation slices."""
+    category_params: list[Any] = [scope.period]
+    category_clauses = ["category.import_month = $1"]
+    category_clauses.extend(
+        append_reporting_scope(scope, alias="category", params=category_params)
+    )
+    item_params: list[Any] = [scope.period]
+    item_clauses = ["item.import_month = $1"]
+    item_clauses.extend(append_reporting_scope(scope, alias="item", params=item_params))
+    async with pool.acquire() as connection:
+        category = await connection.fetchrow(
+            f"""
+            SELECT
+                COALESCE(SUM(category.total_sales), 0) AS total_sales,
+                COALESCE(SUM(category.total_quantity), 0)::numeric AS net_quantity,
+                COUNT(DISTINCT category.category)::numeric AS category_entities,
+                COUNT(DISTINCT ROW(category.category, category.subcategory))::numeric
+                    AS subcategory_entities
+            FROM reporting_category_month category
+            WHERE {" AND ".join(category_clauses)}
+            """,
+            *category_params,
+        )
+        items = await connection.fetchrow(
+            f"""
+            WITH attributes AS (
+                SELECT
+                    supplement.import_month,
+                    supplement.site_code,
+                    supplement.agent,
+                    supplement.item_code,
+                    MAX(NULLIF(BTRIM(supplement.brand), '')) AS brand
+                FROM insight.monthly_review_item_month supplement
+                WHERE supplement.import_month = $1
+                GROUP BY
+                    supplement.import_month,
+                    supplement.site_code,
+                    supplement.agent,
+                    supplement.item_code
+            ), scoped AS (
+                SELECT
+                    item.item_code,
+                    item.total_sales,
+                    item.net_quantity,
+                    item.return_quantity,
+                    item.receipt_count,
+                    attributes.brand
+                FROM reporting_item_month item
+                LEFT JOIN attributes
+                  ON attributes.import_month = item.import_month
+                 AND attributes.site_code IS NOT DISTINCT FROM item.site_code
+                 AND attributes.agent IS NOT DISTINCT FROM item.agent
+                 AND attributes.item_code = item.item_code
+                WHERE {" AND ".join(item_clauses)}
+            )
+            SELECT
+                COALESCE(SUM(scoped.total_sales), 0) AS total_sales,
+                COALESCE(SUM(scoped.net_quantity), 0)::numeric AS net_quantity,
+                COALESCE(SUM(scoped.return_quantity), 0)::numeric AS return_quantity,
+                COALESCE(SUM(scoped.receipt_count), 0)::numeric AS receipt_incidence,
+                COUNT(DISTINCT COALESCE(scoped.brand, 'Necunoscut'))::numeric
+                    AS brand_entities,
+                COUNT(DISTINCT scoped.item_code)::numeric AS product_entities
+            FROM scoped
+            """,
+            *item_params,
+        )
+    if category is None or items is None:
+        raise RuntimeError("Sales Portfolio control query returned no aggregate row")
+    category_sales = decimal(category["total_sales"])
+    category_quantity = decimal(category["net_quantity"])
+    item_sales = decimal(items["total_sales"])
+    item_quantity = decimal(items["net_quantity"])
+    return {
+        "category": {
+            "sales": category_sales,
+            "net_quantity": category_quantity,
+            "entities": decimal(category["category_entities"]),
+        },
+        "subcategory": {
+            "sales": category_sales,
+            "net_quantity": category_quantity,
+            "entities": decimal(category["subcategory_entities"]),
+        },
+        "brand": {
+            "sales": item_sales,
+            "net_quantity": item_quantity,
+            "return_quantity": decimal(items["return_quantity"]),
+            "entities": decimal(items["brand_entities"]),
+        },
+        "product": {
+            "sales": item_sales,
+            "net_quantity": item_quantity,
+            "return_quantity": decimal(items["return_quantity"]),
+            "receipt_incidence": decimal(items["receipt_incidence"]),
+            "entities": decimal(items["product_entities"]),
+        },
+    }
+
+
 async def reconcile_scope(
     pool: asyncpg.Pool,
     repository: PostgresHardenedInsightRepository,
@@ -203,13 +347,15 @@ async def reconcile_scope(
     sample_case: str = "explicit",
     matrix_missing_cases: tuple[str, ...] = (),
 ) -> ReconciliationResult:
-    overview, sales, control, specialized = await asyncio.gather(
+    overview, sales, control, portfolio_control, specialized = await asyncio.gather(
         repository.get_overview(scope),
         repository.get_module(ModuleId.SALES, scope),
         control_totals(pool, scope),
+        portfolio_control_totals(pool, scope),
         specialized_differences(pool, repository, scope),
     )
     domain_differences, unavailable_domains, source_statuses = specialized
+    domain_differences.update(portfolio_metric_differences(portfolio_control, sales))
     overview_sales = metric_value(overview.kpis, "sales.total")
     overview_target = metric_value(overview.kpis, "target.progress_pct")
     target_metric = next(

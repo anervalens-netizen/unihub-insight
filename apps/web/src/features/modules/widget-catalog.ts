@@ -31,6 +31,8 @@ type RecipeKind =
   | 'kpi'
   | 'trend'
   | 'distribution'
+  | 'portfolio-distribution'
+  | 'portfolio-table'
   | 'matrix'
   | 'breakdown'
   | 'alerts'
@@ -65,7 +67,8 @@ export interface ModuleWidgetQuerySpec {
     | 'scatter'
     | 'histogram'
     | 'waterfall'
-    | 'calendar';
+    | 'calendar'
+    | 'table';
   metricId: string;
 }
 
@@ -182,6 +185,12 @@ export function moduleWidgetQuerySpec(
     const metricId = distributionMetrics[module];
     return metricId ? { kind: 'distribution', metricId } : null;
   }
+  if (widgetId === 'portfolio-distribution' && module === 'sales') {
+    return { kind: 'distribution', metricId: 'sales.portfolio_sales' };
+  }
+  if (widgetId === 'portfolio-table' && module === 'sales') {
+    return { kind: 'table', metricId: 'sales.portfolio_sales' };
+  }
   if (widgetId === 'matrix') {
     const metricId = matrixMetrics[module];
     return metricId ? { kind: 'matrix', metricId } : null;
@@ -217,6 +226,40 @@ const recipes: Partial<Record<ModuleSubviewId, readonly Recipe[]>> = {
     { kind: 'kpi', slot: 'primary' },
     { kind: 'distribution', title: 'Mix livrat de API' },
     { kind: 'breakdown', title: 'Contribuții și diferențe' },
+  ],
+  'portfolio-category': [
+    { kind: 'kpi', metricId: 'sales.portfolio_sales' },
+    { kind: 'kpi', metricId: 'sales.portfolio_net_quantity' },
+    { kind: 'portfolio-distribution', title: 'Distribuție vânzări pe categorie' },
+    { kind: 'portfolio-table', title: 'Categorii', subtitle: 'Tabel local căutabil și paginat.' },
+  ],
+  'portfolio-subcategory': [
+    { kind: 'kpi', metricId: 'sales.portfolio_sales' },
+    { kind: 'kpi', metricId: 'sales.portfolio_net_quantity' },
+    { kind: 'portfolio-distribution', title: 'Distribuție vânzări pe subcategorie' },
+    {
+      kind: 'portfolio-table',
+      title: 'Subcategorii',
+      subtitle: 'Tabel local căutabil și paginat.',
+    },
+  ],
+  'portfolio-brand': [
+    { kind: 'kpi', metricId: 'sales.portfolio_sales' },
+    { kind: 'kpi', metricId: 'sales.portfolio_net_quantity' },
+    { kind: 'kpi', metricId: 'sales.portfolio_return_quantity' },
+    { kind: 'portfolio-distribution', title: 'Distribuție vânzări pe brand' },
+    { kind: 'portfolio-table', title: 'Branduri', subtitle: 'Tabel local căutabil și paginat.' },
+  ],
+  'portfolio-product': [
+    { kind: 'kpi', metricId: 'sales.portfolio_sales' },
+    { kind: 'kpi', metricId: 'sales.portfolio_net_quantity' },
+    { kind: 'kpi', metricId: 'sales.portfolio_return_quantity' },
+    { kind: 'kpi', metricId: 'sales.portfolio_receipt_incidence' },
+    {
+      kind: 'portfolio-table',
+      title: 'Produse / SKU',
+      subtitle: 'Tabel local căutabil și paginat; fără donut SKU.',
+    },
   ],
   drivers: [
     { kind: 'kpi', slot: 'primary' },
@@ -448,10 +491,18 @@ const ModulePlanningAccuracyWidget = lazy(() =>
     default: module.ModulePlanningAccuracyWidget,
   })),
 );
+const PortfolioDistributionWidget = lazy(() =>
+  import('./portfolio').then((module) => ({ default: module.PortfolioDistributionWidget })),
+);
+const PortfolioTableWidget = lazy(() =>
+  import('./portfolio').then((module) => ({ default: module.PortfolioTableWidget })),
+);
 
 const componentByKind: Record<Exclude<RecipeKind, 'kpi'>, ComponentType> = {
   trend: ModuleTrendWidget,
   distribution: ModuleDistributionWidget,
+  'portfolio-distribution': PortfolioDistributionWidget,
+  'portfolio-table': PortfolioTableWidget,
   matrix: ModuleMatrixWidget,
   breakdown: ModuleBreakdownWidget,
   alerts: ModuleAlertsWidget,
@@ -477,6 +528,7 @@ function recipeTitle(data: ModuleAnalytics, recipe: Recipe): string {
   if (recipe.title) return recipe.title;
   const metricId =
     recipe.metricId ?? (recipe.slot ? metricSlots[data.module][recipe.slot] : undefined);
+  if (metricId === 'sales.portfolio_receipt_incidence') return 'Incidențe SKU în bonuri';
   return data.kpis.find((metric) => metric.id === metricId)?.label ?? 'Metrica disponibilă';
 }
 

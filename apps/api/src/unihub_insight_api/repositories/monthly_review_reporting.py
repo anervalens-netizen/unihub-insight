@@ -363,3 +363,57 @@ class ReportingMonthlyReviewRepository(PostgresMonthlyReviewRepository):
                     *params,
                 ),
             )
+
+    async def _review_category_rows(
+        self,
+        scope: AnalyticsScope,
+        periods: Sequence[str],
+    ) -> Sequence[asyncpg.Record]:
+        """Return the complete governed category universe for the review periods.
+
+        Product candidates remain deliberately bounded for responsive product
+        ranking. Category aggregates must instead reconcile to the complete
+        scoped sales universe, so they read the Retail-owned category model
+        directly rather than grouping the product candidate list.
+        """
+        bounded_periods = validate_review_periods(periods)
+        params: list[Any] = [list(bounded_periods)]
+        clauses = self._scope_clauses(scope, params)
+        agent_filter = ""
+        if scope.agent:
+            params.append(list(scope.agent))
+            agent_filter = f"AND category_month.agent = ANY(${len(params)}::text[])"
+        where_scope = " AND ".join(clauses)
+
+        async with self.pool.acquire() as connection:
+            return cast(
+                Sequence[asyncpg.Record],
+                await connection.fetch(
+                    f"""
+                WITH eligible AS MATERIALIZED (
+                    SELECT store.site_code
+                    FROM stores store
+                    WHERE {where_scope}
+                )
+                SELECT
+                    category_month.import_month,
+                    category_month.category,
+                    SUM(category_month.total_sales) AS sales,
+                    SUM(category_month.total_quantity) AS units,
+                    0 AS receipts,
+                    0 AS receipt_2plus,
+                    0 AS focus_units,
+                    0 AS gross_sales,
+                    0 AS return_value,
+                    0 AS working_days,
+                    0 AS target
+                FROM reporting_category_month category_month
+                JOIN eligible USING (site_code)
+                WHERE category_month.import_month = ANY($1::text[])
+                  {agent_filter}
+                GROUP BY category_month.import_month, category_month.category
+                ORDER BY category_month.import_month, ABS(SUM(category_month.total_sales)) DESC
+                """,
+                    *params,
+                ),
+            )

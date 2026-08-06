@@ -333,6 +333,7 @@ class BreakdownRow(BaseModel):
     primary: Decimal
     secondary: Decimal | None = None
     tertiary: Decimal | None = None
+    quaternary: Decimal | None = None
     progress_pct: Decimal | None = None
     delta_pct: Decimal | None = None
     risk: RiskLevel = RiskLevel.HEALTHY
@@ -368,6 +369,8 @@ class ModuleAnalyticsSlice(BaseModel):
     matrix: list[MatrixCell]
     calendar: list[CalendarCell] = Field(default_factory=list)
     alerts: list[InsightAlert]
+    entity_dimension: str | None = None
+    distribution_dimension: str | None = None
 
 
 class ModuleAnalyticsResponse(BaseModel):
@@ -387,6 +390,7 @@ class ModuleAnalyticsResponse(BaseModel):
     alerts: list[InsightAlert]
     visits: ModuleAnalyticsSlice | None = None
     campaigns: dict[str, ModuleAnalyticsSlice] = Field(default_factory=dict)
+    portfolio: dict[str, ModuleAnalyticsSlice] = Field(default_factory=dict)
 
 
 class DashboardLayout(BaseModel):

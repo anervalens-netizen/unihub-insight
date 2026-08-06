@@ -6,7 +6,7 @@
 
 ## Starea curentă
 
-Producția existentă rămâne operațională, iar `1.0.0-rc.1` este candidatul integrat pentru promovare. RC1 adaugă coloana vertebrală analitică versionată și înlocuiește șablonul unic cu sub-view-uri de domeniu. Nu este încă `1.0`: sursele live Compensation și Finance nu au generații oficiale eligibile, iar pilotul vizual owner și poarta de șapte zile trebuie închise după deploy.
+Producția existentă rămâne operațională, iar `1.0.0-rc.2` este candidatul integrat pentru promovare. RC2 păstrează coloana vertebrală analitică versionată din RC1 și adaugă Sales Portfolio reconciliat pe categorie, subcategorie, brand și produs. Nu este încă `1.0`: sursele live Compensation și Finance nu au generații oficiale eligibile, iar pilotul vizual owner și poarta de șapte zile trebuie închise după deploy.
 
 | Suprafață | Stare |
 | --- | --- |

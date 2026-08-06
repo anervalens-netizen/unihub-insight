@@ -33,6 +33,9 @@ Native module widgets and custom widgets are both fed by catalog-derived batch q
 | `campaigns.promo_discount` | Canonical Retail Promo discount value | RON | null without a promoted campaign head |
 | `campaigns.incentive_sales` / `campaigns.incentive_quantity` | Net Retail sales and quantity for products participating in the published Incentive generation | RON / integer | null without a promoted campaign head |
 | `campaigns.incentive_reward` | Canonical Retail Incentive reward | RON | null without a promoted campaign head |
+| `sales.portfolio_sales` / `sales.portfolio_net_quantity` | Net sales / quantity on exactly one Sales Portfolio dimension: category, subcategory, brand or product | RON / integer | source-row-missing remains missing |
+| `sales.portfolio_return_quantity` | Signed return quantity for the brand or product portfolio roll-up | integer | source-row-missing remains missing |
+| `sales.portfolio_receipt_incidence` | Sum of SKU–receipt incidences; it is not a distinct receipt count | integer | source-row-missing remains missing |
 
 The linear forecast is explicitly labeled run-rate; it is not the persisted AI forecast used elsewhere in UniHub.
 
@@ -70,18 +73,54 @@ For an open current period, future actual points are null, never repeated last v
 - Snapshot and historical fallback coverage are explicit.
 - Salary totals follow the Retail salary contract.
 
+## Sales Portfolio contract
+
+Sales Portfolio is a monthly, one-dimension-at-a-time roll-up. The permitted
+dimensions are exactly `category`, `subcategory`, `brand` and `product`; they
+cannot be combined as a free taxonomy query.
+
+- `category` and `subcategory` use `reporting_category_month`. Their controls
+  are the sum of `total_sales` and signed net `total_quantity` at the selected
+  scope.
+- `brand` and `product` use `reporting_item_month`. `brand` is a grouping
+  attribute, enriched from `insight.monthly_review_item_month` by
+  `(import_month, site_code, agent, item_code)`; that Monthly Review table
+  never replaces the Retail item read-model for sales, quantities, returns or
+  receipt incidence.
+- Product identity is strictly `item_code` (SKU). Name, real-brand and
+  category differences remain visible as attribute/label warnings; they never
+  split or merge product totals by a display label.
+- `return_quantity` remains signed and is available for brand and product.
+  Zero- or return-only rows remain in the total and table even where a mix
+  chart calculates visual shares only from positive net sales.
+- Product `receipt_count` means SKU–receipt incidences: one receipt containing
+  multiple SKUs contributes once to every represented SKU. It must never be
+  called, summed or compared as a count of distinct receipts. The canonical
+  Sales Transactions receipt metrics remain separate.
+
+For the entire network in 2026-06, each of the four roll-ups conserves the
+published monthly total of **3,223,513.13 RON** and **33,279 net units**. The
+cardinality controls are 6 categories, 20 category/subcategory pairs, 19 real
+brands and 1,099 SKU. This is a reconciliation fact for the read-models, not a
+claim that SKU receipt incidence equals the network receipt count.
+
 ## Risk and alerts
 
 Initial alerts are deterministic rules, not machine-learning scores. They expose the rule outcome and entity label. Thresholds move into the versioned metric/rule catalog before production expansion.
 
 ## Domain contracts and privacy
 
-- Campaign mechanisms remain separate and carry their own cutoff/status/eligibility authority; they are not summed without a defined metric. Retail migration 053 publishes immutable per-agent rows behind a CAS period head through `reporting_campaign_month_v2`; `reporting_source_snapshot_v4` makes an absent head explicitly unavailable. Promo/Incentive reuse the canonical Retail evaluators for sales, net quantity, participating products/stores and discount/reward. Focus Top/Bottom folosește numai magazine observate și `campaigns.focus_share`; nu afirmă coverage, adopție sau cauzalitate.
+- Campaign mechanisms remain separate and carry their own cutoff/status/eligibility authority; they are not summed without a defined metric. Retail migration 053 publishes immutable per-agent rows behind a CAS period head through `reporting_campaign_month_v2`; `reporting_source_snapshot_v4` makes an absent head explicitly unavailable. Promo/Incentive reuse the canonical Retail evaluators for sales, net quantity, participating products/stores and discount/reward. Focus Top/Bottom folosește numai magazine observate și `campaigns.focus_share`; nu afirmă coverage, adopție sau cauzalitate. Concurs had two Retail mechanisms in 2026-06, but remains unavailable in Insight: it has no eligible official head/read-model. Retail's current `promo_bonuri` sums excluded units, not distinct receipts, so it cannot be reused as an Insight receipt metric.
 - Workforce movements come from official effective-dated events, never inferred only from missing sales.
 - Visits read only `reporting_visit_month_v2`; draft rows, distribution/`TR %` locations and `Cartele` are excluded. `avg_completion` is recalculated from the 19 canonical FieldOps fields, not from a stale persisted percentage. Performance and Workforce expose the same Visits slice and source metadata, so their native widgets, query batch, inspect and XLSX cannot drift to the legacy ASM projection.
 - Compensation reads an aggregate Retail view only. No direct `salary_records`, `agent_salary_links`, names or private IDs remain granted. Total uses all rows, average uses values at least 2,000 RON, median uses all values; cohorts of one or two are suppressed across KPI, series, inspect and export, including differencing attacks through filters.
 - Finance explicitly marks `actual`/`estimated` and authority. `__FINANCE_UNALLOCATED__` belongs in company totals and never in store/RM detail. Shadow or unpromoted generations are unavailable, not actual.
 - Planning forecast identifies run, horizon, method/model, input cutoff and coverage. `completed` este numai candidat: v2 publică exclusiv head-ul promovat, cu hash/row-count înghețat, approval artifact, revision CAS și ledger append-only. Target scenarios identify scenario, revision, status, rule-set hash and exact registry-backed snapshot; drafts și scenariile legacy nu devin implicit shared truth. Accuracy păstrează KPI-ul server-side și vizualizează perechile Actual × Forecast publicate pe magazin; clientul nu recalculează o formulă alternativă.
+
+Unavailable or partial Compensation, Finance, Planning and Workforce surfaces
+mean that the required approved aggregate contract, read-model publication or
+eligible head is absent. They do not assert that Retail has no underlying
+operational, salary, P&L, forecast or workforce data.
 
 Retail migration 047 is intentionally additive for consumer N/N-1. Migrations 049–050 add Visits v2 and canonical completion without rewriting FieldOps history. Migrations 051–052 add governed Planning v2. Migration 053 adds Campaigns v2 and snapshot v4 while v1/v3 remain rollback anchors. The current consumer selects snapshot v4, Campaigns v2 and Planning v2. Without the matching approved head, results stay `partial/unavailable`; legacy raw grants never authorize Insight to query raw business tables.
 

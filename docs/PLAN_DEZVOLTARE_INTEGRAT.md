@@ -4,7 +4,7 @@ status: active
 baseline_date: 2026-08-05
 baseline_sha: 9fecf15b938954bb93567fa4b51e4b8f73cda76e
 retail_contract_sha: 0aef1b01e103b864455e537e71df786109f14d53
-candidate: 1.0.0-rc.1
+candidate: 1.0.0-rc.2
 ---
 
 # Plan integrat de dezvoltare UniHub Insight
@@ -17,9 +17,9 @@ Viziunea funcțională de referință este [conversația inițială](https://cha
 
 Acesta este un singur plan persistent. Nu este împărțit în luni, proiecte succesive sau handoff-uri artificiale. Ordinea menționată mai jos exprimă numai dependențe tehnice: un grafic nu poate fi declarat complet înaintea contractului metricii și a reconcilierii sursei sale.
 
-## Stare candidat RC1
+## Stare candidat RC2
 
-La 2026-08-06, Retail publică aditiv read-model-urile v1, Sales day v1, Visits v2 pe autor Team Leader, Planning v2 cu head de promovare CAS și Campaigns v2 cu generații immutable/head CAS pentru Promo și Incentive. Migrarea 052 expune reader-ului numai digestul definer necesar verificării, iar migrarea 053 publică numai agregatul de campanie aprobat, nu formule duplicate în Insight. Completion-ul Visits este recalculat din cele 19 câmpuri FieldOps. Candidatul Insight `1.0.0-rc.1` implementează catalogul/query batch/inspect/export, `ChartSpec`, sub-view-urile specializate, Visits și Campaigns native, dashboard ACL/preset/versionare, brandingul light Retail și master scope-ul RM/magazine/agenți multi-select. Finance și Compensation rămân explicit `UNAVAILABLE`, iar Planning `partial`, până când Retail promovează generații/head-uri eligibile; datele legacy și run-urile doar `completed` nu sunt declarate oficiale. Închiderea `1.0.0` rămâne condiționată de matricea reală Authentik, acceptarea vizuală owner și șapte zile curate de performanță/RUM pe exact SHA-ul final.
+La 2026-08-06, Retail publică aditiv read-model-urile v1, Sales day v1, Visits v2 pe autor Team Leader, Planning v2 cu head de promovare CAS și Campaigns v2 cu generații immutable/head CAS pentru Promo și Incentive. Migrarea 052 expune reader-ului numai digestul definer necesar verificării, iar migrarea 053 publică numai agregatul de campanie aprobat, nu formule duplicate în Insight. Completion-ul Visits este recalculat din cele 19 câmpuri FieldOps. Candidatul Insight `1.0.0-rc.2` păstrează coloana vertebrală RC1 și adaugă Sales Portfolio reconciliat pe categorie, subcategorie, brand real și produs/SKU; nu rescrie `1.0.0-rc.1` cu alt conținut. Finance și Compensation rămân explicit `UNAVAILABLE`, iar Planning `partial`, până când Retail promovează generații/head-uri eligibile; datele legacy și run-urile doar `completed` nu sunt declarate oficiale. Închiderea `1.0.0` rămâne condiționată de matricea reală Authentik, acceptarea vizuală owner și șapte zile curate de performanță/RUM pe exact SHA-ul final.
 
 ## Adevărul de pornire
 
@@ -44,9 +44,9 @@ Inventarul a fost verificat read-only în PostgreSQL live la 2026-08-05 (Europe/
 
 | Domeniu | Acoperire disponibilă | Decizie pentru plan |
 | --- | --- | --- |
-| Vânzări și performanță | `reporting_agent_month` și `reporting_item_month`, 2023-09…2026-08; zi/lună, categorie, subcategorie, brand, produs, bonuri și retururi | baza pentru Sales, Performance, Monthly Review și drill-down; nu se reimplementează formulele Retail |
+| Vânzări și performanță | `reporting_agent_month`, `reporting_category_month` și `reporting_item_month`, 2023-09…2026-08; zi/lună, categorie/subcategorie, brand real, produs/SKU, bonuri și retururi | Sales Portfolio păstrează categoria/subcategoria din read-modelul de categorie; `insight.monthly_review_item_month` adaugă numai atributele brand/categorie peste item, fără a deveni sursă contabilă |
 | Agenți | profile și lifecycle 2023-09…2026-08; targeturi pe agent și magazin | analiză longitudinală numai cu identitate stabilă; legăturile lipsă rămân explicit neasociate |
-| Campanii | Focus în reporting; Promo și Incentive publicate prin `reporting_campaign_month_v2`; Concurs și Folii fără head oficial eligibil | Insight citește exclusiv mecanismele publicate și păstrează Concurs/Folii unavailable până la un contract Retail oficial; nu duplică regulile de eligibilitate |
+| Campanii | Focus în reporting; Promo și Incentive publicate prin `reporting_campaign_month_v2`; Concurs și Folii fără head oficial eligibil | Insight citește exclusiv mecanismele publicate și păstrează Concurs/Folii unavailable până la un contract Retail oficial; Concurs are două mecanisme Retail în 2026-06, dar `promo_bonuri` însumează unități excluse, nu bonuri distincte, deci nu poate deveni metrică Insight |
 | Workforce și Grile | lifecycle, profil agent, `grile_store_current_status`; 274 vizite FieldOps în intervalul 2026-03-19…2026-08-05 la snapshot | Visits v2 este publicat pe autor Team Leader și îmbogățire curentă de magazin; mișcările, rosterul și Grile analitice complete rămân contracte separate |
 | Compensații | 3.716 înregistrări lunare 2025-01…2026-06 la snapshot și legături agent-persoană | componentele salariale se expun numai prin view-uri agregate dedicate; CNP și identitatea privată nu intră în Insight; pragul de minimum 3 persoane rămâne fail-closed |
 | Finance/P&L | `store_pnl_monthly`, 2017-01…2026-06 la snapshot; tabelele noii autorități de generații nu au încă head live | fiecare valoare trebuie să arate `actual/estimate`, autoritatea, reconcilierea și coverage; Insight nu tratează shadow/generații nepromovate drept actuale |
@@ -67,11 +67,17 @@ Acestea sunt contracte de publicat, nu obiecte presupuse existente. Fiecare treb
 
 Reguli de domeniu care nu pot fi pierdute în agregare:
 
+- Sales Portfolio acceptă exact o dimensiune dintre categorie, subcategorie, brand și produs. `item_code` este identitatea produsului; retururile rămân semnate, iar `receipt_count` la produs este incidență SKU–bon, nu bon distinct. Brandul este atribut real din Monthly Review peste `reporting_item_month`, nu o nouă sursă de vânzări. În network 2026-06, toate cele patru roll-up-uri conservă 3,223,513.13 RON și 33,279 unități nete (6 categorii, 20 perechi, 19 branduri, 1,099 SKU).
 - Campaigns păstrează separat Promo/Incentive/Concurs/Focus/Folii, cutoff-ul POS, stările `complete/partial/invalid`, excluderile Promo din Incentive și politica de identitate Concurs; mecanismele nu se însumează arbitrar;
 - Workforce folosește identitate stabilă effective-dated și evenimente oficiale; intrările/ieșirile nu se deduc din lipsa vânzărilor, iar vizitele păstrează snapshotul Team Leader;
 - Compensation elimină și revocă accesul Insight direct la `salary_records`, `agent_salary_links` și `full_name`; read-model-ul final este exclusiv agregat, fără persoane, iar filtrele/inspect/export nu permit diferențierea unei persoane. Totalul folosește toate rândurile, media numai valorile ≥2.000 RON, mediana toate valorile, iar cohortele de 1–2 persoane nu produc KPI, serie sau export;
 - Finance selectează explicit `actual` versus `estimated` la cheia companie–lună–magazin canonic; `__FINANCE_UNALLOCATED__` intră în totalul companiei, niciodată în magazin/RM, iar shadow/nepromovat nu devine oficial;
 - Planning fixează pentru forecast `run_id`, horizon, model/method, input cutoff și coverage; numai head-ul cu hash/row-count, approval artifact, revision CAS și ledger este eligibil. Pentru Target fixează `scenario_id`, revizie, status, rule-set hash și snapshot exact reconciliat cu registry-ul; drafturile și legacy-unversioned nu devin implicit analiză partajată.
+
+Părțile `unavailable/partial` din Workforce, Compensation, Finance și Planning
+arată lipsa contractului agregat aprobat, a publicării read-model-ului sau a
+head-ului/generației eligibile pentru Insight; nu afirmă inexistența tuturor
+datelor Retail subiacente.
 
 ## Experiența finală
 
@@ -241,7 +247,7 @@ Nu se mai creează pagini placeholder și nu se marchează un modul complet pent
 - browser E2E în Chrome pentru toate modulele, sub-view-urile, filtrele, chart toggles, inspect, fullscreen, cross-filter, dashboards și downloaduri;
 - verificare vizuală pe 1180, 1440, 1920 și ultrawide, light/dark, Compact/Comfortable;
 - testarea scenariilor empty/partial/stale/unauthorized și a lunilor fără sursă;
-- reconciliere la cent pentru Finance, la unitate/bon pentru Sales/Campaigns și ponderat la grain lună × Team Leader × magazin pentru total/completion/checklist Visits v2;
+- reconciliere la cent pentru Finance; la unitate pentru Sales Portfolio (inclusiv cardinalitatea 4 dimensiuni, retur semnat și incidență SKU–bon), la unitate/bon pentru Sales/Campaigns și ponderat la grain lună × Team Leader × magazin pentru total/completion/checklist Visits v2;
 - load test pe dashboarduri mixte cu 8–12 widgeturi și export concurent;
 - owner visual pilot pe Overview și câte un template dens de modul înainte de propagarea layoutului.
 

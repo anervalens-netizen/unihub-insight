@@ -935,10 +935,11 @@ class PostgresMonthlyReviewRepository(PostgresHardenedInsightRepository):
         seasonal_periods = [shift_month(scope.period, offset) for offset in (-25, -24, -13, -12, -1, 0)]
         periods = unique_periods([scope.period, previous_year_period, *trend_periods, *seasonal_periods])
         product_periods = unique_periods([scope.period, previous_year_period, *recent_periods])
-        store_records, agent_records, product_records, meta = await asyncio.gather(
+        store_records, agent_records, product_records, category_records, meta = await asyncio.gather(
             self._review_store_rows(scope, periods),
             self._review_agent_rows(scope, periods),
             self._review_product_rows(scope, product_periods),
+            self._review_category_rows(scope, product_periods),
             self._meta_for_review(scope),
         )
         store_values: dict[tuple[str, str], Aggregate] = {}
@@ -1029,23 +1030,30 @@ class PostgresMonthlyReviewRepository(PostgresHardenedInsightRepository):
         ]
         products.sort(key=lambda item: item.score, reverse=True)
         products = products[:150]
-        category_groups: dict[str, list[str]] = defaultdict(list)
-        for entity in product_entities.values():
-            category_groups[entity.category].append(entity.id)
-        category_values = aggregate_groups(product_values, category_groups, product_periods)
+        category_values: dict[tuple[str, str], Aggregate] = {}
+        category_entities: dict[str, ProductEntity] = {}
+        for row in category_records:
+            category = str(row["category"])
+            category_entities[category] = ProductEntity(
+                category,
+                category,
+                "Portofoliu",
+                category,
+            )
+            category_values[(str(row["import_month"]), category)] = self._aggregate(row)
         categories = [
             product_row(
-                ProductEntity(category, category, "Portofoliu", category),
-                category_values.get((scope.period, category), Aggregate()),
-                category_values.get((previous_year_period, category), Aggregate()),
+                entity,
+                category_values.get((scope.period, entity.id), Aggregate()),
+                category_values.get((previous_year_period, entity.id), Aggregate()),
                 average(
-                    [category_values.get((item, category), Aggregate()) for item in recent_periods],
+                    [category_values.get((item, entity.id), Aggregate()) for item in recent_periods],
                     len(recent_periods),
                 ),
                 None,
                 None,
             )
-            for category in category_groups
+            for entity in category_entities.values()
         ]
         categories.sort(key=lambda item: item.sales, reverse=True)
 
@@ -1141,6 +1149,13 @@ class PostgresMonthlyReviewRepository(PostgresHardenedInsightRepository):
                 "Exportul Excel păstrează numerele ca valori numerice și separă fiecare nivel într-o foaie dedicată.",
             ],
         )
+
+    async def _review_category_rows(
+        self,
+        scope: AnalyticsScope,
+        periods: Sequence[str],
+    ) -> Sequence[asyncpg.Record]:
+        raise NotImplementedError("Monthly Review category aggregates require a governed reporting read model")
 
     async def _meta_for_review(self, scope: AnalyticsScope) -> OverviewMeta:
         summary = await self._fetch_summary(scope, scope.period)

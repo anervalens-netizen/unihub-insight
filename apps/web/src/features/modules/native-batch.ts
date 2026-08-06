@@ -23,6 +23,7 @@ interface NativeBatchRow {
   readonly step_kind?: unknown;
   readonly target?: unknown;
   readonly tertiary?: unknown;
+  readonly quaternary?: unknown;
   readonly value?: unknown;
   readonly x?: unknown;
   readonly y?: unknown;
@@ -275,6 +276,7 @@ export function applyNativeBatchResults(
               primary: value,
               secondary: numeric(row.secondary),
               tertiary: numeric(row.tertiary),
+              quaternary: numeric(row.quaternary),
               progress_pct: numeric(row.progress_pct),
               delta_pct: null,
               risk: risk(row.risk),

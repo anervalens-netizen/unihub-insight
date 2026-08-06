@@ -67,6 +67,79 @@ def test_visits_fail_reconciliation_when_expected_slice_is_missing() -> None:
     ) == {"visits.presence": Decimal("-1")}
 
 
+def test_sales_portfolio_reconciles_all_taxonomy_dimensions() -> None:
+    reconcile = load_reconcile_module()
+
+    def slice_(metrics: dict[str, Decimal], entities: int) -> SimpleNamespace:
+        return SimpleNamespace(
+            kpis=[SimpleNamespace(id=identifier, value=value) for identifier, value in metrics.items()],
+            breakdown=[object()] * entities,
+        )
+
+    control = {
+        "category": {
+            "sales": Decimal("3223513.13"),
+            "net_quantity": Decimal("33279"),
+            "entities": Decimal("6"),
+        },
+        "subcategory": {
+            "sales": Decimal("3223513.13"),
+            "net_quantity": Decimal("33279"),
+            "entities": Decimal("20"),
+        },
+        "brand": {
+            "sales": Decimal("3223513.13"),
+            "net_quantity": Decimal("33279"),
+            "return_quantity": Decimal("-58"),
+            "entities": Decimal("19"),
+        },
+        "product": {
+            "sales": Decimal("3223513.13"),
+            "net_quantity": Decimal("33279"),
+            "return_quantity": Decimal("-58"),
+            "receipt_incidence": Decimal("32400"),
+            "entities": Decimal("1099"),
+        },
+    }
+    base = {
+        "sales.portfolio_sales": Decimal("3223513.13"),
+        "sales.portfolio_net_quantity": Decimal("33279"),
+    }
+    sales = SimpleNamespace(
+        portfolio={
+            "category": slice_(base, 6),
+            "subcategory": slice_(base, 20),
+            "brand": slice_({**base, "sales.portfolio_return_quantity": Decimal("-58")}, 19),
+            "product": slice_(
+                {
+                    **base,
+                    "sales.portfolio_return_quantity": Decimal("-58"),
+                    "sales.portfolio_receipt_incidence": Decimal("32400"),
+                },
+                1099,
+            ),
+        }
+    )
+
+    assert set(reconcile.portfolio_metric_differences(control, sales).values()) == {Decimal(0)}
+
+
+def test_sales_portfolio_reconciliation_fails_when_a_dimension_is_missing() -> None:
+    reconcile = load_reconcile_module()
+
+    differences = reconcile.portfolio_metric_differences(
+        {
+            dimension: {"sales": Decimal(0), "net_quantity": Decimal(0), "entities": Decimal(0)}
+            for dimension in reconcile.PORTFOLIO_DIMENSIONS
+        },
+        SimpleNamespace(portfolio={}),
+    )
+
+    assert differences == {
+        f"sales.portfolio.{dimension}.presence": Decimal("-1") for dimension in reconcile.PORTFOLIO_DIMENSIONS
+    }
+
+
 def test_authoritative_acceptance_refuses_partial_or_unavailable_sources() -> None:
     reconcile = load_reconcile_module()
     result = reconcile.ReconciliationResult(

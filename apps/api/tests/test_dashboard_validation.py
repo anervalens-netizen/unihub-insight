@@ -143,3 +143,18 @@ def test_dashboard_accepts_only_the_daily_sales_calendar_contract(client: TestCl
     response = client.post("/api/v1/dashboards", json=payload(invalid))
     assert response.status_code == 422
     assert any("calendar requires" in item for item in response.json()["detail"]["errors"])
+
+
+def test_dashboard_validates_sales_portfolio_taxonomy_dimensions(client: TestClient) -> None:
+    product = {
+        **BASE_WIDGET,
+        "metric_id": "sales.portfolio_receipt_incidence",
+        "dimension": "product",
+        "dimensions": ["product"],
+    }
+    assert client.post("/api/v1/dashboards", json=payload(product)).status_code == 201
+
+    invalid = {**product, "dimension": "brand", "dimensions": ["brand"]}
+    response = client.post("/api/v1/dashboards", json=payload(invalid))
+    assert response.status_code == 422
+    assert any("incompatible" in item for item in response.json()["detail"]["errors"])

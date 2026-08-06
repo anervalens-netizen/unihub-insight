@@ -30,7 +30,12 @@ from unihub_insight_api.domain import (
     WidgetQueryResult,
 )
 from unihub_insight_api.repositories.base import AnalyticsRepository
-from unihub_insight_api.services.metric_catalog import METRIC_CATALOG, metric_entity_dimension
+from unihub_insight_api.services.metric_catalog import (
+    METRIC_CATALOG,
+    PORTFOLIO_DIMENSIONS,
+    PORTFOLIO_METRIC_IDS,
+    metric_entity_dimension,
+)
 from unihub_insight_api.services.scope import scope_label
 
 ALLOWED_FILTERS = frozenset({"firm", "regional", "asm", "stores", "agent"})
@@ -45,6 +50,7 @@ ALLOWED_SORT_FIELDS = frozenset(
         "target",
         "secondary",
         "tertiary",
+        "quaternary",
         "progress_pct",
         "risk",
         "net_quantity",
@@ -68,7 +74,14 @@ VISIT_METRICS = frozenset(
 )
 MODULE_METRICS: dict[ModuleId, frozenset[str]] = {
     ModuleId.SALES: frozenset(
-        {"sales.total", "target.progress_pct", "receipts.total", "receipts.average_value", "receipt_2plus_pct"}
+        {
+            "sales.total",
+            "target.progress_pct",
+            "receipts.total",
+            "receipts.average_value",
+            "receipt_2plus_pct",
+            *PORTFOLIO_METRIC_IDS,
+        }
     ),
     ModuleId.PERFORMANCE: frozenset(
         {
@@ -193,6 +206,20 @@ def _metric_for(query: WidgetQuery, user: UserContext) -> MetricDefinition:
         raise QueryValidationFailure("Comparațiile cer dimensiunea time.")
     if any(dimension not in metric.allowed_dimensions for dimension in query.dimensions):
         raise QueryValidationFailure("Combinația metrică × dimensiune nu este permisă.")
+    if query.metric_id in PORTFOLIO_METRIC_IDS and (
+        len(query.dimensions) != 1 or query.dimensions[0] not in PORTFOLIO_DIMENSIONS
+    ):
+        raise QueryValidationFailure(
+            "Portofoliul Sales cere exact o dimensiune: category, subcategory, brand sau product."
+        )
+    if (
+        query.metric_id in PORTFOLIO_METRIC_IDS
+        and query.dimensions == ("product",)
+        and query.visualization not in {ChartKind.KPI, ChartKind.TABLE}
+    ):
+        raise QueryValidationFailure(
+            "Produsele acceptă numai KPI și tabel; distribuțiile cu sute de SKU nu sunt eligibile."
+        )
     if query.time_grain not in metric.allowed_grains:
         raise QueryValidationFailure("Granularitatea nu este permisă pentru metrică.")
     if query.visualization not in metric.allowed_shapes:
@@ -212,10 +239,12 @@ def _metric_for(query: WidgetQuery, user: UserContext) -> MetricDefinition:
         "compensation.payroll": "firm",
         "finance.operating_costs": "category",
     }
-    if query.visualization in {ChartKind.DONUT, ChartKind.TREEMAP} and query.dimensions != (
-        distribution_dimensions.get(query.metric_id),
-    ):
-        raise QueryValidationFailure("Mixul cere dimensiunea agregată aprobată pentru metrică.")
+    if query.visualization in {ChartKind.DONUT, ChartKind.TREEMAP}:
+        if query.metric_id in PORTFOLIO_METRIC_IDS:
+            if len(query.dimensions) != 1 or query.dimensions[0] not in metric.allowed_dimensions:
+                raise QueryValidationFailure("Mixul de portofoliu cere dimensiunea taxonomică a metricii.")
+        elif query.dimensions != (distribution_dimensions.get(query.metric_id),):
+            raise QueryValidationFailure("Mixul cere dimensiunea agregată aprobată pentru metrică.")
     if query.visualization is ChartKind.WATERFALL and (
         query.metric_id != "finance.ebit" or query.dimensions != ("category",)
     ):
@@ -316,6 +345,10 @@ def _sorted_rows(
 def _field_for(module: ModuleId, metric_id: str, *, breakdown: bool = False) -> str:
     mappings: dict[str, str] = {
         "sales.total": "primary",
+        "sales.portfolio_sales": "primary",
+        "sales.portfolio_net_quantity": "secondary",
+        "sales.portfolio_return_quantity": "tertiary",
+        "sales.portfolio_receipt_incidence": "quaternary",
         "target.progress_pct": "progress_pct" if breakdown else "primary",
         "performance.average": "progress_pct" if breakdown else "primary",
         "performance.daily_productivity": "tertiary" if breakdown else "secondary",
@@ -358,7 +391,14 @@ def _decimal_or_none(value: object) -> Decimal | int | str | bool | None:
 def _data_for_metric(
     response: ModuleAnalyticsResponse,
     metric_id: str,
+    dimensions: tuple[str, ...] = (),
 ) -> ModuleAnalyticsResponse | ModuleAnalyticsSlice:
+    if metric_id in PORTFOLIO_METRIC_IDS:
+        dimension = dimensions[0] if len(dimensions) == 1 else None
+        data = response.portfolio.get(dimension or "")
+        if data is None:
+            raise RuntimeError("Portfolio analytics slice is unavailable.")
+        return data
     if metric_id.startswith("campaigns.promo_"):
         data = response.campaigns.get("promo")
         if data is None:
@@ -381,7 +421,7 @@ def _dataset(
     response: ModuleAnalyticsResponse,
     comparison_responses: dict[QueryComparison, ModuleAnalyticsResponse] | None = None,
 ) -> QueryDataset:
-    data = _data_for_metric(response, query.metric_id)
+    data = _data_for_metric(response, query.metric_id, query.dimensions)
     metric = next((item for item in data.kpis if item.id == query.metric_id), None)
     if query.visualization is ChartKind.KPI and query.metric_id == "target.progress_pct":
         actual = next((item for item in response.kpis if item.id == "sales.total"), None)
@@ -523,7 +563,10 @@ def _dataset(
         trend_rows: list[dict[str, str | Decimal | int | bool | None]] = []
         points = data.trend
         comparison_points = {
-            comparison: {point.key: point for point in _data_for_metric(comparison_response, query.metric_id).trend}
+            comparison: {
+                point.key: point
+                for point in _data_for_metric(comparison_response, query.metric_id, query.dimensions).trend
+            }
             for comparison, comparison_response in (comparison_responses or {}).items()
         }
         primary_values: list[Decimal | None] = []
@@ -596,10 +639,9 @@ def _dataset(
             rows=_sorted_rows(trend_rows, query.sort, query.limit),
         )
 
-    if query.visualization in {ChartKind.DONUT, ChartKind.TREEMAP} or query.dimensions[0] in {
-        "category",
-        "mechanism",
-    }:
+    if query.visualization in {ChartKind.DONUT, ChartKind.TREEMAP} or (
+        query.metric_id not in PORTFOLIO_METRIC_IDS and query.dimensions[0] in {"category", "mechanism"}
+    ):
         return QueryDataset(
             dimensions=[
                 DatasetDimension(
@@ -621,6 +663,11 @@ def _dataset(
         )
 
     field = _field_for(query.module, query.metric_id, breakdown=True)
+    entity_dimension = (
+        query.dimensions[0]
+        if query.metric_id in PORTFOLIO_METRIC_IDS
+        else metric_entity_dimension(query.module, query.metric_id)
+    )
     breakdown_rows: list[dict[str, str | Decimal | int | bool | None]] = []
     for row in data.breakdown:
         value = _decimal_or_none(getattr(row, field, None))
@@ -636,6 +683,7 @@ def _dataset(
                 "value": value,
                 "secondary": row.secondary,
                 "tertiary": row.tertiary,
+                "quaternary": row.quaternary,
                 "progress_pct": row.progress_pct,
                 "risk": row.risk.value,
             }
@@ -647,13 +695,14 @@ def _dataset(
                 label="Cheie",
                 kind="string",
                 role="key",
-                source_dimension=metric_entity_dimension(query.module, query.metric_id),
+                source_dimension=entity_dimension,
             ),
             DatasetDimension(id="label", label="Entitate", kind="string", role="label"),
             DatasetDimension(id="context", label="Context", kind="string", role="metadata"),
             DatasetDimension(id="value", label=query.metric_id, kind="number"),
             DatasetDimension(id="secondary", label="Secundar", kind="number", role="metadata"),
             DatasetDimension(id="tertiary", label="Terțiar", kind="number", role="metadata"),
+            DatasetDimension(id="quaternary", label="Incidențe SKU în bonuri", kind="number", role="metadata"),
             DatasetDimension(id="progress_pct", label="Progres", kind="number", role="metadata"),
             DatasetDimension(id="risk", label="Risc", kind="string", role="metadata"),
         ],

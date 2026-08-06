@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "UniHub Insight API"
-    version: str = "1.0.0-rc.1"
+    version: str = "1.0.0-rc.2"
     environment: Literal["development", "test", "production"] = "development"
     data_mode: Literal["demo", "postgres"] = "demo"
     auth_mode: Literal["demo", "proxy"] = "demo"

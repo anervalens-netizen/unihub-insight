@@ -30,7 +30,15 @@ import { ModuleProvider } from './context';
 import { moduleDistributionDimension, moduleEntityDimension } from './interactions';
 import { openRetailContext, retailContextUrl, retailEntityContextUrl } from './retail-link';
 import type { ModuleAnalytics, ModuleId } from './schemas';
-import { type ModuleSubview, moduleSubviewConfig, subviewForId, subviewStatus } from './subviews';
+import {
+  type ModuleSubview,
+  moduleSubviewConfig,
+  portfolioDimensionForSubview,
+  specializedSubviewActions,
+  subviewForId,
+  subviewStatus,
+  unavailableSubviewCopy,
+} from './subviews';
 import { moduleWidgetQuerySpec, moduleWidgets } from './widget-catalog';
 
 const QueryInspector = lazy(() =>
@@ -46,28 +54,34 @@ type NativeBatchProjector = (
   results: readonly WidgetQueryResult[],
 ) => ModuleAnalytics;
 
-function nativeWidgetQuery(
+export function nativeWidgetQuery(
   module: ModuleId,
   widgetId: string,
   search: ReturnType<typeof useGlobalSearch> & { period: string },
   metric: MetricDefinition | undefined,
+  selectedSubviewId?: ModuleSubview['id'],
 ): WidgetQuery | null {
   const spec = moduleWidgetQuerySpec(module, widgetId);
   if (!spec || !metric || metric.id !== spec.metricId) return null;
+  const portfolioDimension = selectedSubviewId
+    ? portfolioDimensionForSubview(selectedSubviewId)
+    : undefined;
+  const isPortfolioMetric = metric.id.startsWith('sales.portfolio_');
+  if (isPortfolioMetric && !portfolioDimension) return null;
   const entityDimension = spec.metricId.startsWith('visits.')
     ? 'team_leader'
-    : moduleEntityDimension[module];
+    : (portfolioDimension ?? moduleEntityDimension[module]);
   let visualization: WidgetQuery['visualization'];
   let dimensions: string[];
   if (spec.kind === 'kpi') {
     visualization = 'kpi';
-    dimensions = [];
+    dimensions = portfolioDimension ? [portfolioDimension] : [];
   } else if (spec.kind === 'trend') {
     visualization = 'line';
     dimensions = ['time'];
   } else if (spec.kind === 'distribution') {
     visualization = 'donut';
-    const dimension = moduleDistributionDimension[module];
+    const dimension = portfolioDimension ?? moduleDistributionDimension[module];
     if (!dimension) return null;
     dimensions = [dimension];
   } else if (spec.kind === 'matrix') {
@@ -117,7 +131,12 @@ function nativeWidgetQuery(
           ? parseComparisons(search)
           : [],
     sort: [],
-    limit: spec.kind === 'matrix' ? 5000 : spec.kind === 'breakdown' ? 500 : 100,
+    limit:
+      spec.kind === 'matrix' || spec.kind === 'table' || isPortfolioMetric
+        ? 5000
+        : spec.kind === 'breakdown'
+          ? 500
+          : 100,
     visualization,
   };
 }
@@ -134,7 +153,10 @@ function moduleExportParams(
 export function moduleSubviewData(data: ModuleAnalytics, subview: ModuleSubview): ModuleAnalytics {
   if (subview.id === 'visits' && data.visits) return { ...data, ...data.visits };
   const campaignSlice = data.campaigns?.[subview.id];
-  return campaignSlice ? { ...data, ...campaignSlice } : data;
+  if (campaignSlice) return { ...data, ...campaignSlice };
+  const portfolioDimension = portfolioDimensionForSubview(subview.id);
+  const portfolioSlice = portfolioDimension ? data.portfolio?.[portfolioDimension] : undefined;
+  return portfolioSlice ? { ...data, ...portfolioSlice } : data;
 }
 
 function SubviewNavigation({
@@ -225,10 +247,11 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
           widget.id,
           input,
           spec ? catalogMetrics.get(spec.metricId) : undefined,
+          selectedSubview.id,
         );
         return widgetQuery ? [widgetQuery] : [];
       }),
-    [candidateWidgets, catalogMetrics, input, module],
+    [candidateWidgets, catalogMetrics, input, module, selectedSubview.id],
   );
   const batchRequest = useMemo<QueryBatchRequest>(
     () => ({
@@ -257,6 +280,9 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
       active = false;
     };
   }, []);
+  useEffect(() => {
+    if (rawStatus?.availability === 'unavailable') setEditMode(false);
+  }, [rawStatus?.availability]);
 
   if (incompatibleAgent) {
     return (
@@ -338,6 +364,7 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
   const inspectedMetric = inspectedQuery ? catalogMetrics.get(inspectedQuery.metric_id) : undefined;
   const inspectedResult = inspectWidget ? batchResultByWidget.get(inspectWidget) : undefined;
   const retailUrl = retailContextUrl(environment.retailBaseUrl, module, selectedSubview.id, input);
+  const actions = specializedSubviewActions(status?.availability ?? 'unavailable');
   const handleUrlState = (event: { dimensionId: string; value: string; label: string | null }) => {
     updateSearch(crossFilterPatch(search.drill, event));
   };
@@ -367,7 +394,11 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
       />
       <section className="module-view-heading">
         <div>
-          <span>Sub-view specializat</span>
+          <span>
+            {portfolioDimensionForSubview(selectedSubview.id)
+              ? 'Sales Portfolio'
+              : 'Sub-view specializat'}
+          </span>
           <h2>{selectedSubview.label}</h2>
           <p>{selectedSubview.description}</p>
         </div>
@@ -405,12 +436,14 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
             <ExternalLink size={15} />
             Deschide în Retail
           </a>
-          <ExcelExportButton
-            path={`/exports/modules/${module}.xlsx`}
-            params={moduleExportParams(input, data.meta.analytical_snapshot_id)}
-            filename={`${module}-${period}.xlsx`}
-            label="Raport complet XLSX"
-          />
+          {actions.showExport ? (
+            <ExcelExportButton
+              path={`/exports/modules/${module}.xlsx`}
+              params={moduleExportParams(input, data.meta.analytical_snapshot_id)}
+              filename={`${module}-${period}.xlsx`}
+              label="Raport complet XLSX"
+            />
+          ) : null}
           <button
             type="button"
             className="button button--secondary"
@@ -422,7 +455,7 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
             <RefreshCw size={15} />
             Actualizează
           </button>
-          {editMode ? (
+          {actions.showLayout && editMode ? (
             <button
               type="button"
               className="button button--ghost"
@@ -432,20 +465,22 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
               Layout implicit
             </button>
           ) : null}
-          <button
-            type="button"
-            className={`button ${editMode ? 'button--primary' : 'button--secondary'}`}
-            onClick={() => setEditMode((value) => !value)}
-          >
-            {editMode ? <Lock size={15} /> : <Unlock size={15} />}
-            {editMode ? 'Salvează layout' : 'Editează layout'}
-          </button>
+          {actions.showLayout ? (
+            <button
+              type="button"
+              className={`button ${editMode ? 'button--primary' : 'button--secondary'}`}
+              onClick={() => setEditMode((value) => !value)}
+            >
+              {editMode ? <Lock size={15} /> : <Unlock size={15} />}
+              {editMode ? 'Salvează layout' : 'Editează layout'}
+            </button>
+          ) : null}
         </div>
       </section>
       <Suspense fallback={null}>
         <SourceMetadataStrip data={data} />
       </Suspense>
-      {editMode ? (
+      {actions.showLayout && editMode ? (
         <div className="edit-notice">
           Trage cardurile din antet și redimensionează-le. Layoutul local este versionat separat
           pentru fiecare modul.
@@ -455,9 +490,7 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
         <div className="module-unavailable" role="status">
           <strong>{selectedSubview.label} nu este disponibil</strong>
           <span>{status.reason}</span>
-          <small>
-            Contractul lipsă nu este înlocuit cu cifre din alt mecanism sau din altă generație.
-          </small>
+          <small>{unavailableSubviewCopy(selectedSubview)}</small>
         </div>
       ) : (
         <DashboardCanvas

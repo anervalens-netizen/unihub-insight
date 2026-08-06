@@ -15,6 +15,17 @@ KPI_TABLE = (ChartKind.KPI, ChartKind.TABLE)
 TREND = (ChartKind.KPI, ChartKind.LINE, ChartKind.AREA, ChartKind.BAR, ChartKind.TABLE)
 TREND_MIX = (*TREND[:-1], ChartKind.DONUT, ChartKind.TREEMAP, ChartKind.TABLE)
 TEMPORAL_COMPARISONS = ("previous-period", "previous-year", "recent-average")
+PORTFOLIO_DIMENSIONS = ("category", "subcategory", "brand", "product")
+PORTFOLIO_ITEM_DIMENSIONS = ("brand", "product")
+PORTFOLIO_SHAPES = (ChartKind.KPI, ChartKind.BAR, ChartKind.DONUT, ChartKind.TREEMAP, ChartKind.TABLE)
+PORTFOLIO_METRIC_IDS = frozenset(
+    {
+        "sales.portfolio_sales",
+        "sales.portfolio_net_quantity",
+        "sales.portfolio_return_quantity",
+        "sales.portfolio_receipt_incidence",
+    }
+)
 
 MODULE_PRIMARY_METRIC_IDS: dict[ModuleId, str] = {
     ModuleId.SALES: "sales.total",
@@ -160,6 +171,54 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         dimensions=("firm", "regional", "asm", "store", "agent", "category", "time"),
         comparisons=("target", *TEMPORAL_COMPARISONS),
         shapes=(*TREND_MIX[:-1], ChartKind.CALENDAR, ChartKind.TABLE),
+    ),
+    metric(
+        "sales.portfolio_sales",
+        "Vânzări nete portofoliu",
+        "Vânzări nete pe categorie, subcategorie, brand real sau produs, din read-model-urile Retail aprobate.",
+        MetricUnit.CURRENCY,
+        dimensions=PORTFOLIO_DIMENSIONS,
+        grains=("month",),
+        comparisons=(),
+        missing="source-row-missing-remains-missing",
+        shapes=PORTFOLIO_SHAPES,
+        source_authority="reporting_category_month/reporting_item_month",
+    ),
+    metric(
+        "sales.portfolio_net_quantity",
+        "Cantitate netă portofoliu",
+        "Cantitate netă pe categorie, subcategorie, brand real sau produs.",
+        MetricUnit.INTEGER,
+        dimensions=PORTFOLIO_DIMENSIONS,
+        grains=("month",),
+        comparisons=(),
+        missing="source-row-missing-remains-missing",
+        shapes=PORTFOLIO_SHAPES,
+        source_authority="reporting_category_month/reporting_item_month",
+    ),
+    metric(
+        "sales.portfolio_return_quantity",
+        "Cantitate retur semnată",
+        "Cantitatea de retur semnată pe brand real sau produs, exclusiv din reporting_item_month.",
+        MetricUnit.INTEGER,
+        dimensions=PORTFOLIO_ITEM_DIMENSIONS,
+        grains=("month",),
+        comparisons=(),
+        missing="source-row-missing-remains-missing",
+        shapes=PORTFOLIO_SHAPES,
+        source_authority="reporting_item_month",
+    ),
+    metric(
+        "sales.portfolio_receipt_incidence",
+        "Incidențe SKU în bonuri",
+        "Suma incidențelor produs-bon pentru SKU; nu reprezintă bonuri distincte.",
+        MetricUnit.INTEGER,
+        dimensions=("product",),
+        grains=("month",),
+        comparisons=(),
+        missing="source-row-missing-remains-missing",
+        shapes=PORTFOLIO_SHAPES,
+        source_authority="reporting_item_month",
     ),
     metric(
         "target.progress_pct",
@@ -601,6 +660,33 @@ DIMENSION_CATALOG: tuple[DimensionDefinition, ...] = (
         description="Categorie autoritativă din reporting Retail.",
         stable_key="category_id",
         allowed_grains=("day", "week", "month", "quarter", "year"),
+    ),
+    DimensionDefinition(
+        id="subcategory",
+        display_name="Subcategorie",
+        description="Subcategoria Retail, păstrată împreună cu categoria părinte în identificatorul analitic.",
+        stable_key="category_subcategory_id",
+        allowed_grains=("month",),
+        source_authority="reporting_category_month",
+    ),
+    DimensionDefinition(
+        id="brand",
+        display_name="Brand",
+        description="Brandul real din Monthly Review, atașat fără a modifica măsurile din reporting_item_month.",
+        stable_key="brand_normalized",
+        allowed_grains=("month",),
+        source_authority="insight.monthly_review_item_month",
+    ),
+    DimensionDefinition(
+        id="product",
+        display_name="Produs",
+        description=(
+            "SKU Retail curent, consolidat strict pe item_code; contextul de brand/categorie și eticheta MAX stabilă "
+            "sunt semnalate când sursa are variante."
+        ),
+        stable_key="item_code",
+        allowed_grains=("month",),
+        source_authority="reporting_item_month",
     ),
 )
 
