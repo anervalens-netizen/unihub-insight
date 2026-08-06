@@ -6,13 +6,41 @@ Prove that UniHub Insight presents the same business truth as UniHub Retail for 
 
 ## Latest production evidence — 2026-08-06
 
-The bounded representative matrix passes 30/30 scopes: 15 for the closed
-month 2026-07 and 15 for the current month 2026-08. Every Sales, Target,
-Campaigns, Workforce and eligible Visits control difference is zero, including
-the official weighted Visits completion/checklist grain. Compensation, Finance
-and Planning remain explicitly unavailable where Retail has no eligible
-approved generation or head; reconciliation does not convert that absence to
-zero. The exact deployed SHA remains independently bound by public
+The bounded matrix has zero numeric differences for every available case:
+19/19 in the closed month 2026-07 and 18/18 in the current month 2026-08.
+This is **not** authoritative acceptance: 0/19 and 0/18 cases pass the source
+authority gate. July is missing the historically transferred-store sample;
+August is missing that sample and a partial-month target agent. Campaigns,
+Workforce and Planning are `partial`, Finance and Compensation are
+`unavailable`, and July Sales is also `partial`. Visits v2 differences are zero
+where eligible. Missing/partial sources and missing samples are never converted
+to success.
+
+Campaign publication v2 also reconciles June 2026 exactly. The source remains
+`partial`, rather than `unavailable`, because the legacy completed-sales head
+does not prove final sales authority. That status does not alter the canonical
+mechanism totals.
+
+| Mechanism / scope | Sales RON | Net quantity | Products | Stores | Canonical value |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Promo `promotie-actuala-mihai` / network | 190,544.58 | 1,090 | 42 | 76 | discount 21,991.08 |
+| Promo / Mobiup | 98,880.60 | 526 | 40 | 36 | discount 11,664.26 |
+| Promo / MobiCell | 91,663.98 | 564 | 37 | 40 | discount 10,326.82 |
+| Incentive campaign `5` / network | 2,803,358.98 | 29,107 | 877 | 76 | reward 76,367.50 |
+| Incentive / Mobiup | 1,371,590.36 | 14,006 | 838 | 36 | reward 33,105.00 |
+| Incentive / MobiCell | 1,431,768.62 | 15,101 | 809 | 40 | reward 43,262.50 |
+
+Promo discounted units are 646 network / 302 Mobiup / 344 MobiCell.
+Incentive eligible quantity is 27,549 and qualified quantity is 17,792;
+qualified-store count is 40 and potential reward is 161,025. Negative return
+rows remain signed in the publication. Every control total above has difference
+`0.00` or `0`, including the two company slices; active product counts are the
+distinct union of published product codes, never a sum of slice counts.
+
+`ops/scripts/reconcile.py --matrix` is fail-closed by default. `--numeric-only`
+still fails when a required sample is absent. The combination
+`--numeric-only --allow-missing-cases` is diagnostic evidence only and cannot
+approve `1.0`. The exact deployed SHA remains independently bound by public
 `build-info.json`, release evidence, preflight and the SLI evaluator.
 
 ## Required samples
@@ -43,7 +71,11 @@ Compare net sales, net quantity, receipts, 2+ accessory receipts, cutoff date an
 
 ### Campaigns
 
-Compare Focus sales/quantity and the count of active products/stores. Promo, Incentive and Concurs remain separate metrics and are not merged into Focus.
+Compare Focus sales/quantity and the count of active products/stores. Promo and
+Incentive additionally compare mechanism existence, sales, signed net quantity,
+distinct published product codes, participating stores and canonical
+discount/reward from `reporting_campaign_month_v2`. Promo, Incentive and Concurs
+remain separate metrics and are not merged into Focus.
 
 ### Workforce
 
@@ -85,4 +117,4 @@ Compare completed forecast run IDs, actuals, forecast values, target gap and acc
 
 ## No-go conditions
 
-Deployment remains blocked by any write privilege on the analytics role, an unexplained total difference, an agent receiving a store target, sensitive values visible below the suppression threshold, P&L actual/estimate overlap, stale migration checksum or non-finite query scope.
+Promotion remains blocked by any missing required sample, non-official required source, write privilege on the analytics role, unexplained total difference, an agent receiving a store target, sensitive values visible below the suppression threshold, P&L actual/estimate overlap, stale migration checksum or non-finite query scope.

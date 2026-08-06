@@ -17,6 +17,11 @@ from unihub_insight_api.domain import (
 from unihub_insight_api.services.metric_catalog import METRIC_CATALOG, metric_entity_dimension
 
 CATALOG_METRICS = {metric.id: metric for metric in METRIC_CATALOG}
+COMMERCIAL_CAMPAIGN_METRICS = frozenset(
+    metric_id
+    for metric_id in CATALOG_METRICS
+    if metric_id.startswith("campaigns.promo_") or metric_id.startswith("campaigns.incentive_")
+)
 VISIT_METRICS = frozenset(
     {
         "visits.total",
@@ -61,6 +66,7 @@ MODULE_METRICS: dict[ModuleId, frozenset[str]] = {
             "campaigns.focus_share",
             "campaigns.active_stores",
             "campaigns.active_products",
+            *COMMERCIAL_CAMPAIGN_METRICS,
         }
     ),
     ModuleId.WORKFORCE: frozenset(
@@ -186,6 +192,10 @@ SCALAR_ONLY_METRICS = frozenset(
         "performance.volatility",
         "campaigns.active_stores",
         "campaigns.active_products",
+        "campaigns.promo_active_stores",
+        "campaigns.promo_active_products",
+        "campaigns.incentive_active_stores",
+        "campaigns.incentive_active_products",
         "workforce.coverage",
         "workforce.stability",
         "compensation.sales_ratio",
@@ -249,13 +259,13 @@ def dashboard_allows_scope(document: DashboardDocument, scope: AnalyticsScope) -
     ceiling = document.scope_ceiling
     if ceiling.firms and scope.firm not in ceiling.firms:
         return False
-    if ceiling.regionals and scope.regional not in ceiling.regionals:
+    if ceiling.regionals and (not scope.regional or not set(scope.regional).issubset(ceiling.regionals)):
         return False
     if ceiling.asms and scope.asm not in ceiling.asms:
         return False
     if ceiling.stores and (not scope.stores or not set(scope.stores).issubset(ceiling.stores)):
         return False
-    return ceiling.allow_agent or scope.agent is None
+    return ceiling.allow_agent or not scope.agent
 
 
 def validate_batch_for_dashboard(document: DashboardDocument, request: QueryBatchRequest) -> None:
@@ -319,6 +329,10 @@ def validate_dashboard(request: DashboardCreateRequest, user: UserContext) -> No
         mix_dimensions = {
             "sales.total": "category",
             "campaigns.focus_sales": "category",
+            "campaigns.promo_sales": "category",
+            "campaigns.promo_discount": "category",
+            "campaigns.incentive_sales": "category",
+            "campaigns.incentive_reward": "category",
             "workforce.headcount": "tenure",
             "compensation.payroll": "firm",
             "finance.operating_costs": "category",

@@ -89,6 +89,26 @@ function nextWidget(module: ModuleId, existing: DashboardWidget[]): DashboardWid
   };
 }
 
+function withDuplicatedWidget(document: DashboardDocument, id: string): DashboardDocument {
+  const source = document.widgets.find((widget) => widget.id === id);
+  if (!source) return document;
+  const bottom = document.widgets.reduce(
+    (maximum, widget) => Math.max(maximum, widget.layout.y + widget.layout.h),
+    0,
+  );
+  return {
+    ...document,
+    widgets: [
+      ...document.widgets,
+      {
+        ...structuredClone(source),
+        id: crypto.randomUUID(),
+        layout: { ...source.layout, x: 0, y: bottom },
+      },
+    ],
+  };
+}
+
 export function CustomDashboardsPage() {
   const identity = useIdentity();
   const search = useGlobalSearch();
@@ -239,26 +259,14 @@ export function CustomDashboardsPage() {
     );
 
   const duplicateWidget = (id: string): void =>
-    setDraft((current) => {
-      if (!current) return current;
-      const source = current.widgets.find((widget) => widget.id === id);
-      if (!source) return current;
-      const bottom = current.widgets.reduce(
-        (maximum, widget) => Math.max(maximum, widget.layout.y + widget.layout.h),
-        0,
-      );
-      return {
-        ...current,
-        widgets: [
-          ...current.widgets,
-          {
-            ...structuredClone(source),
-            id: crypto.randomUUID(),
-            layout: { ...source.layout, x: 0, y: bottom },
-          },
-        ],
-      };
-    });
+    setDraft((current) => (current ? withDuplicatedWidget(current, id) : current));
+
+  const duplicateWidgetAndSave = (id: string): void => {
+    if (!draft || updateMutation.isPending) return;
+    const duplicated = withDuplicatedWidget(draft, id);
+    if (duplicated === draft) return;
+    updateMutation.mutate({ id: draft.id, document: duplicated });
+  };
 
   const applyLayout = useCallback((items: DashboardLayoutItem[]): void => {
     setDraft((current) =>
@@ -453,6 +461,7 @@ export function CustomDashboardsPage() {
                   editMode={canEdit && editLayout}
                   resetToken={resetToken}
                   onLayoutChange={canEdit ? applyLayout : () => undefined}
+                  {...(canEdit ? { onDuplicateWidget: duplicateWidgetAndSave } : {})}
                   onUrlStateChange={(event) => {
                     updateSearch(crossFilterPatch(search.drill, event));
                   }}

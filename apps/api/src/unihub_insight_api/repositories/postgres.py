@@ -85,7 +85,7 @@ class PostgresAnalyticsRepository:
                        authority_head, contract_version, rule_version, status,
                        as_of, cutoff, is_final, coverage_numerator,
                        coverage_denominator, produced_at, warnings
-                FROM reporting_source_snapshot_v3
+                FROM reporting_source_snapshot_v4
                 WHERE period = $1
                 ORDER BY domain
                 """,
@@ -121,7 +121,7 @@ class PostgresAnalyticsRepository:
         )
         digest = hashlib.sha256(f"{scope.period}|{generation_material}".encode()).hexdigest()
         return AnalyticalSnapshot(
-            id=f"retail-v3-{scope.period}-{digest[:32]}",
+            id=f"retail-v4-{scope.period}-{digest[:32]}",
             period=scope.period,
             sources=sources,
         )
@@ -372,7 +372,7 @@ class PostgresAnalyticsRepository:
                 ),
                 snapshot AS (
                     SELECT is_final AS is_month_final
-                    FROM reporting_source_snapshot_v3
+                    FROM reporting_source_snapshot_v4
                     WHERE domain = 'sales' AND period = $1
                     ORDER BY produced_at DESC
                     LIMIT 1
@@ -471,12 +471,12 @@ class PostgresAnalyticsRepository:
     @staticmethod
     def _target_source_sql(scope: AnalyticsScope, params: list[Any]) -> str:
         if scope.agent:
-            params.append(scope.agent)
+            params.append(list(scope.agent))
             return f"""
                 SELECT site_code, COALESCE(SUM(target_value), 0) AS target_value
                 FROM agent_targets
                 WHERE import_month = $1
-                  AND agent = ${len(params)}
+                  AND agent = ANY(${len(params)}::text[])
                 GROUP BY site_code
             """
         return """
@@ -495,6 +495,10 @@ class PostgresAnalyticsRepository:
             params.append(value)
             clauses.append(f"{column} = ${len(params)}{cast}")
 
+        def add_many(column: str, values: tuple[str, ...]) -> None:
+            params.append(list(values))
+            clauses.append(f"{column} = ANY(${len(params)}::text[])")
+
         if scope.stores:
             params.append(list(scope.stores))
             clauses.append(f"agg.site_code = ANY(${len(params)}::text[])")
@@ -502,11 +506,11 @@ class PostgresAnalyticsRepository:
             if scope.firm:
                 add("agg.firma", scope.firm)
             if scope.regional:
-                add("agg.regional", scope.regional)
+                add_many("agg.regional", scope.regional)
             if scope.asm:
                 add("agg.asm", scope.asm)
         if scope.agent:
-            add("agg.agent", scope.agent)
+            add_many("agg.agent", scope.agent)
         return clauses, params
 
     @staticmethod

@@ -248,6 +248,9 @@ test('native inspector traps focus, exports safe source rows and restores focus'
   page,
 }) => {
   await page.goto('/sales?period=2026-08&range=12&comparison=previous-year');
+  const explain = page.getByRole('button', { name: /Explică metrica/ }).first();
+  await explain.click();
+  await expect(page.getByRole('note').first()).toContainText('Formulă:');
   const inspect = page.getByRole('button', { name: /Inspectează datele/ }).first();
   await inspect.click();
 
@@ -278,7 +281,7 @@ test('native chart toggles, fullscreen, PNG and XLSX actions are operational', a
   await expect(expand).toBeFocused();
 
   const xlsx = page.waitForEvent('download');
-  await page.getByRole('button', { name: /Excel/ }).click();
+  await page.getByRole('button', { name: 'Raport complet XLSX' }).click();
   await expect((await xlsx).suggestedFilename()).toMatch(/\.xlsx$/);
 });
 
@@ -376,7 +379,7 @@ test('native trend applies an exact custom range and survives reload', async ({ 
 
 test('module contextual Retail link preserves the operational scope', async ({ page }) => {
   await page.goto(
-    '/sales?period=2026-08&range=custom&start=2026-03&end=2026-08&subview=trend&firm=Mobicell&regional=Nord&stores=S001&agent=Agent%20Test',
+    '/sales?period=2026-08&range=custom&start=2026-03&end=2026-08&subview=trend&firm=Mobicell&regional=Nord&asm=ASM%20Test&stores=S001&agent=Agent%20Test',
   );
   const link = page.getByRole('link', { name: /Deschide Trend în UniHub Retail/ });
   const linkHref = await link.getAttribute('href');
@@ -392,6 +395,7 @@ test('module contextual Retail link preserves the operational scope', async ({ p
     range_end: '2026-08',
     firma: 'Mobicell',
     rm: 'Nord',
+    asm: 'ASM Test',
     magazin: 'S001',
     agent: 'Agent Test',
   });
@@ -467,15 +471,71 @@ test('empty analytical arrays render bounded empty states', async ({ page }) => 
   await expect(page.locator('.empty-state').first()).toBeVisible();
 });
 
+test('global filter preset supports create, apply, update and delete', async ({ page }) => {
+  await page.goto('/?period=2026-08&range=12&comparison=previous-year');
+  const preset = page.locator('.filter-popover--presets');
+  await preset.locator('summary').click();
+  await preset.getByPlaceholder('Nume preset').fill('Închidere august');
+  await preset.getByRole('checkbox').check();
+  await preset.getByRole('button', { name: 'Nou' }).click();
+  await expect(preset.getByText('Preset salvat.')).toBeVisible();
+  await expect(preset.locator('select')).toHaveValue(/.+/);
+
+  await page.goto('/?period=2026-07&range=month');
+  await preset.locator('summary').click();
+  await preset.locator('select').selectOption({ label: 'Închidere august · shared' });
+  await expect(preset.getByText('Preset aplicat.')).toBeVisible();
+  await expect(page).toHaveURL(/period=2026-08/);
+  await expect(page.getByLabel('Interval')).toHaveValue('12');
+
+  await preset.getByPlaceholder('Nume preset').fill('Închidere august validată');
+  await preset.getByRole('button', { name: 'Actualizează' }).click();
+  await expect(preset.getByText('Preset actualizat.')).toBeVisible();
+  await expect(preset.locator('select option:checked')).toHaveText(
+    'Închidere august validată · shared',
+  );
+
+  await preset.getByRole('button', { name: 'Șterge' }).click();
+  await expect(preset.getByText('Preset șters.')).toBeVisible();
+  await expect(preset.locator('select')).toHaveValue('');
+  await expect(preset.locator('option')).toHaveCount(1);
+});
+
 test('custom dashboard blank, widget duplication, versioning and clone lifecycle', async ({
   page,
 }) => {
+  await page.route('**/api/v1/dashboards/subjects', (route) =>
+    route.fulfill({
+      json: [
+        {
+          subject: 'demo-admin',
+          email: 'andrei@example.test',
+          display_name: 'Andrei',
+          last_seen_at: '2026-08-06T08:00:00Z',
+        },
+        {
+          subject: 'authentik:alexandra',
+          email: 'alexandra@example.test',
+          display_name: 'Alexandra',
+          last_seen_at: '2026-08-06T08:00:00Z',
+        },
+      ],
+    }),
+  );
   await page.goto('/dashboards?period=2026-08');
   await page.getByTitle('Creează dashboard gol').click();
   await expect(page.locator('.dashboard-name-input')).toHaveValue('Dashboard nou');
   await expect(page.locator('.save-message')).toContainText('Dashboard creat');
 
   await page.getByRole('button', { name: 'Configurare' }).click();
+  await page.getByLabel('Subiect autorizat').selectOption('authentik:alexandra');
+  const alexandraAcl = page.locator('.dashboard-acl-row').filter({ hasText: 'Alexandra' });
+  await expect(alexandraAcl).toBeVisible();
+  await alexandraAcl.locator('select').selectOption('edit');
+  await expect(alexandraAcl.locator('select')).toHaveValue('edit');
+  await alexandraAcl.getByRole('button', { name: /Elimină authentik:alexandra/ }).click();
+  await expect(alexandraAcl).toHaveCount(0);
+  await expect(page.getByText('Niciun share explicit.')).toBeVisible();
   await page.locator('.widget-editor-header select').selectOption('sales');
   await expect(page.locator('.widget-editor-card')).toHaveCount(1);
   const firstEditor = page.locator('.widget-editor-card').first();
@@ -534,7 +594,11 @@ test('custom dashboard template executes batch and exports inspected rows', asyn
     .click();
   await expect(page.locator('.dashboard-name-input')).toHaveValue('Regional Manager');
   await expect(page.locator('.insight-grid')).toBeVisible();
-  const inspect = page.getByRole('button', { name: /Inspectează datele Vânzări/ });
+  const initialCards = await page.locator('.widget-card').count();
+  await page.getByRole('button', { name: /Duplică widgetul Vânzări/ }).click();
+  await expect(page.locator('.widget-card')).toHaveCount(initialCards + 1);
+  await expect(page.locator('.save-message')).toContainText('Dashboard salvat');
+  const inspect = page.getByRole('button', { name: /Inspectează datele Vânzări/ }).first();
   await expect(inspect).toBeEnabled();
   await inspect.click();
   const dialog = page.getByRole('dialog', { name: /Vânzări/ });
@@ -642,13 +706,17 @@ test('canvas POC bounds 10 widgets, heatmap 100x36, scatter 5000 and repeated na
       page
         .locator('.widget-card')
         .filter({ hasText: 'Matrice magazine' })
-        .locator('canvas')
+        .locator('.chart[data-chart-ready="true"]')
         .count(),
     )
     .toBeGreaterThanOrEqual(1);
   await expect
     .poll(() =>
-      page.locator('.widget-card').filter({ hasText: 'Clasament' }).locator('canvas').count(),
+      page
+        .locator('.widget-card')
+        .filter({ hasText: 'Clasament' })
+        .locator('.chart[data-chart-ready="true"]')
+        .count(),
     )
     .toBeGreaterThanOrEqual(1);
   const canvasCount = await page.locator('.configured-chart canvas').count();

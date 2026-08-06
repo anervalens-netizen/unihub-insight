@@ -14,7 +14,7 @@ from unihub_insight_api.services.module_window import ModuleWindow
 ALLOWED_COMPARISONS = frozenset({"target", "forecast", "previous-period", "previous-year", "recent-average"})
 
 
-def parse_stores(value: str | None) -> tuple[str, ...]:
+def parse_selection(value: str | None) -> tuple[str, ...]:
     if not value:
         return ()
     seen: set[str] = set()
@@ -27,23 +27,24 @@ def parse_stores(value: str | None) -> tuple[str, ...]:
     return tuple(result)
 
 
+parse_stores = parse_selection
+
+
 async def analytics_scope(
     period: Annotated[str, Query(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")],
     comparison: Annotated[ComparisonMode, Query()] = ComparisonMode.PREVIOUS_YEAR,
     firm: Annotated[str | None, Query(max_length=120)] = None,
-    regional: Annotated[str | None, Query(max_length=120)] = None,
-    asm: Annotated[str | None, Query(max_length=120)] = None,
+    regional: Annotated[str | None, Query(max_length=2000)] = None,
     stores: Annotated[str | None, Query(max_length=2000)] = None,
-    agent: Annotated[str | None, Query(max_length=180)] = None,
+    agent: Annotated[str | None, Query(max_length=2000)] = None,
 ) -> AnalyticsScope:
     return AnalyticsScope(
         period=period,
         comparison=comparison,
         firm=firm or None,
-        regional=regional or None,
-        asm=asm or None,
-        stores=parse_stores(stores),
-        agent=agent or None,
+        regional=parse_selection(regional),
+        stores=parse_selection(stores),
+        agent=parse_selection(agent),
     )
 
 

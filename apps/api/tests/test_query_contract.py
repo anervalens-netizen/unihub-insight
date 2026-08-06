@@ -57,6 +57,13 @@ def test_versioned_catalog_exposes_query_and_dimension_contract(client: TestClie
     visits = next(item for item in payload["metrics"] if item["id"] == "visits.total")
     assert visits["source_authority"] == "reporting_visit_month_v2"
     assert "team_leader" in visits["allowed_dimensions"]
+    campaign_metrics = {item["id"] for item in payload["metrics"] if item["id"].startswith("campaigns.")}
+    assert {
+        "campaigns.promo_sales",
+        "campaigns.promo_discount",
+        "campaigns.incentive_sales",
+        "campaigns.incentive_reward",
+    } <= campaign_metrics
     formula_references = [item["formula_reference"] for item in payload["metrics"]]
     assert len(formula_references) == len(set(formula_references))
     assert all(reference != "retail-reporting-contract" for reference in formula_references)

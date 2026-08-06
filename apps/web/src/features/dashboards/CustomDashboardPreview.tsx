@@ -23,6 +23,7 @@ export function CustomDashboardPreview({
   editMode,
   resetToken,
   onLayoutChange,
+  onDuplicateWidget,
   onUrlStateChange,
   onEntityOpen,
   onUrlRangeChange,
@@ -33,6 +34,7 @@ export function CustomDashboardPreview({
   editMode: boolean;
   resetToken: number;
   onLayoutChange: (items: DashboardLayoutItem[]) => void;
+  onDuplicateWidget?: (widgetId: string) => void;
   onUrlStateChange?: (event: ChartUrlStateEvent) => void;
   onEntityOpen?: (module: ModuleId, event: ChartUrlStateEvent) => void;
   onUrlRangeChange?: (event: ChartUrlRangeEvent) => void;
@@ -91,6 +93,9 @@ export function CustomDashboardPreview({
       id: widget.id,
       title: widget.title,
       subtitle: `${widget.module} · ${widget.metric_id}`,
+      explanation: metric
+        ? `${metric.description} Formulă: ${metric.formula_reference}. Missing: ${metric.missing_policy}.`
+        : `Metrica ${widget.metric_id} nu mai există în catalogul activ.`,
       component: Component,
       x: widget.layout.x,
       y: widget.layout.y,
@@ -112,6 +117,7 @@ export function CustomDashboardPreview({
         onLayoutChange={onLayoutChange}
         onInspect={setInspectWidgetId}
         onExport={setInspectWidgetId}
+        {...(onDuplicateWidget ? { onDuplicate: onDuplicateWidget } : {})}
       />
       {inspectWidget && inspectResult && inspectMetric && batchQuery.data ? (
         <Suspense fallback={null}>

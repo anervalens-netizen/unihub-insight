@@ -16,9 +16,10 @@ describe('Retail contextual deep links', () => {
         start: '2026-03',
         end: '2026-08',
         firm: 'Mobicell',
-        regional: 'Nord',
+        regional: 'Nord,Sud',
+        asm: 'ASM legacy drill',
         stores: 'S001',
-        agent: 'Agent Test',
+        agent: 'Agent 1,Agent 2',
       }),
     );
     expect(url.pathname).toBe('/hub');
@@ -29,9 +30,10 @@ describe('Retail contextual deep links', () => {
       range_start: '2026-03',
       range_end: '2026-08',
       firma: 'Mobicell',
-      rm: 'Nord',
+      rm: 'Nord,Sud',
+      asm: 'ASM legacy drill',
       magazin: 'S001',
-      agent: 'Agent Test',
+      agent: 'Agent 1,Agent 2',
     });
   });
 

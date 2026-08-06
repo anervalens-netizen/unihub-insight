@@ -53,6 +53,11 @@ ALLOWED_SORT_FIELDS = frozenset(
     }
 )
 METRICS = {metric.id: metric for metric in METRIC_CATALOG}
+COMMERCIAL_CAMPAIGN_METRICS = frozenset(
+    metric_id
+    for metric_id in METRICS
+    if metric_id.startswith("campaigns.promo_") or metric_id.startswith("campaigns.incentive_")
+)
 VISIT_METRICS = frozenset(
     {
         "visits.total",
@@ -75,7 +80,13 @@ MODULE_METRICS: dict[ModuleId, frozenset[str]] = {
         }
     ),
     ModuleId.CAMPAIGNS: frozenset(
-        {"campaigns.focus_sales", "campaigns.focus_share", "campaigns.active_stores", "campaigns.active_products"}
+        {
+            "campaigns.focus_sales",
+            "campaigns.focus_share",
+            "campaigns.active_stores",
+            "campaigns.active_products",
+            *COMMERCIAL_CAMPAIGN_METRICS,
+        }
     ),
     ModuleId.WORKFORCE: frozenset(
         {
@@ -134,6 +145,10 @@ SCALAR_ONLY_METRICS = frozenset(
         "performance.volatility",
         "campaigns.active_stores",
         "campaigns.active_products",
+        "campaigns.promo_active_stores",
+        "campaigns.promo_active_products",
+        "campaigns.incentive_active_stores",
+        "campaigns.incentive_active_products",
         "workforce.coverage",
         "workforce.stability",
         "compensation.sales_ratio",
@@ -189,6 +204,10 @@ def _metric_for(query: WidgetQuery, user: UserContext) -> MetricDefinition:
     distribution_dimensions = {
         "sales.total": "category",
         "campaigns.focus_sales": "category",
+        "campaigns.promo_sales": "category",
+        "campaigns.promo_discount": "category",
+        "campaigns.incentive_sales": "category",
+        "campaigns.incentive_reward": "category",
         "workforce.headcount": "tenure",
         "compensation.payroll": "firm",
         "finance.operating_costs": "category",
@@ -238,6 +257,13 @@ def _filter_text(value: str | tuple[str, ...] | None) -> str | None:
     return value.strip() or None
 
 
+def _filter_values(value: str | tuple[str, ...] | None) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    source = value.split(",") if isinstance(value, str) else value
+    return tuple(dict.fromkeys(item.strip() for item in source if item.strip()))
+
+
 def resolve_query_scope(base: AnalyticsScope, query: WidgetQuery) -> AnalyticsScope:
     filters = query.filters
     stores_value = filters.get("stores", base.stores)
@@ -250,10 +276,10 @@ def resolve_query_scope(base: AnalyticsScope, query: WidgetQuery) -> AnalyticsSc
         period=period,
         comparison=base.comparison,
         firm=_filter_text(filters.get("firm", base.firm)),
-        regional=_filter_text(filters.get("regional", base.regional)),
+        regional=_filter_values(filters.get("regional", base.regional)),
         asm=_filter_text(filters.get("asm", base.asm)),
         stores=stores,
-        agent=_filter_text(filters.get("agent", base.agent)),
+        agent=_filter_values(filters.get("agent", base.agent)),
     )
 
 
@@ -295,6 +321,12 @@ def _field_for(module: ModuleId, metric_id: str, *, breakdown: bool = False) -> 
         "performance.daily_productivity": "tertiary" if breakdown else "secondary",
         "campaigns.focus_sales": "primary",
         "campaigns.focus_share": "progress_pct" if breakdown else "secondary",
+        "campaigns.promo_sales": "primary",
+        "campaigns.promo_quantity": "secondary",
+        "campaigns.promo_discount": "tertiary" if breakdown else "secondary",
+        "campaigns.incentive_sales": "primary",
+        "campaigns.incentive_quantity": "secondary",
+        "campaigns.incentive_reward": "tertiary" if breakdown else "secondary",
         "workforce.headcount": "primary",
         "workforce.productivity": "secondary",
         "workforce.stability": "comparison" if not breakdown else "progress_pct",
@@ -327,6 +359,16 @@ def _data_for_metric(
     response: ModuleAnalyticsResponse,
     metric_id: str,
 ) -> ModuleAnalyticsResponse | ModuleAnalyticsSlice:
+    if metric_id.startswith("campaigns.promo_"):
+        data = response.campaigns.get("promo")
+        if data is None:
+            raise RuntimeError("Promo analytics slice is unavailable.")
+        return data
+    if metric_id.startswith("campaigns.incentive_"):
+        data = response.campaigns.get("incentive")
+        if data is None:
+            raise RuntimeError("Incentive analytics slice is unavailable.")
+        return data
     if metric_id not in VISIT_METRICS:
         return response
     if response.visits is None:

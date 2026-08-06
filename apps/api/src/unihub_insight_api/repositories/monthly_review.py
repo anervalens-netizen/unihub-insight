@@ -1192,16 +1192,18 @@ class PostgresMonthlyReviewRepository(PostgresHardenedInsightRepository):
             clauses.append(f"{alias}.is_active = TRUE")
             for column, value in (
                 ("firma", scope.firm),
-                ("regional", scope.regional),
                 ("asm", scope.asm),
             ):
                 if value:
                     params.append(value)
                     clauses.append(f"{alias}.{column} = ${len(params)}")
+            if scope.regional:
+                params.append(list(scope.regional))
+                clauses.append(f"{alias}.regional = ANY(${len(params)}::text[])")
         return clauses
 
     async def _review_store_rows(self, scope: AnalyticsScope, periods: Sequence[str]) -> Sequence[asyncpg.Record]:
-        params: list[Any] = [list(periods), scope.agent]
+        params: list[Any] = [list(periods), list(scope.agent) or None]
         clauses = self._scope_clauses(scope, params)
         where_scope = " AND ".join(clauses)
         async with self.pool.acquire() as connection:
@@ -1223,7 +1225,7 @@ class PostgresMonthlyReviewRepository(PostgresHardenedInsightRepository):
                     JOIN eligible ON eligible.site_code = sale.site_code
                     LEFT JOIN focus_products focus ON focus.item_code = sale.item_code
                     WHERE sale.import_month = ANY($1::text[]) AND NOT sale.is_cartela
-                      AND ($2::text IS NULL OR sale.agent = $2)
+                      AND ($2::text[] IS NULL OR sale.agent = ANY($2::text[]))
                     GROUP BY sale.import_month, sale.site_code
                 ), receipts AS (
                     SELECT receipt.import_month, receipt.site_code,
@@ -1235,10 +1237,17 @@ class PostgresMonthlyReviewRepository(PostgresHardenedInsightRepository):
                         FROM sales_transactions sale
                         JOIN eligible ON eligible.site_code = sale.site_code
                         WHERE sale.import_month = ANY($1::text[]) AND NOT sale.is_cartela
-                          AND ($2::text IS NULL OR sale.agent = $2)
+                          AND ($2::text[] IS NULL OR sale.agent = ANY($2::text[]))
                         GROUP BY sale.import_month, sale.site_code, sale.sale_date, sale.bon_nr
                     ) receipt
                     GROUP BY receipt.import_month, receipt.site_code
+                ), agent_target AS (
+                    SELECT target.import_month, target.site_code,
+                           SUM(target.target_value) AS target_value
+                    FROM agent_targets target
+                    WHERE target.import_month = ANY($1::text[])
+                      AND ($2::text[] IS NULL OR target.agent = ANY($2::text[]))
+                    GROUP BY target.import_month, target.site_code
                 )
                 SELECT requested.import_month, eligible.*,
                        COALESCE(tx.sales, 0) AS sales,
@@ -1249,12 +1258,12 @@ class PostgresMonthlyReviewRepository(PostgresHardenedInsightRepository):
                        COALESCE(tx.working_days, 0) AS working_days,
                        COALESCE(receipts.receipts, 0) AS receipts,
                        COALESCE(receipts.receipt_2plus, 0) AS receipt_2plus,
-                       COALESCE(CASE WHEN $2::text IS NULL THEN store_target.target_value ELSE agent_target.target_value END, 0) AS target
+                       COALESCE(CASE WHEN $2::text[] IS NULL THEN store_target.target_value ELSE agent_target.target_value END, 0) AS target
                 FROM eligible CROSS JOIN requested
                 LEFT JOIN tx USING (import_month, site_code)
                 LEFT JOIN receipts USING (import_month, site_code)
                 LEFT JOIN store_targets store_target ON store_target.import_month = requested.import_month AND store_target.site_code = eligible.site_code
-                LEFT JOIN agent_targets agent_target ON agent_target.import_month = requested.import_month AND agent_target.site_code = eligible.site_code AND agent_target.agent = $2
+                LEFT JOIN agent_target ON agent_target.import_month = requested.import_month AND agent_target.site_code = eligible.site_code
                 ORDER BY requested.import_month, eligible.site_code
             """,
                 *params,
@@ -1264,8 +1273,8 @@ class PostgresMonthlyReviewRepository(PostgresHardenedInsightRepository):
         params: list[Any] = [list(periods)]
         clauses = self._scope_clauses(scope, params)
         if scope.agent:
-            params.append(scope.agent)
-            clauses.append(f"sale.agent = ${len(params)}")
+            params.append(list(scope.agent))
+            clauses.append(f"sale.agent = ANY(${len(params)}::text[])")
         where_scope = " AND ".join(clauses)
         async with self.pool.acquire() as connection:
             return await connection.fetch(
@@ -1316,8 +1325,8 @@ class PostgresMonthlyReviewRepository(PostgresHardenedInsightRepository):
         params: list[Any] = [list(periods)]
         clauses = self._scope_clauses(scope, params)
         if scope.agent:
-            params.append(scope.agent)
-            clauses.append(f"sale.agent = ${len(params)}")
+            params.append(list(scope.agent))
+            clauses.append(f"sale.agent = ANY(${len(params)}::text[])")
         async with self.pool.acquire() as connection:
             return await connection.fetch(
                 f"""

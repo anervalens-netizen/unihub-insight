@@ -174,6 +174,10 @@ export function EChart({
       locale: 'EN',
     });
     chartRef.current = chart;
+    const markFinished = () => {
+      host.setAttribute('data-chart-ready', 'true');
+    };
+    chart.on('finished', markFinished);
     let resizeTimer = 0;
     const resizeObserver = new ResizeObserver(() => {
       window.clearTimeout(resizeTimer);
@@ -184,6 +188,7 @@ export function EChart({
     resizeObserver.observe(host);
     return () => {
       resizeObserver.disconnect();
+      chart.off('finished', markFinished);
       window.clearTimeout(resizeTimer);
       dequeueResize(chart);
       chartRef.current = null;
@@ -266,6 +271,7 @@ export function EChart({
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart || chart.isDisposed()) return;
+    hostRef.current?.setAttribute('data-chart-ready', 'false');
     chart.setOption(designedOption, {
       notMerge: true,
       lazyUpdate: false,

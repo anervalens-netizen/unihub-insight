@@ -77,6 +77,80 @@ def metric(
     )
 
 
+def commercial_campaign_metrics(mechanism: str, label: str) -> tuple[MetricDefinition, ...]:
+    dimensions = ("firm", "regional", "asm", "store", "mechanism", "category", "time")
+    prefix = f"campaigns.{mechanism}"
+    return (
+        metric(
+            f"{prefix}_sales",
+            f"Vânzări {label}",
+            f"Vânzările nete ale produselor participante în mecanismul {label}.",
+            MetricUnit.CURRENCY,
+            dimensions=dimensions,
+            shapes=TREND_MIX,
+            missing="null-without-campaign-publication",
+        ),
+        metric(
+            f"{prefix}_quantity",
+            f"Cantitate netă {label}",
+            f"Cantitatea netă vândută pentru produsele participante în {label}.",
+            MetricUnit.INTEGER,
+            dimensions=dimensions,
+            shapes=KPI_TABLE,
+            missing="null-without-campaign-publication",
+        ),
+        metric(
+            f"{prefix}_{'discount' if mechanism == 'promo' else 'reward'}",
+            "Discount Promo" if mechanism == "promo" else "Recompensă Incentive",
+            "Valoarea calculată de evaluatorul canonic Retail.",
+            MetricUnit.CURRENCY,
+            dimensions=dimensions,
+            shapes=TREND_MIX,
+            missing="null-without-campaign-publication",
+        ),
+        metric(
+            f"{prefix}_active_stores",
+            f"Magazine participante {label}",
+            "Magazine distincte cu rezultat materializat.",
+            MetricUnit.INTEGER,
+            aggregation="distinct-count",
+            dimensions=dimensions,
+            grains=("month",),
+            shapes=KPI_TABLE,
+            missing="null-without-campaign-publication",
+        ),
+        metric(
+            f"{prefix}_active_products",
+            f"Produse participante {label}",
+            "Produse distincte active în configurația mecanismului.",
+            MetricUnit.INTEGER,
+            aggregation="distinct-count",
+            dimensions=dimensions,
+            grains=("month",),
+            shapes=KPI_TABLE,
+            missing="null-without-campaign-publication",
+        ),
+        metric(
+            f"{prefix}_{'qualifying_receipts' if mechanism == 'promo' else 'qualified_quantity'}",
+            "Bonuri eligibile Promo" if mechanism == "promo" else "Cantitate calificată Incentive",
+            "Volumul calificat de evaluatorul canonic Retail.",
+            MetricUnit.INTEGER,
+            dimensions=dimensions,
+            shapes=KPI_TABLE,
+            missing="null-without-campaign-publication",
+        ),
+        metric(
+            f"{prefix}_{'discounted_units' if mechanism == 'promo' else 'eligible_quantity'}",
+            "Unități cu discount Promo" if mechanism == "promo" else "Cantitate eligibilă Incentive",
+            "Volumul eligibil materializat de evaluatorul canonic Retail.",
+            MetricUnit.INTEGER,
+            dimensions=dimensions,
+            shapes=KPI_TABLE,
+            missing="null-without-campaign-publication",
+        ),
+    )
+
+
 METRIC_CATALOG: tuple[MetricDefinition, ...] = (
     metric(
         "sales.total",
@@ -215,6 +289,8 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         shapes=KPI_TABLE,
         missing="null-without-focus-contract",
     ),
+    *commercial_campaign_metrics("promo", "Promo"),
+    *commercial_campaign_metrics("incentive", "Incentive"),
     metric(
         "workforce.headcount",
         "Headcount activ",

@@ -151,6 +151,7 @@ export const moduleAnalyticsSliceSchema = moduleAnalyticsBaseSchema.pick({
 
 export const moduleAnalyticsSchema = moduleAnalyticsBaseSchema.extend({
   visits: moduleAnalyticsSliceSchema.nullable().optional(),
+  campaigns: z.record(z.string(), moduleAnalyticsSliceSchema).optional(),
 });
 
 export type ModuleAnalytics = z.infer<typeof moduleAnalyticsSchema>;

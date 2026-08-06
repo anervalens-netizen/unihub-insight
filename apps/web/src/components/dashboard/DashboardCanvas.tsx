@@ -48,6 +48,7 @@ export function DashboardCanvas({
   storageKey,
   onInspect,
   onExport,
+  onDuplicate,
   onLayoutChange,
 }: {
   widgets: DashboardWidgetDefinition[];
@@ -56,6 +57,7 @@ export function DashboardCanvas({
   storageKey: string;
   onInspect?: (widgetId: string) => void;
   onExport?: (widgetId: string) => void;
+  onDuplicate?: (widgetId: string) => void;
   onLayoutChange?: (items: DashboardLayoutItem[]) => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -153,6 +155,7 @@ export function DashboardCanvas({
             : {};
         const exportProps =
           onExport && widget.inspectable !== false ? { onExport: () => onExport(widget.id) } : {};
+        const duplicateProps = onDuplicate ? { onDuplicate: () => onDuplicate(widget.id) } : {};
         return (
           <div
             key={widget.id}
@@ -170,8 +173,14 @@ export function DashboardCanvas({
                 title={widget.title}
                 editMode={editMode}
                 {...(widget.subtitle === undefined ? {} : { subtitle: widget.subtitle })}
+                {...(widget.explanation === undefined
+                  ? widget.subtitle === undefined
+                    ? {}
+                    : { explanation: widget.subtitle }
+                  : { explanation: widget.explanation })}
                 {...inspectProps}
                 {...exportProps}
+                {...duplicateProps}
               >
                 <Widget />
               </WidgetFrame>

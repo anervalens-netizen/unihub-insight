@@ -107,23 +107,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         request_id = _request_id(request.headers.get("x-request-id"))
         request.state.request_id = request_id
         started = time.perf_counter()
-        response = await call_next(request)
-        duration_ms = (time.perf_counter() - started) * 1000
-        route = _route_label(request)
-        surface = http_surface(route, request.path_params)
-        subject = trusted_proxy_subject(request, resolved_settings) if resolved_settings.auth_mode == "proxy" else None
-        metrics.record_http(
+        try:
+            response = await call_next(request)
+        except Exception:
+            _record_http_request(
+                request=request,
+                settings=resolved_settings,
+                source_sha=source_sha,
+                status_code=500,
+                started=started,
+            )
+            raise
+        duration_ms = _record_http_request(
+            request=request,
+            settings=resolved_settings,
             source_sha=source_sha,
-            traffic_class=traffic_class(
-                subject=subject,
-                system=surface == "system",
-                demo=resolved_settings.auth_mode == "demo",
-            ),
-            surface=surface,
-            route=route,
-            method=request.method,
             status_code=response.status_code,
-            duration_seconds=duration_ms / 1000,
+            started=started,
         )
         response.headers["X-Request-ID"] = request_id
         response.headers["Server-Timing"] = f"app;dur={duration_ms:.2f}"
@@ -148,6 +148,34 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(dashboards_router)
     app.include_router(telemetry_router)
     return app
+
+
+def _record_http_request(
+    *,
+    request: Request,
+    settings: Settings,
+    source_sha: str,
+    status_code: int,
+    started: float,
+) -> float:
+    duration_ms = (time.perf_counter() - started) * 1000
+    route = _route_label(request)
+    surface = http_surface(route, request.path_params)
+    subject = trusted_proxy_subject(request, settings) if settings.auth_mode == "proxy" else None
+    metrics.record_http(
+        source_sha=source_sha,
+        traffic_class=traffic_class(
+            subject=subject,
+            system=surface == "system",
+            demo=settings.auth_mode == "demo",
+        ),
+        surface=surface,
+        route=route,
+        method=request.method,
+        status_code=status_code,
+        duration_seconds=duration_ms / 1000,
+    )
+    return duration_ms
 
 
 app = create_app()

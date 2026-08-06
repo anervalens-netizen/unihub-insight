@@ -1,23 +1,28 @@
-import { Download, Expand, GripHorizontal, TableProperties, X } from 'lucide-react';
+import { CopyPlus, Download, Expand, GripHorizontal, Info, TableProperties, X } from 'lucide-react';
 import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 export function WidgetFrame({
   title,
   subtitle,
+  explanation,
   editMode,
   onInspect,
   onExport,
+  onDuplicate,
   children,
 }: {
   title: string;
   subtitle?: string;
+  explanation?: string;
   editMode: boolean;
   onInspect?: () => void;
   onExport?: () => void;
+  onDuplicate?: () => void;
   children: ReactNode;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [showExplanation, setShowExplanation] = useState(false);
   const headingId = useId();
   const expandButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
@@ -71,6 +76,27 @@ export function WidgetFrame({
         {subtitle ? <p>{subtitle}</p> : null}
       </div>
       <div className="widget-actions">
+        {explanation ? (
+          <button
+            type="button"
+            className="icon-button"
+            aria-label={`Explică metrica ${title}`}
+            aria-expanded={showExplanation}
+            onClick={() => setShowExplanation((value) => !value)}
+          >
+            <Info size={15} />
+          </button>
+        ) : null}
+        {onDuplicate ? (
+          <button
+            type="button"
+            className="icon-button"
+            aria-label={`Duplică widgetul ${title}`}
+            onClick={onDuplicate}
+          >
+            <CopyPlus size={15} />
+          </button>
+        ) : null}
         {onInspect ? (
           <button
             type="button"
@@ -108,6 +134,11 @@ export function WidgetFrame({
     <>
       <article className="widget-card" aria-labelledby={headingId}>
         {header}
+        {showExplanation && explanation ? (
+          <div className="widget-explanation" role="note">
+            {explanation}
+          </div>
+        ) : null}
         <div className="widget-body">{children}</div>
       </article>
       {expanded

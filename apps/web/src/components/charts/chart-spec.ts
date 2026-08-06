@@ -177,7 +177,7 @@ function sourceFor(dataset: QueryDataset) {
 function baseOption(dataset: QueryDataset, tooltipTrigger: 'axis' | 'item' = 'axis') {
   return {
     dataset: sourceFor(dataset),
-    aria: { enabled: true, decal: { show: true } },
+    aria: { enabled: true },
     tooltip: { trigger: tooltipTrigger, confine: true },
     animation: false,
     grid: { top: 22, right: 18, bottom: 42, left: 58, containLabel: true },
@@ -270,10 +270,17 @@ function heatmapOption(dataset: QueryDataset): EChartsCoreOption | null {
   if (values.length === 0) return null;
   const minimum = Math.min(...values);
   const maximum = Math.max(...values);
+  const xValues = [...new Set(dataset.rows.map((row) => String(row[x.id] ?? '')))].filter(Boolean);
+  const yValues = [...new Set(dataset.rows.map((row) => String(row[y.id] ?? '')))].filter(Boolean);
+  const data = dataset.rows.map((row) => [
+    String(row[x.id] ?? ''),
+    String(row[y.id] ?? ''),
+    typeof row[value.id] === 'number' ? row[value.id] : '-',
+  ]);
   return {
-    ...baseOption(dataset, 'item'),
-    xAxis: { type: 'category' },
-    yAxis: { type: 'category' },
+    ...baseOption({ ...dataset, rows: [] }, 'item'),
+    xAxis: { type: 'category', data: xValues },
+    yAxis: { type: 'category', data: yValues },
     visualMap: {
       min: minimum,
       max: maximum === minimum ? minimum + 1 : maximum,
@@ -284,7 +291,9 @@ function heatmapOption(dataset: QueryDataset): EChartsCoreOption | null {
     series: [
       {
         type: 'heatmap',
-        encode: { x: x.id, y: y.id, value: value.id, tooltip: [x.id, y.id, value.id] },
+        data,
+        universalTransition: false,
+        emphasis: { disabled: data.length > 2000 },
         progressive: 1000,
         progressiveThreshold: 2000,
       },
@@ -303,8 +312,15 @@ function scatterOption(dataset: QueryDataset, metric: MetricDefinition): ECharts
   );
   if (!x || !y || dataset.rows.length === 0) return null;
   const label = categoryDimension(dataset);
+  const data = dataset.rows.map((row) => ({
+    name: label ? String(row[label.id] ?? '') : '',
+    value: [
+      typeof row[x.id] === 'number' ? row[x.id] : '-',
+      typeof row[y.id] === 'number' ? row[y.id] : '-',
+    ],
+  }));
   return {
-    ...baseOption(dataset, 'item'),
+    ...baseOption({ ...dataset, rows: [] }, 'item'),
     xAxis: { type: 'value', name: x.label },
     yAxis: { type: 'value', name: y.label },
     series: [
@@ -312,15 +328,13 @@ function scatterOption(dataset: QueryDataset, metric: MetricDefinition): ECharts
         type: 'scatter',
         name: metric.display_name,
         symbolSize: 10,
+        data,
         large: dataset.rows.length > 2000,
         largeThreshold: 2000,
+        universalTransition: false,
+        emphasis: { disabled: dataset.rows.length > 2000 },
         progressive: 1000,
         progressiveThreshold: 2000,
-        encode: {
-          x: x.id,
-          y: y.id,
-          ...(label ? { itemName: label.id, tooltip: [label.id, x.id, y.id] } : {}),
-        },
       },
     ],
   } as EChartsCoreOption;

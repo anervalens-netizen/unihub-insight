@@ -3,14 +3,29 @@ import { type ComponentType, createElement, lazy } from 'react';
 import type { DashboardWidgetDefinition } from '../../components/dashboard/types';
 import type { ModuleAnalytics, ModuleId } from './schemas';
 import { type ModuleSubviewId, subviewForId } from './subviews';
-import {
-  ModuleAlertsWidget,
-  ModuleBreakdownWidget,
-  ModuleDistributionWidget,
-  ModuleKpiByMetric,
-  ModuleMatrixWidget,
-  ModuleTrendWidget,
-} from './widgets';
+
+type ModuleWidgetName =
+  | 'ModuleAlertsWidget'
+  | 'ModuleBreakdownWidget'
+  | 'ModuleDistributionWidget'
+  | 'ModuleKpiByMetric'
+  | 'ModuleMatrixWidget'
+  | 'ModuleTrendWidget';
+
+function lazyModuleWidget<Props extends object = Record<string, never>>(name: ModuleWidgetName) {
+  return lazy(() =>
+    import('./widgets').then((module) => ({
+      default: module[name] as unknown as ComponentType<Props>,
+    })),
+  );
+}
+
+const ModuleAlertsWidget = lazyModuleWidget('ModuleAlertsWidget');
+const ModuleBreakdownWidget = lazyModuleWidget('ModuleBreakdownWidget');
+const ModuleDistributionWidget = lazyModuleWidget('ModuleDistributionWidget');
+const ModuleKpiByMetric = lazyModuleWidget<{ metricId: string }>('ModuleKpiByMetric');
+const ModuleMatrixWidget = lazyModuleWidget('ModuleMatrixWidget');
+const ModuleTrendWidget = lazyModuleWidget('ModuleTrendWidget');
 
 type RecipeKind =
   | 'kpi'
@@ -259,8 +274,42 @@ const recipes: Partial<Record<ModuleSubviewId, readonly Recipe[]>> = {
     { kind: 'visits-breakdown', title: 'Vizite pe Team Leader autor' },
     { kind: 'visits-matrix', title: 'Team Leader × perioadă' },
   ],
-  promo: [{ kind: 'alerts', title: 'Promo indisponibil' }],
-  incentive: [{ kind: 'alerts', title: 'Incentive indisponibil' }],
+  promo: [
+    { kind: 'kpi', metricId: 'campaigns.promo_sales' },
+    { kind: 'kpi', metricId: 'campaigns.promo_quantity' },
+    { kind: 'kpi', metricId: 'campaigns.promo_discount' },
+    { kind: 'kpi', metricId: 'campaigns.promo_active_stores' },
+    { kind: 'kpi', metricId: 'campaigns.promo_active_products' },
+    { kind: 'kpi', metricId: 'campaigns.promo_qualifying_receipts' },
+    { kind: 'kpi', metricId: 'campaigns.promo_discounted_units' },
+    { kind: 'trend', metricId: 'campaigns.promo_sales', title: 'Vânzări Promo în timp' },
+    { kind: 'breakdown', metricId: 'campaigns.promo_sales', title: 'Promo pe magazine' },
+    { kind: 'distribution', metricId: 'campaigns.promo_discount', title: 'Discount pe campanie' },
+    { kind: 'matrix', metricId: 'campaigns.promo_discount', title: 'Discount magazin × perioadă' },
+    { kind: 'alerts', title: 'Coverage Promo' },
+  ],
+  incentive: [
+    { kind: 'kpi', metricId: 'campaigns.incentive_sales' },
+    { kind: 'kpi', metricId: 'campaigns.incentive_quantity' },
+    { kind: 'kpi', metricId: 'campaigns.incentive_reward' },
+    { kind: 'kpi', metricId: 'campaigns.incentive_active_stores' },
+    { kind: 'kpi', metricId: 'campaigns.incentive_active_products' },
+    { kind: 'kpi', metricId: 'campaigns.incentive_qualified_quantity' },
+    { kind: 'kpi', metricId: 'campaigns.incentive_eligible_quantity' },
+    { kind: 'trend', metricId: 'campaigns.incentive_sales', title: 'Vânzări Incentive în timp' },
+    { kind: 'breakdown', metricId: 'campaigns.incentive_sales', title: 'Incentive pe magazine' },
+    {
+      kind: 'distribution',
+      metricId: 'campaigns.incentive_reward',
+      title: 'Recompensă pe campanie',
+    },
+    {
+      kind: 'matrix',
+      metricId: 'campaigns.incentive_reward',
+      title: 'Recompensă magazin × perioadă',
+    },
+    { kind: 'alerts', title: 'Coverage Incentive' },
+  ],
   contest: [{ kind: 'alerts', title: 'Concurs indisponibil' }],
   focus: [
     { kind: 'kpi', slot: 'primary' },

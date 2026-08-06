@@ -1,5 +1,8 @@
 from fastapi.testclient import TestClient
 
+from unihub_insight_api.config import Settings
+from unihub_insight_api.main import create_app
+
 
 def test_liveness_and_request_metadata(client: TestClient) -> None:
     response = client.get("/livez", headers={"X-Request-ID": "test-request-1"})
@@ -32,6 +35,21 @@ def test_metrics_exposes_bounded_http_telemetry(client: TestClient) -> None:
     assert 'source_sha="development"' in response.text
     assert 'traffic_class="system"' in response.text
     assert 'surface="system"' in response.text
+
+
+def test_unhandled_exception_is_counted_as_http_5xx() -> None:
+    app = create_app(Settings(environment="test", data_mode="demo"))
+
+    async def boom() -> None:
+        raise RuntimeError("expected test failure")
+
+    app.add_api_route("/boom", boom)
+    with TestClient(app, raise_server_exceptions=False) as test_client:
+        response = test_client.get("/boom")
+        metrics = test_client.get("/metrics").text
+
+    assert response.status_code == 500
+    assert 'route="/boom",method="GET",status_class="5xx"' in metrics
 
 
 def test_web_vital_uses_finite_surface_and_demo_traffic_class(client: TestClient) -> None:

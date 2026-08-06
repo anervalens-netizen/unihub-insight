@@ -9,6 +9,6 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-npm run dev:api &
+${UNIHUB_INSIGHT_API_COMMAND:-npm run dev:api} &
 API_PID=$!
-npm run dev:web
+${UNIHUB_INSIGHT_WEB_COMMAND:-npm run dev:web}

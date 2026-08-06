@@ -54,10 +54,10 @@ class ReportingMonthlyReviewRepository(PostgresMonthlyReviewRepository):
         agent_filter_core = ""
         agent_filter_supplement = ""
         if scope.agent:
-            params.append(scope.agent)
+            params.append(list(scope.agent))
             agent_parameter = len(params)
-            agent_filter_core = f"AND fact.agent = ${agent_parameter}"
-            agent_filter_supplement = f"AND supplement.agent = ${agent_parameter}"
+            agent_filter_core = f"AND fact.agent = ANY(${agent_parameter}::text[])"
+            agent_filter_supplement = f"AND supplement.agent = ANY(${agent_parameter}::text[])"
             target_cte = f"""
                 targets AS (
                     SELECT
@@ -66,7 +66,7 @@ class ReportingMonthlyReviewRepository(PostgresMonthlyReviewRepository):
                         SUM(target.target_value) AS target_value
                     FROM agent_targets target
                     WHERE target.import_month = ANY($1::text[])
-                      AND target.agent = ${agent_parameter}
+                      AND target.agent = ANY(${agent_parameter}::text[])
                     GROUP BY target.import_month, target.site_code
                 )
             """
@@ -170,11 +170,11 @@ class ReportingMonthlyReviewRepository(PostgresMonthlyReviewRepository):
         agent_filter_supplement = ""
         target_filter = ""
         if scope.agent:
-            params.append(scope.agent)
+            params.append(list(scope.agent))
             agent_parameter = len(params)
-            agent_filter_core = f"AND fact.agent = ${agent_parameter}"
-            agent_filter_supplement = f"AND supplement.agent = ${agent_parameter}"
-            target_filter = f"AND target.agent = ${agent_parameter}"
+            agent_filter_core = f"AND fact.agent = ANY(${agent_parameter}::text[])"
+            agent_filter_supplement = f"AND supplement.agent = ANY(${agent_parameter}::text[])"
+            target_filter = f"AND target.agent = ANY(${agent_parameter}::text[])"
         where_scope = " AND ".join(clauses)
 
         async with self.pool.acquire() as connection:
@@ -277,10 +277,10 @@ class ReportingMonthlyReviewRepository(PostgresMonthlyReviewRepository):
         agent_filter_core = ""
         agent_filter_supplement = ""
         if scope.agent:
-            params.append(scope.agent)
+            params.append(list(scope.agent))
             agent_parameter = len(params)
-            agent_filter_core = f"AND fact.agent = ${agent_parameter}"
-            agent_filter_supplement = f"AND supplement.agent = ${agent_parameter}"
+            agent_filter_core = f"AND fact.agent = ANY(${agent_parameter}::text[])"
+            agent_filter_supplement = f"AND supplement.agent = ANY(${agent_parameter}::text[])"
         where_scope = " AND ".join(clauses)
 
         async with self.pool.acquire() as connection:

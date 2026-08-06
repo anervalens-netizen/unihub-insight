@@ -18,8 +18,13 @@ import { environment } from '../../lib/environment';
 import { formatDate, formatMonth } from '../../lib/format';
 import { currentBusinessMonth, parseComparisons, rangeBounds } from '../../lib/search';
 import { useIdentity } from '../identity/context';
-import { analyticsCatalogQuery } from '../query/api';
-import type { MetricDefinition, WidgetQuery } from '../query/schemas';
+import { analyticsCatalogQuery, queryBatchOptions } from '../query/api';
+import type {
+  MetricDefinition,
+  QueryBatchRequest,
+  WidgetQuery,
+  WidgetQueryResult,
+} from '../query/schemas';
 import { moduleAnalyticsQuery } from './api';
 import { ModuleProvider } from './context';
 import { moduleDistributionDimension, moduleEntityDimension } from './interactions';
@@ -31,8 +36,16 @@ import { moduleWidgetQuerySpec, moduleWidgets } from './widget-catalog';
 const QueryInspector = lazy(() =>
   import('../query/QueryInspector').then((module) => ({ default: module.QueryInspector })),
 );
+const SourceMetadataStrip = lazy(() =>
+  import('./SourceMetadataStrip').then((module) => ({ default: module.SourceMetadataStrip })),
+);
 
 const businessFilterKeys = ['firm', 'regional', 'asm', 'stores', 'agent'] as const;
+type NativeBatchProjector = (
+  data: ModuleAnalytics,
+  results: readonly WidgetQueryResult[],
+) => ModuleAnalytics;
+
 function nativeWidgetQuery(
   module: ModuleId,
   widgetId: string,
@@ -119,7 +132,9 @@ function moduleExportParams(
 }
 
 export function moduleSubviewData(data: ModuleAnalytics, subview: ModuleSubview): ModuleAnalytics {
-  return subview.id === 'visits' && data.visits ? { ...data, ...data.visits } : data;
+  if (subview.id === 'visits' && data.visits) return { ...data, ...data.visits };
+  const campaignSlice = data.campaigns?.[subview.id];
+  return campaignSlice ? { ...data, ...campaignSlice } : data;
 }
 
 function SubviewNavigation({
@@ -161,64 +176,6 @@ function SubviewNavigation({
   );
 }
 
-function SourceMetadataStrip({ data }: { data: ModuleAnalytics }) {
-  const sources = Object.values(data.meta.sources ?? {});
-  return (
-    <section className="module-source-strip" aria-labelledby="module-source-metadata-title">
-      <h3 id="module-source-metadata-title" className="sr-only">
-        Metadata surse
-      </h3>
-      {data.meta.range_start && data.meta.range_end ? (
-        <span className="meta-chip">
-          Fereastră serie: {data.meta.range_start} → {data.meta.range_end}
-        </span>
-      ) : null}
-      {data.meta.range_start && data.meta.range_start !== data.meta.period ? (
-        <span className="meta-chip">KPI/mix/ranking: {data.meta.period}</span>
-      ) : null}
-      {data.meta.warnings?.map((warning) => (
-        <span className="meta-chip meta-chip--warning" key={warning}>
-          {warning}
-        </span>
-      ))}
-      {sources.length === 0 ? (
-        <span className="meta-chip meta-chip--warning">Metadata sursă indisponibilă</span>
-      ) : (
-        sources.map((source) => (
-          <details className="source-meta" key={source.domain}>
-            <summary>
-              <span>{source.domain}</span>
-              <strong className={`source-status source-status--${source.status}`}>
-                {source.status}
-              </strong>
-            </summary>
-            <div>
-              <span>{source.source}</span>
-              <span>
-                Cutoff: {source.cutoff ?? '—'} · as of: {source.as_of ?? '—'} ·{' '}
-                {source.is_final ? 'final' : 'deschis'}
-              </span>
-              <span>
-                Coverage: {source.coverage_numerator ?? '—'}/{source.coverage_denominator ?? '—'}
-              </span>
-              <span>
-                Autoritate: {source.authority} · head {source.authority_head ?? '—'}
-              </span>
-              <span>
-                Generație: {source.source_generation ?? '—'} · contract v{source.contract_version} ·
-                rule {source.rule_version ?? '—'}
-              </span>
-              {source.warnings.length > 0 ? (
-                <span>Warnings: {source.warnings.join(' · ')}</span>
-              ) : null}
-            </div>
-          </details>
-        ))
-      )}
-    </section>
-  );
-}
-
 export function AnalyticsModulePage({ module }: { module: ModuleId }) {
   const search = useGlobalSearch();
   const updateSearch = useUpdateGlobalSearch();
@@ -234,7 +191,7 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
     search.agent &&
       (module === 'finance' || module === 'planning' || selectedSubview.id === 'visits'),
   );
-  const query = useQuery({
+  const moduleQuery = useQuery({
     ...moduleAnalyticsQuery(module, input),
     enabled: !incompatibleAgent,
   });
@@ -242,6 +199,64 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
   const [editMode, setEditMode] = useState(false);
   const [resetToken, setResetToken] = useState(0);
   const [inspectWidget, setInspectWidget] = useState<string | null>(null);
+  const rawData = moduleQuery.data;
+  const rawStatuses = rawData
+    ? new Map(views.map((view) => [view.id, subviewStatus(rawData, view)]))
+    : new Map<string, ReturnType<typeof subviewStatus>>();
+  const rawStatus = rawStatuses.get(selectedSubview.id);
+  const rawDisplayData = rawData ? moduleSubviewData(rawData, selectedSubview) : undefined;
+  const catalogMetrics = useMemo(
+    () => new Map((catalogQuery.data?.metrics ?? []).map((metric) => [metric.id, metric])),
+    [catalogQuery.data?.metrics],
+  );
+  const candidateWidgets = useMemo(
+    () =>
+      rawDisplayData && rawStatus?.availability !== 'unavailable'
+        ? moduleWidgets(rawDisplayData, selectedSubview.id)
+        : [],
+    [rawDisplayData, rawStatus?.availability, selectedSubview.id],
+  );
+  const widgetQueryList = useMemo(
+    () =>
+      candidateWidgets.flatMap((widget) => {
+        const spec = moduleWidgetQuerySpec(module, widget.id);
+        const widgetQuery = nativeWidgetQuery(
+          module,
+          widget.id,
+          input,
+          spec ? catalogMetrics.get(spec.metricId) : undefined,
+        );
+        return widgetQuery ? [widgetQuery] : [];
+      }),
+    [candidateWidgets, catalogMetrics, input, module],
+  );
+  const batchRequest = useMemo<QueryBatchRequest>(
+    () => ({
+      ...(rawData?.meta.analytical_snapshot_id
+        ? { snapshot_id: rawData.meta.analytical_snapshot_id }
+        : {}),
+      dashboard_id: null,
+      widgets: widgetQueryList,
+    }),
+    [rawData?.meta.analytical_snapshot_id, widgetQueryList],
+  );
+  const batchRequired = widgetQueryList.length > 0;
+  const batchQuery = useQuery({
+    ...queryBatchOptions(batchRequest, input),
+    enabled: !incompatibleAgent && batchRequired && moduleQuery.isSuccess && catalogQuery.isSuccess,
+  });
+  const [nativeBatchProjector, setNativeBatchProjector] = useState<NativeBatchProjector | null>(
+    null,
+  );
+  useEffect(() => {
+    let active = true;
+    void import('./native-batch').then(({ applyNativeBatchResults }) => {
+      if (active) setNativeBatchProjector(() => applyNativeBatchResults);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   if (incompatibleAgent) {
     return (
@@ -256,17 +271,28 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
       />
     );
   }
-  if (query.isPending) return <LoadingState label="Se construiește analiza…" />;
-  if (query.isError) {
+  if (
+    moduleQuery.isPending ||
+    catalogQuery.isPending ||
+    (batchRequired && (batchQuery.isPending || !nativeBatchProjector))
+  ) {
+    return <LoadingState label="Se construiește analiza din catalog…" />;
+  }
+  if (moduleQuery.isError || catalogQuery.isError || (batchRequired && batchQuery.isError)) {
+    const error = moduleQuery.error ?? catalogQuery.error ?? batchQuery.error;
     return (
       <ErrorState
-        message={query.error instanceof Error ? query.error.message : 'Eroare necunoscută.'}
-        onRetry={() => void query.refetch()}
+        message={error instanceof Error ? error.message : 'Eroare necunoscută.'}
+        onRetry={() => {
+          void moduleQuery.refetch();
+          void catalogQuery.refetch();
+          if (batchRequired) void batchQuery.refetch();
+        }}
       />
     );
   }
 
-  const data = query.data;
+  const data = moduleQuery.data;
   if (!identity.capabilities.includes(data.required_capability)) {
     return (
       <ErrorState
@@ -277,27 +303,40 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
   }
   const statuses = new Map(views.map((view) => [view.id, subviewStatus(data, view)]));
   const status = statuses.get(selectedSubview.id);
-  const displayData = moduleSubviewData(data, selectedSubview);
-  const catalogMetrics = new Map(
-    (catalogQuery.data?.metrics ?? []).map((metric) => [metric.id, metric]),
-  );
-  const widgetQueries = new Map<string, WidgetQuery>();
-  const snapshotId = data.meta.analytical_snapshot_id;
+  const batchResults = batchQuery.data?.results ?? [];
+  const batchResultByWidget = new Map(batchResults.map((result) => [result.widget_id, result]));
+  const displayData = nativeBatchProjector
+    ? nativeBatchProjector(moduleSubviewData(data, selectedSubview), batchResults)
+    : moduleSubviewData(data, selectedSubview);
+  const widgetQueries = new Map(widgetQueryList.map((item) => [item.widget_id, item]));
+  const snapshotId = batchQuery.data?.snapshot.id ?? data.meta.analytical_snapshot_id;
   const widgets = (
     status?.availability === 'unavailable' ? [] : moduleWidgets(displayData, selectedSubview.id)
   ).map((widget) => {
-    const spec = moduleWidgetQuerySpec(module, widget.id);
-    const widgetQuery = nativeWidgetQuery(
-      module,
-      widget.id,
-      input,
-      spec ? catalogMetrics.get(spec.metricId) : undefined,
-    );
-    if (widgetQuery) widgetQueries.set(widget.id, widgetQuery);
-    return { ...widget, inspectable: Boolean(snapshotId && widgetQuery) };
+    const widgetQuery = widgetQueries.get(widget.id);
+    const batchResult = batchResultByWidget.get(widget.id);
+    const metric = widgetQuery ? catalogMetrics.get(widgetQuery.metric_id) : undefined;
+    const explanation = metric
+      ? `${metric.description} Formulă: ${metric.formula_reference}. Missing: ${metric.missing_policy}.`
+      : widget.subtitle;
+    if (widgetQuery && batchResult?.error) {
+      const message = batchResult.error.message;
+      return {
+        ...widget,
+        ...(explanation ? { explanation } : {}),
+        inspectable: false,
+        component: () => <ErrorState message={message} onRetry={() => void batchQuery.refetch()} />,
+      };
+    }
+    return {
+      ...widget,
+      ...(explanation ? { explanation } : {}),
+      inspectable: Boolean(snapshotId && widgetQuery && batchResult?.dataset),
+    };
   });
   const inspectedQuery = inspectWidget ? widgetQueries.get(inspectWidget) : undefined;
   const inspectedMetric = inspectedQuery ? catalogMetrics.get(inspectedQuery.metric_id) : undefined;
+  const inspectedResult = inspectWidget ? batchResultByWidget.get(inspectWidget) : undefined;
   const retailUrl = retailContextUrl(environment.retailBaseUrl, module, selectedSubview.id, input);
   const handleUrlState = (event: { dimensionId: string; value: string; label: string | null }) => {
     updateSearch(crossFilterPatch(search.drill, event));
@@ -370,11 +409,15 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
             path={`/exports/modules/${module}.xlsx`}
             params={moduleExportParams(input, data.meta.analytical_snapshot_id)}
             filename={`${module}-${period}.xlsx`}
+            label="Raport complet XLSX"
           />
           <button
             type="button"
             className="button button--secondary"
-            onClick={() => void query.refetch()}
+            onClick={() => {
+              void moduleQuery.refetch();
+              if (batchRequired) void batchQuery.refetch();
+            }}
           >
             <RefreshCw size={15} />
             Actualizează
@@ -399,7 +442,9 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
           </button>
         </div>
       </section>
-      <SourceMetadataStrip data={data} />
+      <Suspense fallback={null}>
+        <SourceMetadataStrip data={data} />
+      </Suspense>
       {editMode ? (
         <div className="edit-notice">
           Trage cardurile din antet și redimensionează-le. Layoutul local este versionat separat
@@ -424,13 +469,13 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
           onExport={setInspectWidget}
         />
       )}
-      {inspectWidget && inspectedQuery && inspectedMetric && snapshotId ? (
+      {inspectWidget && inspectedQuery && inspectedMetric && inspectedResult && snapshotId ? (
         <Suspense fallback={null}>
           <QueryInspector
             dashboardId={null}
             snapshotId={snapshotId}
             search={input}
-            result={{ widget_id: inspectWidget, query: inspectedQuery, meta: null }}
+            result={inspectedResult}
             metric={inspectedMetric}
             onClose={() => setInspectWidget(null)}
           />

@@ -4,7 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ComparisonMode(StrEnum):
@@ -115,10 +115,19 @@ class AnalyticsScope(BaseModel):
     period: str
     comparison: ComparisonMode = ComparisonMode.PREVIOUS_YEAR
     firm: str | None = None
-    regional: str | None = None
+    regional: tuple[str, ...] = ()
     asm: str | None = None
     stores: tuple[str, ...] = ()
-    agent: str | None = None
+    agent: tuple[str, ...] = ()
+
+    @field_validator("regional", "stores", "agent", mode="before")
+    @classmethod
+    def normalize_multi_scope(cls, value: object) -> object:
+        if value is None:
+            return ()
+        if isinstance(value, str):
+            return tuple(dict.fromkeys(item.strip() for item in value.split(",") if item.strip()))
+        return value
 
 
 class UserContext(BaseModel):
@@ -377,6 +386,7 @@ class ModuleAnalyticsResponse(BaseModel):
     calendar: list[CalendarCell] = Field(default_factory=list)
     alerts: list[InsightAlert]
     visits: ModuleAnalyticsSlice | None = None
+    campaigns: dict[str, ModuleAnalyticsSlice] = Field(default_factory=dict)
 
 
 class DashboardLayout(BaseModel):

@@ -13,7 +13,6 @@ export function analyticsSearchParams(search: GlobalSearch & { period: string })
   if (search.drill) params.set('drill', search.drill);
   if (search.firm) params.set('firm', search.firm);
   if (search.regional) params.set('regional', search.regional);
-  if (search.asm) params.set('asm', search.asm);
   if (search.stores) params.set('stores', search.stores);
   if (search.agent) params.set('agent', search.agent);
   return params;

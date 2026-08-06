@@ -2,7 +2,7 @@
 
 ## Global scope
 
-The filter bar controls period, comparison, company, RM, ASM, stores and agent. Scope is stored in the URL, so a copied link reproduces the same analysis. Selected stores dominate historical parent-company filters where the Retail identity contract requires it.
+The filter bar controls period, comparison, company, RM, stores and agent. RM, stores and agents are searchable multi-selects; ASM remains available only in internal drill/reconciliation contracts. Scope is stored in the URL, so a copied link reproduces the same analysis. Selected stores dominate historical parent-company filters where the Retail identity contract requires it.
 
 Finance and Planning do not accept agent scope. Compensation is visible only with the HR capability; Finance only with the P&L capability.
 
@@ -25,7 +25,7 @@ Finance and Planning do not accept agent scope. Compensation is visible only wit
 - Use **Edit layout** to drag a card by its header and resize it from its edges.
 - Use **Layout implicit** to restore the versioned default.
 - Expand any card to fullscreen.
-- Folosește iconul tabel pentru inspect. Inspectorul rerulează server-side exact query-ul și snapshotul widgetului și oferă CSV bounded.
+- Folosește iconul info pentru definiție/formulă/missing policy și iconul tabel pentru inspect. Inspectorul rerulează server-side exact query-ul și snapshotul widgetului și oferă CSV/XLSX bounded. `Raport complet XLSX` este exportul separat al întregului modul.
 - Chart toggles offer only visualizations compatible with the analytical contract.
 
 ## Custom dashboards
@@ -37,7 +37,7 @@ Start blank or clone Director, Regional Manager, Finance or Risk templates. A ca
 - **Override** — ignores global business filters and uses only specified local values; period/comparison remain global.
 - **Ignore** — analyzes network scope for the selected period/comparison.
 
-Orice stare non-inherited este vizibilă pe card. Share-ul este țintit per subject cu `read/edit/admin`; capability și scope ceiling sunt reverificate server-side la read/query/inspect/export. Versiunile anterioare rămân selectabile, iar preset-urile pot fi personale sau partajate.
+Orice stare non-inherited este vizibilă pe card. Duplicarea din vizualizare salvează atomic o versiune nouă înainte să execute query-ul nou. Share-ul este țintit per subject cu `read/edit/admin`; capability și scope ceiling sunt reverificate server-side la read/query/inspect/export. Versiunile anterioare rămân selectabile, iar preset-urile pot fi personale sau partajate și suportă creare, aplicare, actualizare și ștergere.
 
 ## Data-state interpretation
 
@@ -47,7 +47,7 @@ Orice stare non-inherited este vizibilă pe card. Share-ul este țintit per subj
 - Forecast run-rate is labeled separately from persisted AI forecast.
 - Missing data is not silently converted to zero.
 - Calendarul Sales arată numai zile observate până la cutoff. O celulă absentă rămâne missing; returul este cantitate negativă, iar numărul afișat de magazine este observat, nu coverage complet declarat.
-- Visits din Performance și Workforce folosește autorul Team Leader păstrat în vizită, nu ASM-ul magazinului. Filtrele firmă/RM/ASM/magazin folosesc ierarhia curentă; filtrul agent este incompatibil și trebuie eliminat înainte de deschiderea sub-view-ului.
+- Visits din Performance și Workforce folosește autorul Team Leader păstrat în vizită, nu ASM-ul magazinului. Filtrele firmă/RM/magazin folosesc ierarhia curentă; filtrul agent este incompatibil și trebuie eliminat înainte de deschiderea sub-view-ului.
 - Compensation citește numai read-model-ul agregat Retail; nu există persoană/nume/CNP în contract. Cohortele sub trei persoane sunt suprimate inclusiv în inspect și export.
 - `UNAVAILABLE` înseamnă că nu există o generație autoritativă eligibilă; UI nu transformă date legacy sau lipsa în zero.
 

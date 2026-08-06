@@ -19,7 +19,7 @@ Acesta este un singur plan persistent. Nu este împărțit în luni, proiecte su
 
 ## Stare candidat RC1
 
-La 2026-08-06, Retail SHA `a5150341d4962a6f9592108adb7b74ec946bd964` publică aditiv read-model-urile v1, Sales day v1, Visits v2 pe autor Team Leader și Planning v2 cu head de promovare CAS; migrarea 052 expune reader-ului numai digestul definer necesar verificării, nu tabelele forecast brute. Completion-ul Visits este recalculat din cele 19 câmpuri FieldOps. Candidatul Insight `1.0.0-rc.1` implementează catalogul/query batch/inspect/export, `ChartSpec`, sub-view-urile specializate, Visits nativ și dashboard ACL/preset/versionare. Finance și Compensation rămân explicit `UNAVAILABLE`, iar Planning `partial`, până când Retail promovează generații/head-uri eligibile; datele legacy și run-urile doar `completed` nu sunt declarate oficiale. Închiderea `1.0.0` rămâne condiționată de matricea reală Authentik, acceptarea vizuală owner și șapte zile curate de performanță/RUM pe exact SHA-ul final.
+La 2026-08-06, Retail publică aditiv read-model-urile v1, Sales day v1, Visits v2 pe autor Team Leader, Planning v2 cu head de promovare CAS și Campaigns v2 cu generații immutable/head CAS pentru Promo și Incentive. Migrarea 052 expune reader-ului numai digestul definer necesar verificării, iar migrarea 053 publică numai agregatul de campanie aprobat, nu formule duplicate în Insight. Completion-ul Visits este recalculat din cele 19 câmpuri FieldOps. Candidatul Insight `1.0.0-rc.1` implementează catalogul/query batch/inspect/export, `ChartSpec`, sub-view-urile specializate, Visits și Campaigns native, dashboard ACL/preset/versionare, brandingul light Retail și master scope-ul RM/magazine/agenți multi-select. Finance și Compensation rămân explicit `UNAVAILABLE`, iar Planning `partial`, până când Retail promovează generații/head-uri eligibile; datele legacy și run-urile doar `completed` nu sunt declarate oficiale. Închiderea `1.0.0` rămâne condiționată de matricea reală Authentik, acceptarea vizuală owner și șapte zile curate de performanță/RUM pe exact SHA-ul final.
 
 ## Adevărul de pornire
 
@@ -27,12 +27,12 @@ La 2026-08-06, Retail SHA `a5150341d4962a6f9592108adb7b74ec946bd964` publică ad
 | --- | --- | --- |
 | Producție | LIVE | server principal, Caddy, Authentik, API pe UDS privat, PostgreSQL read-only, monitorizare și backup metadata |
 | Acces | LIVE | acces la aplicație limitat la Andrei, Alexandra și Bogdan; capabilitățile de modul sunt verificate server-side |
-| Shell și filtre | LIVE | desktop full-width, sidebar, light/dark, filtre în URL pentru perioadă/companie/RM/ASM/magazin/agent |
+| Shell și filtre | LIVE | desktop full-width, sidebar light collapsible, light implicit și filtre URL pentru perioadă/companie/RM multi/magazin multi/agent multi; ASM rămâne numai dimensiune internă |
 | Overview | LIVE | KPI, evoluție zilnică, target/run-rate, contribuții, priorități și alerte |
 | Raport lunar | LIVE | YoY, MoM, medie recentă 3/6/12 luni, companii/RM/magazine/agenți/produse/retururi și XLSX numeric |
 | Sales, Performance, Campaigns, Workforce, Compensation, Finance, Planning | PARȚIAL | date live și câte o pagină, dar predominant același șablon generic cu 4 KPI, trend, distribuție, matrice și tabel |
-| Custom Dashboards | PARȚIAL | CRUD în DB, template-uri, layout, metrică/vizualizare și filtre locale; lipsesc configurarea completă, ACL țintit, preseturi, clone și toate interacțiunile |
-| Inspect/export | PARȚIAL | query/inspect/CSV/XLSX server-side unificat pe widgeturi native/custom și PNG sigur; lipsește reconcilierea tuturor surselor oficiale și browser QA complet |
+| Custom Dashboards | RC1 | CRUD/preset/clone/duplicate/layout/versionare/ACL/scope/batch sunt implementate; lipsește matricea live sharing/revocare cu cele trei sesiuni reale |
+| Inspect/export | RC1 | query/inspect/CSV/XLSX server-side unificat pe widgeturi native/custom și PNG sigur; lipsește reconcilierea tuturor surselor oficiale și acceptarea externă |
 | Interacțiuni analitice | RC1 | fullscreen/focus trap, keyboard drill/reset, breadcrumb/reload, click semantic pe timp și ierarhia completă, selecție temporală dataZoom/control accesibil, comparații simultane allowlist-uite și deep-link contextual consumat de Retail |
 | Identitate versiune | PARȚIAL | UI indică `v0.5`, în timp ce metadatele pachetelor/API au versiuni mai vechi; versiunea produsului trebuie unificată |
 
@@ -46,7 +46,7 @@ Inventarul a fost verificat read-only în PostgreSQL live la 2026-08-05 (Europe/
 | --- | --- | --- |
 | Vânzări și performanță | `reporting_agent_month` și `reporting_item_month`, 2023-09…2026-08; zi/lună, categorie, subcategorie, brand, produs, bonuri și retururi | baza pentru Sales, Performance, Monthly Review și drill-down; nu se reimplementează formulele Retail |
 | Agenți | profile și lifecycle 2023-09…2026-08; targeturi pe agent și magazin | analiză longitudinală numai cu identitate stabilă; legăturile lipsă rămân explicit neasociate |
-| Campanii | Focus în reporting, campanii Incentive în DB; Promo, Concurs și Folii folosesc contracte/configurații/generații Retail dispersate | Retail trebuie să publice read-model-uri lunare canonice pentru fiecare mecanism; Insight nu citește fișierele interne și nu duplică regulile de eligibilitate |
+| Campanii | Focus în reporting; Promo și Incentive publicate prin `reporting_campaign_month_v2`; Concurs și Folii fără head oficial eligibil | Insight citește exclusiv mecanismele publicate și păstrează Concurs/Folii unavailable până la un contract Retail oficial; nu duplică regulile de eligibilitate |
 | Workforce și Grile | lifecycle, profil agent, `grile_store_current_status`; 274 vizite FieldOps în intervalul 2026-03-19…2026-08-05 la snapshot | Visits v2 este publicat pe autor Team Leader și îmbogățire curentă de magazin; mișcările, rosterul și Grile analitice complete rămân contracte separate |
 | Compensații | 3.716 înregistrări lunare 2025-01…2026-06 la snapshot și legături agent-persoană | componentele salariale se expun numai prin view-uri agregate dedicate; CNP și identitatea privată nu intră în Insight; pragul de minimum 3 persoane rămâne fail-closed |
 | Finance/P&L | `store_pnl_monthly`, 2017-01…2026-06 la snapshot; tabelele noii autorități de generații nu au încă head live | fiecare valoare trebuie să arate `actual/estimate`, autoritatea, reconcilierea și coverage; Insight nu tratează shadow/generații nepromovate drept actuale |
@@ -56,7 +56,7 @@ Inventarul a fost verificat read-only în PostgreSQL live la 2026-08-05 (Europe/
 
 Noile suprafețe trebuie să fie Retail-owned, versionate și acordate explicit rolului read-only Insight:
 
-- `reporting_campaign_month`: mecanism, campanie, perioadă/cutoff, scope, target, actual, coverage, adopție, discount, contribuție și statut `official/partial/unavailable`;
+- `reporting_campaign_month_v2`: mecanism, campanie, perioadă/cutoff, firmă/RM/magazin/agent/produs, vânzări, cantitate netă semnată, discount/recompensă, eligibilitate, coduri active și statut `official/partial/unavailable`;
 - `reporting_workforce_month`: persoană opacă, rol, intrare/ieșire/transfer, vechime, zile lucrate, magazine acoperite și legătura de reporting;
 - `reporting_compensation_month`: numai agregate și componente aprobate, fără CNP sau identificatori privați;
 - `reporting_visit_month_v2`: vizite și indicatori agregați la lună × Team Leader autor × magazin; v1 pe ASM rămâne numai rollback N-1;
@@ -137,7 +137,7 @@ Rendererul implicit rămâne Canvas pentru graficele mari. SVG se acceptă numai
 
 `connectNulls` este `false` implicit: lipsa, zilele viitoare și coverage incomplet nu sunt unite vizual. Pentru scene mari animația se reduce/oprește, iar orice opțiune venită din dashboard este whitelist-uită; nu se acceptă formatter HTML, URL, regex sau funcție arbitrară.
 
-**POC-uri și stare:** browser QA reproductibil 51/51 acoperă cele 10 rute, formele native, toggle-ul histogramă↔boxplot, 1180/1440/1920/ultrawide, light/dark, Compact/Comfortable, inspector, URL drill/reload/reset, selecție temporală, deschiderea distinctă a detaliului Retail și 403; trendurile lungi activează zoom, iar bundle-ul are buget verificat. POC-ul Canvas din 2026-08-06 trece pe 10 widgeturi, heatmap 100×36, scatter 5.000 puncte, first render 7.634,2 ms, resize blocking p95 151,5 ms și heap post-GC +18.927.354 bytes după trei remount-uri, sub pragul de 64 MiB. SVG rămâne neautorizat fără un caz de business distinct. PNG rămâne non-persistent și cu pixel ratio controlat. Poarta rămâne interacțiune p95 sub 200 ms.
+**POC-uri și stare:** browser QA reproductibil acoperă cele 10 rute, formele native, toggle-ul histogramă↔boxplot, 1180/1440/1920/ultrawide, light/dark, Compact/Comfortable, inspector, preset CRUD/apply, ACL UI, URL drill/reload/reset, selecție temporală, deschiderea distinctă a detaliului Retail și 403; trendurile lungi activează zoom, iar bundle-ul are buget verificat. POC-ul Canvas din 2026-08-06 așteaptă evenimentul ECharts `finished` și trece pe 10 widgeturi, heatmap 100×36, scatter 5.000 puncte, first render 5.753,5 ms, resize blocking p95 33,5 ms și heap post-GC -2.075.992 bytes după trei remount-uri, sub pragul de 64 MiB. SVG rămâne neautorizat fără un caz de business distinct. PNG rămâne non-persistent și cu pixel ratio controlat. Poarta rămâne interacțiune p95 sub 200 ms.
 
 ### Contract analitic comun
 

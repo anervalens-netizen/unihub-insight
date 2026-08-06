@@ -23,10 +23,14 @@ export const globalSearchSchema = z.object({
   start: z.string().regex(monthPattern).optional(),
   end: z.string().regex(monthPattern).optional(),
   firm: z.string().max(120).optional(),
-  regional: z.string().max(120).optional(),
+  // CSV values are kept in the URL so old shared links remain readable while
+  // the API normalizes them into ordered tuples at its boundary.
+  regional: z.string().max(2_000).optional(),
+  // ASM is intentionally retained only for legacy/internal drill state. It is
+  // not emitted by the primary analytics serializer or the master filter UI.
   asm: z.string().max(120).optional(),
   stores: z.string().max(2_000).optional(),
-  agent: z.string().max(180).optional(),
+  agent: z.string().max(2_000).optional(),
   drill: z.string().max(2_000).optional(),
   subview: z.string().max(80).optional(),
   dashboard_id: z.string().max(100).optional(),
@@ -73,7 +77,7 @@ export function currentBusinessMonth(now = new Date()): string {
   return `${year}-${month}`;
 }
 
-export function parseStoreSelection(value: string | undefined): string[] {
+export function parseSelection(value: string | undefined): string[] {
   if (!value) return [];
   return [
     ...new Set(
@@ -85,14 +89,16 @@ export function parseStoreSelection(value: string | undefined): string[] {
   ];
 }
 
-export function serializeStoreSelection(values: readonly string[]): string | undefined {
+export function serializeSelection(values: readonly string[]): string | undefined {
   const normalized = [...new Set(values.map((item) => item.trim()).filter(Boolean))];
   return normalized.length > 0 ? normalized.join(',') : undefined;
 }
 
+export const parseStoreSelection = parseSelection;
+export const serializeStoreSelection = serializeSelection;
+
 export function activeFilterCount(search: GlobalSearch): number {
-  return [search.firm, search.regional, search.asm, search.stores, search.agent].filter(Boolean)
-    .length;
+  return [search.firm, search.regional, search.stores, search.agent].filter(Boolean).length;
 }
 
 export function parseComparisons(

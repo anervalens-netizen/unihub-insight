@@ -12,6 +12,8 @@ The request is finite: metric IDs + versions, dimensions, time range/grain, filt
 
 Saved widgets persist `metric_id`, `metric_version` and `query_contract_version`. Inspector and exports execute the same query and snapshot server-side; they do not reconstruct analytical rows from UI payloads.
 
+Native module widgets and custom widgets are both fed by catalog-derived batch queries. Native specialized cards are projections of their exact batch datasets; they do not execute a parallel legacy visual payload. A duplicated custom widget is persisted as a new dashboard version before its new ID is eligible for batch/inspect/export authorization.
+
 ## Initial metric definitions
 
 | ID | Definition | Unit | Missing policy |
@@ -27,6 +29,10 @@ Saved widgets persist `metric_id`, `metric_version` and `query_contract_version`
 | `visits.distinct_stores` | Distinct visited `site_code` values in scope | integer | missing period remains missing |
 | `visits.avg_completion` | Visit-count-weighted FieldOps completion average, derived from the 19 canonical visit fields | % | null without eligible visits |
 | `visits.checklist_score` | Visit-count-weighted mean of the five boolean checklist checks | % | null without eligible visits |
+| `campaigns.promo_sales` / `campaigns.promo_quantity` | Net Retail sales and quantity for products participating in the published Promo generation | RON / integer | null without a promoted campaign head |
+| `campaigns.promo_discount` | Canonical Retail Promo discount value | RON | null without a promoted campaign head |
+| `campaigns.incentive_sales` / `campaigns.incentive_quantity` | Net Retail sales and quantity for products participating in the published Incentive generation | RON / integer | null without a promoted campaign head |
+| `campaigns.incentive_reward` | Canonical Retail Incentive reward | RON | null without a promoted campaign head |
 
 The linear forecast is explicitly labeled run-rate; it is not the persisted AI forecast used elsewhere in UniHub.
 
@@ -46,8 +52,8 @@ For an open current period, future actual points are null, never repeated last v
 
 ## Scope rules
 
-- Hierarchy: company → RM → ASM → store → agent.
-- Store selection is ordered, deduplicated and supports multiple `site_code` values.
+- Master hierarchy: company → RM → store → agent. ASM remains an internal drill/reconciliation dimension and is not serialized by the primary filter bar.
+- RM, store and agent selections are ordered, deduplicated CSV sets; each supports multiple values through the same URL/query/export contract.
 - `site_code` is the stable operational store key.
 - Current agent identity can use reporting label plus site scope only for the bounded current slice; stable effective-dated entity IDs are mandatory before cross-store longitudinal analysis.
 - Selected store can dominate historical parent filters where the Retail contract requires it.
@@ -70,14 +76,14 @@ Initial alerts are deterministic rules, not machine-learning scores. They expose
 
 ## Domain contracts and privacy
 
-- Campaign mechanisms remain separate and carry their own cutoff/status/eligibility authority; they are not summed without a defined metric. Focus Top/Bottom folosește numai magazine observate și `campaigns.focus_share`; nu afirmă coverage, adopție sau cauzalitate.
+- Campaign mechanisms remain separate and carry their own cutoff/status/eligibility authority; they are not summed without a defined metric. Retail migration 053 publishes immutable per-agent rows behind a CAS period head through `reporting_campaign_month_v2`; `reporting_source_snapshot_v4` makes an absent head explicitly unavailable. Promo/Incentive reuse the canonical Retail evaluators for sales, net quantity, participating products/stores and discount/reward. Focus Top/Bottom folosește numai magazine observate și `campaigns.focus_share`; nu afirmă coverage, adopție sau cauzalitate.
 - Workforce movements come from official effective-dated events, never inferred only from missing sales.
 - Visits read only `reporting_visit_month_v2`; draft rows, distribution/`TR %` locations and `Cartele` are excluded. `avg_completion` is recalculated from the 19 canonical FieldOps fields, not from a stale persisted percentage. Performance and Workforce expose the same Visits slice and source metadata, so their native widgets, query batch, inspect and XLSX cannot drift to the legacy ASM projection.
 - Compensation reads an aggregate Retail view only. No direct `salary_records`, `agent_salary_links`, names or private IDs remain granted. Total uses all rows, average uses values at least 2,000 RON, median uses all values; cohorts of one or two are suppressed across KPI, series, inspect and export, including differencing attacks through filters.
 - Finance explicitly marks `actual`/`estimated` and authority. `__FINANCE_UNALLOCATED__` belongs in company totals and never in store/RM detail. Shadow or unpromoted generations are unavailable, not actual.
 - Planning forecast identifies run, horizon, method/model, input cutoff and coverage. `completed` este numai candidat: v2 publică exclusiv head-ul promovat, cu hash/row-count înghețat, approval artifact, revision CAS și ledger append-only. Target scenarios identify scenario, revision, status, rule-set hash and exact registry-backed snapshot; drafts și scenariile legacy nu devin implicit shared truth. Accuracy păstrează KPI-ul server-side și vizualizează perechile Actual × Forecast publicate pe magazin; clientul nu recalculează o formulă alternativă.
 
-Retail migration 047 is intentionally additive for consumer N/N-1. Migrations 049–050 add Visits v2 and canonical completion without rewriting FieldOps history. Migration 051 adds `reporting_source_snapshot_v3` and `reporting_planning_scenario_v2`; migration 052 grants the Insight reader only the fixed-search-path definer digest needed by those views, while raw forecast tables remain inaccessible. The current consumer selects v3/v2 while v1/v2 contracts remain rollback anchors. The migrations perform zero business promotions: without an approved Planning head or exact Target snapshot, results stay `partial/unavailable`. Legacy raw grants do not authorize new Insight code to query raw tables.
+Retail migration 047 is intentionally additive for consumer N/N-1. Migrations 049–050 add Visits v2 and canonical completion without rewriting FieldOps history. Migrations 051–052 add governed Planning v2. Migration 053 adds Campaigns v2 and snapshot v4 while v1/v3 remain rollback anchors. The current consumer selects snapshot v4, Campaigns v2 and Planning v2. Without the matching approved head, results stay `partial/unavailable`; legacy raw grants never authorize Insight to query raw business tables.
 
 ## Export contract
 

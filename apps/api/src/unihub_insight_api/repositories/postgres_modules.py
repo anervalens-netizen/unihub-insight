@@ -220,6 +220,10 @@ def append_reporting_scope(
         params.append(value)
         clauses.append(f"{alias}.{column} = ${len(params)}{cast}")
 
+    def add_many(column: str, values: tuple[str, ...]) -> None:
+        params.append(list(values))
+        clauses.append(f"{alias}.{column} = ANY(${len(params)}::text[])")
+
     if scope.stores:
         params.append(list(scope.stores))
         clauses.append(f"{alias}.site_code = ANY(${len(params)}::text[])")
@@ -227,11 +231,11 @@ def append_reporting_scope(
         if scope.firm:
             add("firma", scope.firm)
         if scope.regional:
-            add("regional", scope.regional)
+            add_many("regional", scope.regional)
         if scope.asm:
             add("asm", scope.asm)
     if include_agent and scope.agent:
-        add("agent", scope.agent)
+        add_many("agent", scope.agent)
     return clauses
 
 
@@ -334,6 +338,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         calendar: list[CalendarCell] | None = None,
         alerts: list[InsightAlert],
         visits: ModuleAnalyticsSlice | None = None,
+        campaigns: dict[str, ModuleAnalyticsSlice] | None = None,
     ) -> ModuleAnalyticsResponse:
         title, description, capability, axes, charts = MODULE_DEFINITIONS[module]
         return ModuleAnalyticsResponse(
@@ -352,6 +357,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             calendar=calendar or [],
             alerts=alerts,
             visits=visits,
+            campaigns=campaigns or {},
         )
 
     async def _sales_history(
@@ -365,12 +371,12 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         clauses = ["agg.import_month BETWEEN $1 AND $2"]
         clauses.extend(append_reporting_scope(scope, alias="agg", params=params))
         if scope.agent:
-            params.append(scope.agent)
+            params.append(list(scope.agent))
             target_cte = f"""
                 SELECT import_month, site_code, SUM(target_value) AS target_value
                 FROM agent_targets
                 WHERE import_month BETWEEN $1 AND $2
-                  AND agent = ${len(params)}
+                  AND agent = ANY(${len(params)}::text[])
                 GROUP BY import_month, site_code
             """
         else:
@@ -1005,15 +1011,284 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                 *params,
             )
 
+    async def _campaign_mechanism_rows(
+        self,
+        scope: AnalyticsScope,
+        *,
+        start: str,
+        end: str,
+    ) -> Sequence[asyncpg.Record]:
+        params: list[Any] = [start, end]
+        clauses = ["campaign.period BETWEEN $1 AND $2"]
+        clauses.extend(append_reporting_scope(scope, alias="campaign", params=params))
+        async with self.pool.acquire() as connection:
+            return await connection.fetch(
+                f"""
+                SELECT campaign.period, campaign.mechanism, campaign.campaign_key,
+                       campaign.site_code, campaign.agent, campaign.locatie, campaign.firma,
+                       campaign.regional, campaign.asm,
+                       campaign.actual_sales, campaign.actual_quantity,
+                       campaign.active_product_count, campaign.active_product_codes,
+                       campaign.promo_qualifying_bons,
+                       campaign.promo_discounted_units,
+                       campaign.promo_discount_value,
+                       campaign.incentive_sold_quantity,
+                       campaign.incentive_eligible_quantity,
+                       campaign.incentive_qualified_quantity,
+                       campaign.incentive_value,
+                       campaign.incentive_potential,
+                       campaign.incentive_store_qualified,
+                       campaign.status, campaign.warnings
+                FROM reporting_campaign_month_v2 AS campaign
+                WHERE {" AND ".join(clauses)}
+                  AND campaign.mechanism IN ('promo', 'incentive')
+                ORDER BY campaign.period, campaign.mechanism,
+                         campaign.campaign_key, campaign.site_code
+                """,
+                *params,
+            )
+
+    @staticmethod
+    def _commercial_campaign_slice(
+        mechanism: str,
+        rows: Sequence[asyncpg.Record],
+        period: str,
+    ) -> ModuleAnalyticsSlice:
+        is_promo = mechanism == "promo"
+        all_current = [row for row in rows if str(row["period"]) == period and str(row["mechanism"]) == mechanism]
+        current = [row for row in all_current if str(row["status"]) != "unavailable"]
+        mechanism_rows = [
+            row for row in rows if str(row["mechanism"]) == mechanism and str(row["status"]) != "unavailable"
+        ]
+
+        def numeric(row: asyncpg.Record, field: str) -> Decimal:
+            value = row[field]
+            return Decimal(str(value)) if value is not None else Decimal(0)
+
+        def reward(row: asyncpg.Record) -> Decimal:
+            return numeric(row, "promo_discount_value" if is_promo else "incentive_value")
+
+        def volume(row: asyncpg.Record) -> Decimal:
+            return numeric(row, "actual_quantity")
+
+        sales = sum((numeric(row, "actual_sales") for row in current), Decimal(0))
+        quantity = sum((volume(row) for row in current), Decimal(0))
+        reward_value = sum((reward(row) for row in current), Decimal(0))
+        active_product_codes = {str(code) for row in current for code in (row["active_product_codes"] or ())}
+        active_products = len(active_product_codes)
+        if is_promo:
+            active_store_codes = {
+                str(row["site_code"])
+                for row in current
+                if numeric(row, "promo_qualifying_bons") > 0
+                or numeric(row, "promo_discounted_units") > 0
+                or numeric(row, "promo_discount_value") > 0
+            }
+        else:
+            active_store_codes = {
+                str(row["site_code"])
+                for row in current
+                if bool(row["incentive_store_qualified"])
+                or numeric(row, "incentive_qualified_quantity") > 0
+                or numeric(row, "incentive_value") > 0
+            }
+        qualifying = sum(
+            (numeric(row, "promo_qualifying_bons" if is_promo else "incentive_qualified_quantity") for row in current),
+            Decimal(0),
+        )
+        eligible = sum(
+            (numeric(row, "promo_discounted_units" if is_promo else "incentive_eligible_quantity") for row in current),
+            Decimal(0),
+        )
+
+        prefix = f"campaigns.{mechanism}"
+        kpis = []
+        if current:
+            kpis = [
+                KpiMetric(id=f"{prefix}_sales", label="Vânzări", value=_money(sales), unit=MetricUnit.CURRENCY),
+                KpiMetric(id=f"{prefix}_quantity", label="Cantitate netă", value=quantity, unit=MetricUnit.INTEGER),
+                KpiMetric(
+                    id=f"{prefix}_{'discount' if is_promo else 'reward'}",
+                    label="Discount" if is_promo else "Bonus / recompensă",
+                    value=_money(reward_value),
+                    unit=MetricUnit.CURRENCY,
+                ),
+                KpiMetric(
+                    id=f"{prefix}_active_stores",
+                    label="Magazine participante",
+                    value=Decimal(len(active_store_codes)),
+                    unit=MetricUnit.INTEGER,
+                ),
+                KpiMetric(
+                    id=f"{prefix}_active_products",
+                    label="Produse participante",
+                    value=Decimal(active_products),
+                    unit=MetricUnit.INTEGER,
+                ),
+                KpiMetric(
+                    id=f"{prefix}_{'qualifying_receipts' if is_promo else 'qualified_quantity'}",
+                    label="Bonuri eligibile" if is_promo else "Cantitate calificată",
+                    value=qualifying,
+                    unit=MetricUnit.INTEGER,
+                ),
+                KpiMetric(
+                    id=f"{prefix}_{'discounted_units' if is_promo else 'eligible_quantity'}",
+                    label="Unități cu discount" if is_promo else "Cantitate eligibilă",
+                    value=eligible,
+                    unit=MetricUnit.INTEGER,
+                ),
+            ]
+
+        monthly: dict[str, dict[str, Decimal]] = defaultdict(lambda: {"sales": Decimal(0), "reward": Decimal(0)})
+        by_campaign: dict[str, Decimal] = defaultdict(Decimal)
+        current_by_store: dict[tuple[str, str], dict[str, Any]] = {}
+        history_by_store: dict[tuple[str, str, str], dict[str, Any]] = {}
+        for row in mechanism_rows:
+            row_period = str(row["period"])
+            campaign_key = str(row["campaign_key"])
+            monthly[row_period]["sales"] += numeric(row, "actual_sales")
+            monthly[row_period]["reward"] += reward(row)
+            if row_period == period:
+                by_campaign[str(row["campaign_key"])] += reward(row)
+            key = (row_period, campaign_key, str(row["site_code"]))
+            bucket = history_by_store.setdefault(
+                key,
+                {
+                    "campaign_key": campaign_key,
+                    "site_code": str(row["site_code"]),
+                    "locatie": str(row["locatie"] or row["site_code"]),
+                    "firma": str(row["firma"] or "—"),
+                    "regional": str(row["regional"] or "—"),
+                    "sales": Decimal(0),
+                    "quantity": Decimal(0),
+                    "reward": Decimal(0),
+                    "eligible": Decimal(0),
+                    "qualifying": Decimal(0),
+                    "active_product_codes": set(),
+                },
+            )
+            bucket["sales"] += numeric(row, "actual_sales")
+            bucket["quantity"] += volume(row)
+            bucket["reward"] += reward(row)
+            bucket["eligible"] += numeric(
+                row,
+                "promo_discounted_units" if is_promo else "incentive_eligible_quantity",
+            )
+            bucket["qualifying"] += numeric(
+                row,
+                "promo_qualifying_bons" if is_promo else "incentive_qualified_quantity",
+            )
+            bucket["active_product_codes"].update(str(code) for code in (row["active_product_codes"] or ()))
+            if row_period == period:
+                current_by_store[(campaign_key, str(row["site_code"]))] = bucket
+
+        trend = [
+            TrendPoint(
+                key=key,
+                label=key,
+                primary=_money(values["sales"]),
+                secondary=_money(values["reward"]),
+            )
+            for key, values in sorted(monthly.items())
+        ]
+        breakdown = [
+            BreakdownRow(
+                id=f"{campaign_key}:{site_code}",
+                label=str(values["locatie"]),
+                context=(
+                    f"{values['campaign_key']} · {values['firma']} · {values['regional']}"
+                    f" · {len(values['active_product_codes'])} produse"
+                ),
+                primary=_money(values["sales"]),
+                secondary=values["quantity"],
+                tertiary=_money(values["reward"]),
+                progress_pct=_ratio(values["qualifying"], values["eligible"]),
+                risk=RiskLevel.HEALTHY,
+            )
+            for (campaign_key, site_code), values in current_by_store.items()
+        ]
+        top_codes = {
+            (str(values["campaign_key"]), str(values["site_code"]))
+            for values in sorted(
+                current_by_store.values(),
+                key=lambda item: Decimal(item["sales"]),
+                reverse=True,
+            )[:8]
+        }
+        matrix = [
+            MatrixCell(
+                x=row_period,
+                y=f"{values['campaign_key']} · {values['locatie']}",
+                value=_money(values["reward"]),
+                risk=RiskLevel.HEALTHY,
+            )
+            for (row_period, campaign_key, site_code), values in history_by_store.items()
+            if (campaign_key, site_code) in top_codes and row_period >= shift_month(period, -5)
+        ]
+        warnings = sorted({str(item) for row in all_current for item in (row["warnings"] or ())})
+        alerts = (
+            [
+                InsightAlert(
+                    id=f"campaign-{mechanism}-partial",
+                    severity=AlertSeverity.INFO,
+                    title=f"{mechanism.title()} publicat parțial",
+                    description="; ".join(warnings),
+                )
+            ]
+            if warnings
+            else []
+        )
+        unavailable_campaigns = {str(row["campaign_key"]) for row in all_current if str(row["status"]) == "unavailable"}
+        if unavailable_campaigns and current:
+            alerts.append(
+                InsightAlert(
+                    id=f"campaign-{mechanism}-unavailable-items",
+                    severity=AlertSeverity.WARNING,
+                    title=f"{mechanism.title()} cu coverage incomplet",
+                    description="Campanii neincluse în total: " + ", ".join(sorted(unavailable_campaigns)),
+                )
+            )
+        if not current:
+            alerts.append(
+                InsightAlert(
+                    id=f"campaign-{mechanism}-missing",
+                    severity=AlertSeverity.WARNING,
+                    title=f"{mechanism.title()} indisponibil",
+                    description="Mecanismul nu este publicat în read-model pentru perioada selectată.",
+                )
+            )
+        return ModuleAnalyticsSlice(
+            axes=(
+                ValueAxis(key="primary", label="Vânzări", unit=MetricUnit.CURRENCY),
+                ValueAxis(key="secondary", label="Cantitate netă", unit=MetricUnit.INTEGER),
+                ValueAxis(key="tertiary", label="Discount" if is_promo else "Recompensă", unit=MetricUnit.CURRENCY),
+            ),
+            supported_charts=(
+                ChartKind.LINE,
+                ChartKind.BAR,
+                ChartKind.DONUT,
+                ChartKind.TREEMAP,
+                ChartKind.HEATMAP,
+                ChartKind.TABLE,
+            ),
+            kpis=kpis,
+            trend=trend,
+            distribution=shares(list(by_campaign.items())),
+            breakdown=sorted(breakdown, key=lambda item: item.primary, reverse=True),
+            matrix=matrix,
+            alerts=alerts,
+        )
+
     async def _campaigns(self, scope: AnalyticsScope) -> ModuleAnalyticsResponse:
         start = shift_month(scope.period, -11)
-        rows, distribution_rows, meta = await asyncio.gather(
+        rows, distribution_rows, mechanism_rows, meta = await asyncio.gather(
             self._campaign_rows(scope, start=start, end=scope.period),
             self._campaign_distribution(scope),
+            self._campaign_mechanism_rows(scope, start=start, end=scope.period),
             self._meta(
                 ModuleId.CAMPAIGNS,
                 scope,
-                "reporting_focus_item_month",
+                "reporting_campaign_month_v2",
                 (SourceDomain.SALES,),
             ),
         )
@@ -1122,6 +1397,10 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             breakdown=sorted(breakdown, key=lambda item: item.primary, reverse=True),
             matrix=matrix,
             alerts=alerts,
+            campaigns={
+                mechanism: self._commercial_campaign_slice(mechanism, mechanism_rows, scope.period)
+                for mechanism in ("promo", "incentive")
+            },
         )
 
     async def _workforce_rows(self, scope: AnalyticsScope) -> Sequence[asyncpg.Record]:
@@ -1167,8 +1446,8 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                 params.append(scope.firm)
                 clauses.append(f"store.firma = ${len(params)}")
             if scope.regional:
-                params.append(scope.regional)
-                clauses.append(f"store.regional = ${len(params)}")
+                params.append(list(scope.regional))
+                clauses.append(f"store.regional = ANY(${len(params)}::text[])")
             if scope.asm:
                 params.append(scope.asm)
                 clauses.append(f"store.asm = ${len(params)}")
@@ -1501,8 +1780,8 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                     f"OR (row.is_unallocated AND LOWER(row.company_name) = LOWER(${len(params)})))"
                 )
             if scope.regional:
-                params.append(scope.regional)
-                filters.append(f"row.regional = ${len(params)}")
+                params.append(list(scope.regional))
+                filters.append(f"row.regional = ANY(${len(params)}::text[])")
             if scope.asm:
                 params.append(scope.asm)
                 filters.append(f"row.asm = ${len(params)}")

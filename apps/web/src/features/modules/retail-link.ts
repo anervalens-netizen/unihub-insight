@@ -56,6 +56,9 @@ export function retailContextUrl(
   if (destination.subtab) url.searchParams.set('subtab', destination.subtab);
   if (search.firm) url.searchParams.set('firma', search.firm);
   if (search.regional) url.searchParams.set('rm', search.regional);
+  // Preserve a legacy/internal drill ASM only when it already exists in the
+  // incoming state. Master filters and analyticsSearchParams never create it.
+  if (search.asm) url.searchParams.set('asm', search.asm);
   if (stores.length === 1 && stores[0]) url.searchParams.set('magazin', stores[0]);
   if (stores.length > 1) url.searchParams.set('stores', stores.join(','));
   if (search.agent) url.searchParams.set('agent', search.agent);

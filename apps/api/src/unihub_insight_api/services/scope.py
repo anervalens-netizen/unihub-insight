@@ -25,11 +25,11 @@ def scope_label(scope: AnalyticsScope) -> str:
         if scope.firm:
             segments.append(scope.firm)
         if scope.regional:
-            segments.append(scope.regional)
+            segments.append(scope.regional[0] if len(scope.regional) == 1 else f"{len(scope.regional)} RM")
         if scope.asm:
             segments.append(scope.asm)
     if scope.agent:
-        segments.append(scope.agent)
+        segments.append(scope.agent[0] if len(scope.agent) == 1 else f"{len(scope.agent)} agenți")
     return " · ".join(segments) if segments else "Toată rețeaua"
 
 

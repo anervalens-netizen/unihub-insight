@@ -256,6 +256,12 @@ export const moduleMetrics: Record<
     { id: 'campaigns.focus_share', label: 'Pondere Focus' },
     { id: 'campaigns.active_stores', label: 'Magazine active' },
     { id: 'campaigns.active_products', label: 'Produse active' },
+    { id: 'campaigns.promo_sales', label: 'Vânzări Promo' },
+    { id: 'campaigns.promo_quantity', label: 'Cantitate Promo' },
+    { id: 'campaigns.promo_discount', label: 'Discount Promo' },
+    { id: 'campaigns.incentive_sales', label: 'Vânzări Incentive' },
+    { id: 'campaigns.incentive_quantity', label: 'Cantitate Incentive' },
+    { id: 'campaigns.incentive_reward', label: 'Recompensă Incentive' },
   ],
   workforce: [
     { id: 'workforce.headcount', label: 'Headcount' },

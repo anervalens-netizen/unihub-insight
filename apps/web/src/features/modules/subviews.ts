@@ -378,7 +378,15 @@ export function subviewStatus(data: ModuleAnalytics, view: ModuleSubview): Subvi
       source,
     };
   }
-  if (view.mechanism && !view.mechanism.some((token) => sourceText.includes(token))) {
+  const responseProvesMechanism =
+    (view.id === 'focus' &&
+      (data.kpis?.some((item) => item.id.startsWith('campaigns.focus_')) ?? false)) ||
+    Boolean(data.campaigns?.[view.id]?.kpis.length);
+  if (
+    view.mechanism &&
+    !responseProvesMechanism &&
+    !view.mechanism.some((token) => sourceText.includes(token))
+  ) {
     return {
       availability: 'unavailable',
       reason: `Metadata nu publică un contract pentru mecanismul ${view.label}; Focus nu îl substituie.`,

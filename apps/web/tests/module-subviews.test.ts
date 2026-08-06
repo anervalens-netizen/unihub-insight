@@ -64,6 +64,32 @@ describe('module subview availability', () => {
     ).toBe('partial');
   });
 
+  it('uses the materialized v2 slice as proof for Promo and Incentive', () => {
+    const promoSlice = {
+      axes: [],
+      supported_charts: [],
+      kpis: [{ id: 'campaigns.promo_sales', label: 'Vânzări Promo', value: 1, unit: 'currency' }],
+      trend: [],
+      distribution: [],
+      breakdown: [],
+      matrix: [],
+      calendar: [],
+      alerts: [],
+    } as unknown as NonNullable<ModuleAnalytics['campaigns']>[string];
+    const data = {
+      ...moduleData({ campaigns: source('partial', 'campaign_reporting_heads') }),
+      campaigns: { promo: promoSlice },
+    } as ModuleAnalytics;
+
+    expect(subviewStatus(data, subviewForId('campaigns', 'promo')).availability).toBe('partial');
+    expect(moduleSubviewData(data, subviewForId('campaigns', 'promo')).kpis[0]?.id).toBe(
+      'campaigns.promo_sales',
+    );
+    expect(subviewStatus(data, subviewForId('campaigns', 'incentive')).availability).toBe(
+      'unavailable',
+    );
+  });
+
   it('blocks official-roster surfaces when Workforce is only sales-derived activity', () => {
     const workforceSource = {
       ...source('partial', 'reporting_agent_month'),

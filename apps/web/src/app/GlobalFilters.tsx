@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BookmarkPlus, Check, Filter, RotateCcw, Save, Search, Trash2, X } from 'lucide-react';
+import { BookmarkPlus, Filter, RotateCcw, Save, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import {
   createFilterPreset,
@@ -18,37 +18,33 @@ import {
   globalSearchSchema,
   parseComparisons,
   parseDrillPath,
-  parseStoreSelection,
+  parseSelection,
   type rangePresets,
   serializeComparisons,
-  serializeStoreSelection,
+  serializeSelection,
 } from '../lib/search';
+import { type MultiSearchOption, MultiSearchSelect } from './MultiSearchSelect';
 import { useGlobalSearch, useUpdateGlobalSearch } from './search-hooks';
 
 function matchingStore(
   store: FilterStore,
   firm: string | undefined,
-  regional: string | undefined,
-  asm: string | undefined,
+  regionals: readonly string[],
 ): boolean {
   return (
-    (!firm || store.firm === firm) &&
-    (!regional || store.regional === regional) &&
-    (!asm || store.asm === asm)
+    (!firm || store.firm === firm) && (regionals.length === 0 || regionals.includes(store.regional))
   );
 }
 
 function matchingAgent(
   agent: FilterAgent,
   firm: string | undefined,
-  regional: string | undefined,
-  asm: string | undefined,
+  regionals: readonly string[],
   stores: readonly string[],
 ): boolean {
   return (
     (!firm || agent.firm === firm) &&
-    (!regional || agent.regional === regional) &&
-    (!asm || agent.asm === asm) &&
+    (regionals.length === 0 || regionals.includes(agent.regional)) &&
     (stores.length === 0 || stores.includes(agent.site_code))
   );
 }
@@ -82,76 +78,6 @@ function SelectFilter({
         ))}
       </select>
     </label>
-  );
-}
-
-function StoreMultiSelect({
-  stores,
-  selected,
-  onChange,
-}: {
-  stores: FilterStore[];
-  selected: string[];
-  onChange: (values: string[]) => void;
-}) {
-  const [search, setSearch] = useState('');
-  const selectedSet = useMemo(() => new Set(selected), [selected]);
-  const normalizedSearch = search.trim().toLocaleLowerCase('ro-RO');
-  const filtered = stores.filter((store) =>
-    `${store.label} ${store.site_code}`.toLocaleLowerCase('ro-RO').includes(normalizedSearch),
-  );
-
-  return (
-    <details className="filter-popover">
-      <summary>
-        <span className="filter-summary-label">Magazin</span>
-        <strong>{selected.length === 0 ? 'Toate' : `${selected.length} selectate`}</strong>
-      </summary>
-      <div className="filter-popover-panel">
-        <label className="filter-search">
-          <Search size={14} />
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Caută magazin…"
-          />
-          {search ? (
-            <button type="button" onClick={() => setSearch('')} aria-label="Șterge căutarea">
-              <X size={13} />
-            </button>
-          ) : null}
-        </label>
-        <button type="button" className="select-all" onClick={() => onChange([])}>
-          Toate magazinele
-          {selected.length === 0 ? <Check size={14} /> : null}
-        </button>
-        <div className="store-options">
-          {filtered.map((store) => {
-            const checked = selectedSet.has(store.site_code);
-            return (
-              <label key={store.site_code} className="store-option">
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() =>
-                    onChange(
-                      checked
-                        ? selected.filter((value) => value !== store.site_code)
-                        : [...selected, store.site_code],
-                    )
-                  }
-                />
-                <span>
-                  <strong>{store.label}</strong>
-                  <small>{store.site_code}</small>
-                </span>
-                {checked ? <Check size={14} /> : null}
-              </label>
-            );
-          })}
-        </div>
-      </div>
-    </details>
   );
 }
 
@@ -207,7 +133,6 @@ const presetFilterKeys = [
   'end',
   'firm',
   'regional',
-  'asm',
   'stores',
   'agent',
 ] as const;
@@ -223,7 +148,8 @@ function presetFilters(search: ReturnType<typeof useGlobalSearch>): Record<strin
 
 const clearPresetFilters = Object.fromEntries(
   presetFilterKeys.map((key) => [key, undefined]),
-) as Record<(typeof presetFilterKeys)[number], undefined>;
+) as Record<(typeof presetFilterKeys)[number], undefined> & { asm: undefined };
+clearPresetFilters.asm = undefined;
 
 export function GlobalFilters() {
   const search = useGlobalSearch();
@@ -238,7 +164,9 @@ export function GlobalFilters() {
   const [presetShared, setPresetShared] = useState(false);
   const [presetMessage, setPresetMessage] = useState<string | null>(null);
   const options = optionsQuery.data;
-  const selectedStores = parseStoreSelection(search.stores);
+  const selectedRegionals = parseSelection(search.regional);
+  const selectedStores = parseSelection(search.stores);
+  const selectedAgents = parseSelection(search.agent);
   const selectedComparisons = parseComparisons(search);
   const selectedPreset = presetsQuery.data?.find((preset) => preset.id === presetId);
   const refreshPresets = async (): Promise<void> => {
@@ -298,12 +226,12 @@ export function GlobalFilters() {
   const filteredStores = useMemo(
     () =>
       (options?.stores ?? []).filter((store) =>
-        matchingStore(store, search.firm, search.regional, search.asm),
+        matchingStore(store, search.firm, selectedRegionals),
       ),
-    [options?.stores, search.asm, search.firm, search.regional],
+    [options?.stores, search.firm, selectedRegionals],
   );
 
-  const regionals = useMemo(
+  const regionalOptions = useMemo<MultiSearchOption[]>(
     () =>
       [
         ...new Set(
@@ -311,40 +239,32 @@ export function GlobalFilters() {
             .filter((store) => !search.firm || store.firm === search.firm)
             .map((store) => store.regional),
         ),
-      ].sort((a, b) => a.localeCompare(b, 'ro')),
+      ]
+        .sort((a, b) => a.localeCompare(b, 'ro'))
+        .map((value) => ({ value, label: value })),
     [options?.stores, search.firm],
   );
 
-  const asms = useMemo(
+  const storeOptions = useMemo<MultiSearchOption[]>(
     () =>
-      [
-        ...new Set(
-          (options?.stores ?? [])
-            .filter(
-              (store) =>
-                (!search.firm || store.firm === search.firm) &&
-                (!search.regional || store.regional === search.regional),
-            )
-            .map((store) => store.asm)
-            .filter((value): value is string => Boolean(value)),
-        ),
-      ].sort((a, b) => a.localeCompare(b, 'ro')),
-    [options?.stores, search.firm, search.regional],
+      filteredStores.map((store) => ({
+        value: store.site_code,
+        label: store.label,
+        meta: store.site_code,
+      })),
+    [filteredStores],
   );
 
-  const agents = useMemo(
-    () =>
-      [
-        ...new Set(
-          (options?.agents ?? [])
-            .filter((agent) =>
-              matchingAgent(agent, search.firm, search.regional, search.asm, selectedStores),
-            )
-            .map((agent) => agent.name),
-        ),
-      ].sort((a, b) => a.localeCompare(b, 'ro')),
-    [options?.agents, search.asm, search.firm, search.regional, selectedStores],
-  );
+  const agentOptions = useMemo<MultiSearchOption[]>(() => {
+    const byName = new Map<string, MultiSearchOption>();
+    for (const agent of options?.agents ?? []) {
+      if (!matchingAgent(agent, search.firm, selectedRegionals, selectedStores)) continue;
+      const current = byName.get(agent.name);
+      const sites = current?.meta ? `${current.meta}, ${agent.site_code}` : agent.site_code;
+      byName.set(agent.name, { value: agent.name, label: agent.name, meta: sites });
+    }
+    return [...byName.values()].sort((a, b) => a.label.localeCompare(b.label, 'ro'));
+  }, [options?.agents, search.firm, selectedRegionals, selectedStores]);
 
   const drillPath = parseDrillPath(search.drill);
   const count = activeFilterCount(search) + drillPath.length;
@@ -532,41 +452,47 @@ export function GlobalFilters() {
             updateSearch({
               firm,
               regional: undefined,
-              asm: undefined,
               stores: undefined,
               agent: undefined,
+              asm: undefined,
             })
           }
         />
-        <SelectFilter
+        <MultiSearchSelect
           label="RM"
-          value={search.regional}
-          options={regionals}
+          searchLabel="RM"
+          options={regionalOptions}
+          selected={selectedRegionals}
           disabled={optionsQuery.isPending}
-          onChange={(regional) =>
-            updateSearch({ regional, asm: undefined, stores: undefined, agent: undefined })
+          dataFilterKey="regional"
+          onChange={(regionals) =>
+            updateSearch({
+              regional: serializeSelection(regionals),
+              stores: undefined,
+              agent: undefined,
+              asm: undefined,
+            })
           }
         />
-        <SelectFilter
-          label="ASM"
-          value={search.asm}
-          options={asms}
-          disabled={optionsQuery.isPending}
-          onChange={(asm) => updateSearch({ asm, stores: undefined, agent: undefined })}
-        />
-        <StoreMultiSelect
-          stores={filteredStores}
+        <MultiSearchSelect
+          label="Magazin"
+          searchLabel="magazin"
+          options={storeOptions}
           selected={selectedStores}
+          disabled={optionsQuery.isPending}
+          dataFilterKey="stores"
           onChange={(stores) =>
-            updateSearch({ stores: serializeStoreSelection(stores), agent: undefined })
+            updateSearch({ stores: serializeSelection(stores), agent: undefined, asm: undefined })
           }
         />
-        <SelectFilter
+        <MultiSearchSelect
           label="Agent"
-          value={search.agent}
-          options={agents}
+          searchLabel="agent"
+          options={agentOptions}
+          selected={selectedAgents}
           disabled={optionsQuery.isPending}
-          onChange={(agent) => updateSearch({ agent })}
+          dataFilterKey="agent"
+          onChange={(agents) => updateSearch({ agent: serializeSelection(agents), asm: undefined })}
         />
 
         <button
@@ -578,9 +504,9 @@ export function GlobalFilters() {
               {
                 firm: undefined,
                 regional: undefined,
-                asm: undefined,
                 stores: undefined,
                 agent: undefined,
+                asm: undefined,
                 drill: undefined,
               },
               true,

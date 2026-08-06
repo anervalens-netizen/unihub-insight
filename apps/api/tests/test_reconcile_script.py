@@ -65,3 +65,60 @@ def test_visits_fail_reconciliation_when_expected_slice_is_missing() -> None:
         },
         SimpleNamespace(visits=None),
     ) == {"visits.presence": Decimal("-1")}
+
+
+def test_authoritative_acceptance_refuses_partial_or_unavailable_sources() -> None:
+    reconcile = load_reconcile_module()
+    result = reconcile.ReconciliationResult(
+        sample_case="network",
+        scope="Toată rețeaua",
+        sales_difference=Decimal(0),
+        target_difference=Decimal(0),
+        module_difference=Decimal(0),
+        cutoff_matches=True,
+        domain_differences={"visits.total": Decimal(0)},
+        unavailable_domains=("finance",),
+        incomplete_domains={"campaigns": "partial", "finance": "unavailable"},
+    )
+
+    assert result.numeric_passed is True
+    assert result.authoritative_passed is False
+    assert result.passed is False
+
+
+def test_authoritative_acceptance_requires_numeric_reconciliation_too() -> None:
+    reconcile = load_reconcile_module()
+    result = reconcile.ReconciliationResult(
+        sample_case="asm:1",
+        scope="ASM Test",
+        sales_difference=Decimal("0.02"),
+        target_difference=Decimal(0),
+        module_difference=Decimal(0),
+        cutoff_matches=True,
+        domain_differences={},
+        unavailable_domains=(),
+        incomplete_domains={},
+    )
+
+    assert result.numeric_passed is False
+    assert result.authoritative_passed is False
+
+
+def test_authoritative_acceptance_requires_all_matrix_cases() -> None:
+    reconcile = load_reconcile_module()
+    result = reconcile.ReconciliationResult(
+        sample_case="network",
+        scope="Toată rețeaua",
+        sales_difference=Decimal(0),
+        target_difference=Decimal(0),
+        module_difference=Decimal(0),
+        cutoff_matches=True,
+        domain_differences={},
+        unavailable_domains=(),
+        incomplete_domains={},
+        matrix_missing_cases=("historically-transferred-store",),
+    )
+
+    assert result.numeric_passed is True
+    assert result.authoritative_passed is False
+    assert result.passed is False

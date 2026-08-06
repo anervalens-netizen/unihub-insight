@@ -406,11 +406,11 @@ class DemoAnalyticsRepository:
         if scope.firm:
             stores = [store for store in stores if store.firm == scope.firm]
         if scope.regional:
-            stores = [store for store in stores if store.regional == scope.regional]
+            stores = [store for store in stores if store.regional in scope.regional]
         if scope.asm:
             stores = [store for store in stores if store.asm == scope.asm]
         if scope.agent:
-            site_codes = {agent.site_code for agent in DEMO_AGENTS if agent.name == scope.agent}
+            site_codes = {agent.site_code for agent in DEMO_AGENTS if agent.name in scope.agent}
             stores = [store for store in stores if store.site_code in site_codes]
         return stores
 

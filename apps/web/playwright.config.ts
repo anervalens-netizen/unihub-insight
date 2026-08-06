@@ -32,7 +32,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm --prefix ../.. run dev',
+    command: 'npm --prefix ../.. run dev:e2e',
     url: 'http://localhost:3100',
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,

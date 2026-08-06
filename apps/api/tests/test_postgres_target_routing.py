@@ -49,7 +49,7 @@ async def test_agent_scope_uses_agent_targets(method_name: str) -> None:
     query, params = pool.connection.calls[-1]
     assert "FROM agent_targets" in query
     assert "FROM store_targets" not in query
-    assert params[-1] == "ACSINTED"
+    assert params[-1] == ["ACSINTED"]
 
 
 @pytest.mark.parametrize("method_name", ["_fetch_summary", "_fetch_performance"])

@@ -48,7 +48,7 @@ describe('ChartSpec registry', () => {
     expect(resolved.renderer).toBe('canvas');
     expect(resolved.option).toMatchObject({
       dataset: { dimensions: ['id', 'label', 'value'] },
-      aria: { enabled: true, decal: { show: true } },
+      aria: { enabled: true },
     });
     const option = resolved.option as { series?: unknown };
     expect(option.series).toMatchObject([{ type: 'line', encode: { x: 'label', y: 'value' } }]);
@@ -93,6 +93,44 @@ describe('ChartSpec registry', () => {
     expect(resolveChartSpec(metric, 'scatter', scatter)).toMatchObject({
       kind: 'chart',
       shape: 'scatter',
+      option: {
+        series: [
+          {
+            data: [{ name: 'S001', value: [1200, 98] }],
+            universalTransition: false,
+          },
+        ],
+      },
+    });
+  });
+
+  it('uses direct Canvas heatmap data without the dataset transform path', () => {
+    const heatmap: QueryDataset = {
+      dimensions: [
+        { id: 'x', label: 'Perioadă', kind: 'string', role: 'key' },
+        { id: 'y', label: 'Magazin', kind: 'string', role: 'label' },
+        { id: 'value', label: 'Realizare', kind: 'number', role: 'value' },
+      ],
+      rows: [
+        { x: '2026-07', y: 'S001', value: 90 },
+        { x: '2026-08', y: 'S001', value: 105 },
+      ],
+    };
+    expect(resolveChartSpec(metric, 'heatmap', heatmap)).toMatchObject({
+      kind: 'chart',
+      option: {
+        dataset: { source: [] },
+        xAxis: { data: ['2026-07', '2026-08'] },
+        yAxis: { data: ['S001'] },
+        series: [
+          {
+            data: [
+              ['2026-07', 'S001', 90],
+              ['2026-08', 'S001', 105],
+            ],
+          },
+        ],
+      },
     });
   });
 

@@ -29,6 +29,7 @@ TOLERANCE = Decimal("0.01")
 
 @dataclass(frozen=True)
 class ReconciliationResult:
+    sample_case: str
     scope: str
     sales_difference: Decimal
     target_difference: Decimal
@@ -36,9 +37,11 @@ class ReconciliationResult:
     cutoff_matches: bool
     domain_differences: dict[str, Decimal]
     unavailable_domains: tuple[str, ...]
+    incomplete_domains: dict[str, str]
+    matrix_missing_cases: tuple[str, ...] = ()
 
     @property
-    def passed(self) -> bool:
+    def numeric_passed(self) -> bool:
         return (
             abs(self.sales_difference) <= TOLERANCE
             and abs(self.target_difference) <= TOLERANCE
@@ -48,6 +51,18 @@ class ReconciliationResult:
                 abs(value) <= TOLERANCE for value in self.domain_differences.values()
             )
         )
+
+    @property
+    def authoritative_passed(self) -> bool:
+        return (
+            self.numeric_passed
+            and not self.incomplete_domains
+            and not self.matrix_missing_cases
+        )
+
+    @property
+    def passed(self) -> bool:
+        return self.authoritative_passed
 
 
 def decimal(value: Any) -> Decimal:
@@ -184,6 +199,9 @@ async def reconcile_scope(
     pool: asyncpg.Pool,
     repository: PostgresHardenedInsightRepository,
     scope: AnalyticsScope,
+    *,
+    sample_case: str = "explicit",
+    matrix_missing_cases: tuple[str, ...] = (),
 ) -> ReconciliationResult:
     overview, sales, control, specialized = await asyncio.gather(
         repository.get_overview(scope),
@@ -191,7 +209,7 @@ async def reconcile_scope(
         control_totals(pool, scope),
         specialized_differences(pool, repository, scope),
     )
-    domain_differences, unavailable_domains = specialized
+    domain_differences, unavailable_domains, source_statuses = specialized
     overview_sales = metric_value(overview.kpis, "sales.total")
     overview_target = metric_value(overview.kpis, "target.progress_pct")
     target_metric = next(
@@ -201,6 +219,7 @@ async def reconcile_scope(
     module_sales = metric_value(sales.kpis, "sales.total")
     del overview_target
     return ReconciliationResult(
+        sample_case=sample_case,
         scope=scope_label(scope),
         sales_difference=overview_sales - decimal(control["total_sales"]),
         target_difference=target_total - decimal(control["total_target"]),
@@ -208,6 +227,12 @@ async def reconcile_scope(
         cutoff_matches=overview.meta.as_of == control["last_sale_date"],
         domain_differences=domain_differences,
         unavailable_domains=unavailable_domains,
+        incomplete_domains={
+            domain: status
+            for domain, status in sorted(source_statuses.items())
+            if status != "official"
+        },
+        matrix_missing_cases=matrix_missing_cases,
     )
 
 
@@ -215,25 +240,29 @@ async def specialized_differences(
     pool: asyncpg.Pool,
     repository: PostgresHardenedInsightRepository,
     scope: AnalyticsScope,
-) -> tuple[dict[str, Decimal], tuple[str, ...]]:
-    if scope.agent:
-        return {}, ()
+) -> tuple[dict[str, Decimal], tuple[str, ...], dict[str, str]]:
     snapshot = await repository.resolve_snapshot(scope)
     eligible_domains = {
         domain
         for domain, source in snapshot.sources.items()
         if source.status.value != "unavailable"
     }
-    required_domains = {
-        "campaigns",
-        "workforce",
-        "finance",
-        "planning",
-        "visits",
+    required_domains = {"sales", "planning"}
+    if not scope.agent:
+        required_domains.update({"campaigns", "workforce", "finance", "visits"})
+        if not (scope.regional or scope.asm or scope.stores):
+            required_domains.add("compensation")
+    source_statuses = {
+        domain: (
+            snapshot.sources[domain].status.value
+            if domain in snapshot.sources
+            else "unavailable"
+        )
+        for domain in required_domains
     }
-    if not (scope.regional or scope.asm or scope.stores):
-        required_domains.add("compensation")
     unavailable_domains = set(required_domains - eligible_domains)
+    if scope.agent:
+        return {}, tuple(sorted(unavailable_domains)), source_statuses
     params: list[Any] = [scope.period]
     scope_clauses = append_reporting_scope(
         scope, alias="row", params=params, include_agent=False
@@ -252,21 +281,61 @@ async def specialized_differences(
                 f"OR (row.is_unallocated AND LOWER(row.company_name) = LOWER(${len(finance_params)})))"
             )
         if scope.regional:
-            finance_params.append(scope.regional)
-            finance_clauses.append(f"row.regional = ${len(finance_params)}")
+            finance_params.append(list(scope.regional))
+            finance_clauses.append(
+                f"row.regional = ANY(${len(finance_params)}::text[])"
+            )
         if scope.asm:
             finance_params.append(scope.asm)
             finance_clauses.append(f"row.asm = ${len(finance_params)}")
     finance_scope_sql = " AND ".join(finance_clauses) if finance_clauses else "TRUE"
     async with pool.acquire() as connection:
-        campaign = await connection.fetchrow(
+        campaign_rows = await connection.fetch(
             f"""
-            SELECT COALESCE(SUM(row.actual_sales), 0) AS sales,
-                   COUNT(DISTINCT row.site_code)
-                       FILTER (WHERE row.actual_sales > 0)::numeric AS stores,
-                   COALESCE(MAX(row.active_product_count), 0)::numeric AS products
-            FROM reporting_campaign_month_v1 row
-            WHERE row.period = $1 AND {scope_sql}
+            WITH campaign_base AS MATERIALIZED (
+                SELECT row.*
+                FROM reporting_campaign_month_v2 row
+                WHERE row.period = $1 AND {scope_sql}
+            )
+            SELECT row.mechanism,
+                   COALESCE(SUM(row.actual_sales), 0) AS sales,
+                   COALESCE(SUM(row.actual_quantity), 0)::numeric AS quantity,
+                   COUNT(DISTINCT row.site_code) FILTER (
+                       WHERE (row.mechanism = 'promo' AND (
+                                  COALESCE(row.promo_qualifying_bons, 0) > 0
+                               OR COALESCE(row.promo_discounted_units, 0) > 0
+                               OR COALESCE(row.promo_discount_value, 0) > 0
+                           ))
+                          OR (row.mechanism = 'incentive' AND (
+                                  row.incentive_store_qualified
+                               OR COALESCE(row.incentive_qualified_quantity, 0) > 0
+                               OR COALESCE(row.incentive_value, 0) > 0
+                           ))
+                          OR (row.mechanism = 'focus' AND (
+                                  COALESCE(row.actual_sales, 0) <> 0
+                               OR COALESCE(row.actual_quantity, 0) <> 0
+                           ))
+                   )::numeric AS stores,
+                   COALESCE((
+                       SELECT COUNT(DISTINCT product_code)
+                       FROM campaign_base product_row
+                       CROSS JOIN LATERAL UNNEST(product_row.active_product_codes)
+                           AS product(product_code)
+                       WHERE product_row.mechanism = row.mechanism
+                   ), 0)::numeric AS products,
+                   COALESCE(SUM(row.promo_qualifying_bons), 0)::numeric
+                       AS promo_qualifying_bons,
+                   COALESCE(SUM(row.promo_discounted_units), 0)::numeric
+                       AS promo_discounted_units,
+                   COALESCE(SUM(row.promo_discount_value), 0)
+                       AS promo_discount_value,
+                   COALESCE(SUM(row.incentive_eligible_quantity), 0)::numeric
+                       AS incentive_eligible_quantity,
+                   COALESCE(SUM(row.incentive_qualified_quantity), 0)::numeric
+                       AS incentive_qualified_quantity,
+                   COALESCE(SUM(row.incentive_value), 0) AS incentive_value
+            FROM campaign_base row
+            GROUP BY row.mechanism
             """,
             *params,
         )
@@ -355,22 +424,74 @@ async def specialized_differences(
     differences: dict[str, Decimal] = {}
     campaigns = modules.get("campaigns")
     if campaigns is not None:
+        campaign_controls = {
+            str(row["mechanism"]): row for row in campaign_rows
+        }
+        focus_control = campaign_controls.get("focus")
         differences.update(
             {
                 "campaigns.focus_sales": metric_value(
                     campaigns.kpis, "campaigns.focus_sales"
                 )
-                - decimal(campaign["sales"] if campaign else None),
+                - decimal(focus_control["sales"] if focus_control else None),
                 "campaigns.active_stores": metric_value(
                     campaigns.kpis, "campaigns.active_stores"
                 )
-                - decimal(campaign["stores"] if campaign else None),
+                - decimal(focus_control["stores"] if focus_control else None),
                 "campaigns.active_products": metric_value(
                     campaigns.kpis, "campaigns.active_products"
                 )
-                - decimal(campaign["products"] if campaign else None),
+                - decimal(focus_control["products"] if focus_control else None),
             }
         )
+        for mechanism, reward_field, qualifying_field, eligible_field in (
+            (
+                "promo",
+                "promo_discount_value",
+                "promo_qualifying_bons",
+                "promo_discounted_units",
+            ),
+            (
+                "incentive",
+                "incentive_value",
+                "incentive_qualified_quantity",
+                "incentive_eligible_quantity",
+            ),
+        ):
+            control = campaign_controls.get(mechanism)
+            campaign_slice = campaigns.campaigns.get(mechanism)
+            if control is None or campaign_slice is None:
+                differences[f"campaigns.{mechanism}.presence"] = Decimal(-1)
+                continue
+            prefix = f"campaigns.{mechanism}"
+            differences.update(
+                {
+                    f"{prefix}_sales": metric_value(
+                        campaign_slice.kpis, f"{prefix}_sales"
+                    ) - decimal(control["sales"]),
+                    f"{prefix}_quantity": metric_value(
+                        campaign_slice.kpis, f"{prefix}_quantity"
+                    ) - decimal(control["quantity"]),
+                    f"{prefix}_{'discount' if mechanism == 'promo' else 'reward'}": metric_value(
+                        campaign_slice.kpis,
+                        f"{prefix}_{'discount' if mechanism == 'promo' else 'reward'}",
+                    ) - decimal(control[reward_field]),
+                    f"{prefix}_active_stores": metric_value(
+                        campaign_slice.kpis, f"{prefix}_active_stores"
+                    ) - decimal(control["stores"]),
+                    f"{prefix}_active_products": metric_value(
+                        campaign_slice.kpis, f"{prefix}_active_products"
+                    ) - decimal(control["products"]),
+                    f"{prefix}_{'qualifying_receipts' if mechanism == 'promo' else 'qualified_quantity'}": metric_value(
+                        campaign_slice.kpis,
+                        f"{prefix}_{'qualifying_receipts' if mechanism == 'promo' else 'qualified_quantity'}",
+                    ) - decimal(control[qualifying_field]),
+                    f"{prefix}_{'discounted_units' if mechanism == 'promo' else 'eligible_quantity'}": metric_value(
+                        campaign_slice.kpis,
+                        f"{prefix}_{'discounted_units' if mechanism == 'promo' else 'eligible_quantity'}",
+                    ) - decimal(control[eligible_field]),
+                }
+            )
     workforce_module = modules.get("workforce")
     if workforce_module is not None:
         differences["workforce.headcount"] = metric_value(
@@ -431,7 +552,7 @@ async def specialized_differences(
                 - decimal(compensation["median_salary"]),
             }
         )
-    return differences, tuple(sorted(unavailable_domains))
+    return differences, tuple(sorted(unavailable_domains)), source_statuses
 
 
 def explicit_scope(arguments: argparse.Namespace) -> AnalyticsScope:
@@ -450,37 +571,156 @@ def explicit_scope(arguments: argparse.Namespace) -> AnalyticsScope:
 
 
 async def sample_scopes(
+    pool: asyncpg.Pool,
     repository: PostgresHardenedInsightRepository,
     period: str,
-) -> list[AnalyticsScope]:
+) -> tuple[list[tuple[str, AnalyticsScope]], tuple[str, ...]]:
     options = await repository.get_filter_options(period)
-    scopes = [AnalyticsScope(period=period, comparison=ComparisonMode.NONE)]
+    scopes = [
+        ("network", AnalyticsScope(period=period, comparison=ComparisonMode.NONE))
+    ]
     scopes.extend(
-        AnalyticsScope(period=period, comparison=ComparisonMode.NONE, firm=value)
-        for value in options.firms[:2]
-    )
-    scopes.extend(
-        AnalyticsScope(period=period, comparison=ComparisonMode.NONE, regional=value)
-        for value in options.regionals[:2]
-    )
-    scopes.extend(
-        AnalyticsScope(
-            period=period,
-            comparison=ComparisonMode.NONE,
-            stores=(store.site_code,),
+        (
+            f"firm:{index}",
+            AnalyticsScope(period=period, comparison=ComparisonMode.NONE, firm=value),
         )
-        for store in options.stores[:5]
+        for index, value in enumerate(options.firms[:2], start=1)
     )
     scopes.extend(
-        AnalyticsScope(
-            period=period,
-            comparison=ComparisonMode.NONE,
-            stores=(agent.site_code,),
-            agent=agent.name,
+        (
+            f"regional:{index}",
+            AnalyticsScope(
+                period=period, comparison=ComparisonMode.NONE, regional=value
+            ),
         )
-        for agent in options.agents[:5]
+        for index, value in enumerate(options.regionals[:2], start=1)
     )
-    return scopes
+    scopes.extend(
+        (
+            f"asm:{index}",
+            AnalyticsScope(period=period, comparison=ComparisonMode.NONE, asm=value),
+        )
+        for index, value in enumerate(options.asms[:2], start=1)
+    )
+    scopes.extend(
+        (
+            f"store:{index}",
+            AnalyticsScope(
+                period=period,
+                comparison=ComparisonMode.NONE,
+                stores=(store.site_code,),
+            ),
+        )
+        for index, store in enumerate(options.stores[:5], start=1)
+    )
+    scopes.extend(
+        (
+            f"agent:{index}",
+            AnalyticsScope(
+                period=period,
+                comparison=ComparisonMode.NONE,
+                stores=(agent.site_code,),
+                agent=agent.name,
+            ),
+        )
+        for index, agent in enumerate(options.agents[:5], start=1)
+    )
+    async with pool.acquire() as connection:
+        return_store = await connection.fetchval(
+            """
+            SELECT sales.site_code
+            FROM reporting_sales_day_v1 sales
+            WHERE sales.period = $1
+            GROUP BY sales.site_code
+            HAVING SUM(sales.return_quantity) < 0
+            ORDER BY SUM(sales.return_quantity), sales.site_code
+            LIMIT 1
+            """,
+            period,
+        )
+        transferred_store = await connection.fetchval(
+            """
+            WITH transferred AS (
+                SELECT daily.site_code
+                FROM reporting_agent_day daily
+                GROUP BY daily.site_code
+                HAVING COUNT(DISTINCT daily.firma) > 1
+            )
+            SELECT daily.site_code
+            FROM reporting_agent_day daily
+            JOIN transferred USING (site_code)
+            WHERE daily.import_month = $1
+            GROUP BY daily.site_code
+            ORDER BY daily.site_code
+            LIMIT 1
+            """,
+            period,
+        )
+        partial_target = await connection.fetchrow(
+            """
+            WITH period_days AS (
+                SELECT COUNT(DISTINCT daily.sale_date)::int AS active_days
+                FROM reporting_agent_day daily
+                WHERE daily.import_month = $1
+            )
+            SELECT monthly.site_code, monthly.agent
+            FROM reporting_agent_month monthly
+            JOIN agent_targets target USING (import_month, site_code, agent)
+            CROSS JOIN period_days
+            WHERE monthly.import_month = $1
+              AND target.target_value > 0
+              AND monthly.working_days BETWEEN 1 AND period_days.active_days - 1
+            ORDER BY monthly.working_days, monthly.site_code, monthly.agent
+            LIMIT 1
+            """,
+            period,
+        )
+    missing_cases = [
+        label
+        for label, value in (
+            ("store-with-returns", return_store),
+            ("historically-transferred-store", transferred_store),
+            ("partial-month-target-agent", partial_target),
+        )
+        if value is None
+    ]
+    edge_scopes: list[tuple[str, AnalyticsScope]] = []
+    if return_store is not None:
+        edge_scopes.append(
+            (
+                "store-with-returns",
+                AnalyticsScope(
+                    period=period,
+                    comparison=ComparisonMode.NONE,
+                    stores=(str(return_store),),
+                ),
+            ),
+        )
+    if transferred_store is not None:
+        edge_scopes.append(
+            (
+                "historically-transferred-store",
+                AnalyticsScope(
+                    period=period,
+                    comparison=ComparisonMode.NONE,
+                    stores=(str(transferred_store),),
+                ),
+            ),
+        )
+    if partial_target is not None:
+        edge_scopes.append(
+            (
+                "partial-month-target-agent",
+                AnalyticsScope(
+                    period=period,
+                    comparison=ComparisonMode.NONE,
+                    stores=(str(partial_target["site_code"]),),
+                    agent=str(partial_target["agent"]),
+                ),
+            ),
+        )
+    scopes.extend(edge_scopes)
+    return scopes, tuple(missing_cases)
 
 
 async def run(arguments: argparse.Namespace) -> int:
@@ -496,19 +736,33 @@ async def run(arguments: argparse.Namespace) -> int:
     pool = await create_pool(settings)
     try:
         repository = PostgresHardenedInsightRepository(pool)
-        scopes = (
-            await sample_scopes(repository, arguments.period)
-            if arguments.matrix
-            else [explicit_scope(arguments)]
-        )
-        results = [await reconcile_scope(pool, repository, scope) for scope in scopes]
+        if arguments.matrix:
+            cases, matrix_missing_cases = await sample_scopes(
+                pool, repository, arguments.period
+            )
+        else:
+            cases = [("explicit", explicit_scope(arguments))]
+            matrix_missing_cases = ()
+        results = [
+            await reconcile_scope(
+                pool,
+                repository,
+                scope,
+                sample_case=sample_case,
+                matrix_missing_cases=matrix_missing_cases,
+            )
+            for sample_case, scope in cases
+        ]
     finally:
         await close_pool(pool)
 
     payload = [
         {
+            "sample_case": result.sample_case,
             "scope": result.scope,
             "passed": result.passed,
+            "numeric_passed": result.numeric_passed,
+            "authoritative_passed": result.authoritative_passed,
             "sales_difference": str(result.sales_difference),
             "target_difference": str(result.target_difference),
             "module_difference": str(result.module_difference),
@@ -517,11 +771,20 @@ async def run(arguments: argparse.Namespace) -> int:
                 key: str(value) for key, value in result.domain_differences.items()
             },
             "unavailable_domains": list(result.unavailable_domains),
+            "incomplete_domains": result.incomplete_domains,
+            "matrix_missing_cases": list(result.matrix_missing_cases),
         }
         for result in results
     ]
     print(json.dumps(payload, ensure_ascii=False, indent=2))
-    return 0 if all(result.passed for result in results) else 1
+    reconciled = all(
+        result.numeric_passed if arguments.numeric_only else result.authoritative_passed
+        for result in results
+    )
+    accepted = reconciled and (
+        arguments.allow_missing_cases or not matrix_missing_cases
+    )
+    return 0 if accepted else 1
 
 
 def main() -> None:
@@ -537,7 +800,17 @@ def main() -> None:
     parser.add_argument(
         "--matrix",
         action="store_true",
-        help="test a bounded representative network/firm/RM/store/agent matrix",
+        help="test a bounded representative network/firm/RM/ASM/store/agent matrix",
+    )
+    parser.add_argument(
+        "--numeric-only",
+        action="store_true",
+        help="exit successfully on zero differences even when a required source is not official",
+    )
+    parser.add_argument(
+        "--allow-missing-cases",
+        action="store_true",
+        help="diagnostic only: do not fail when a required matrix sample is absent",
     )
     arguments = parser.parse_args()
     raise SystemExit(asyncio.run(run(arguments)))

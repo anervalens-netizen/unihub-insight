@@ -19,12 +19,20 @@ export function Sidebar({
   return (
     <aside className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''}`}>
       <div className="brand">
-        <div className="brand-mark" aria-hidden="true">
-          U
-        </div>
+        <img
+          className="brand-logo brand-logo--wide"
+          src="/logo-horizontal.png"
+          alt="UniHub Retail"
+        />
+        <img
+          className="brand-logo brand-logo--mark"
+          src="/logo-mark.png"
+          alt=""
+          aria-hidden="true"
+        />
         <div className="brand-copy">
-          <strong>UniHub</strong>
-          <span>Insight</span>
+          <strong>Insight</strong>
+          <span>Retail intelligence</span>
         </div>
       </div>
       <nav className="sidebar-nav" aria-label="Navigație principală">
