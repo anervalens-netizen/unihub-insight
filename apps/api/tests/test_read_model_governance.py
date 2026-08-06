@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[3]
 def test_overview_snapshot_metadata_uses_only_the_governed_read_model() -> None:
     summary = inspect.getsource(PostgresAnalyticsRepository._fetch_summary)
 
-    assert "reporting_source_snapshot_v2" in summary
+    assert "reporting_source_snapshot_v3" in summary
     assert "import_snapshots" not in summary
 
 
@@ -33,10 +33,12 @@ def test_sensitive_modules_read_only_versioned_reporting_contracts() -> None:
     assert "store_pnl_monthly" not in finance
     assert "store_pnl_generation_rows" not in finance
 
-    assert "reporting_planning_scenario_v1" in planning
+    assert "reporting_planning_scenario_v2" in planning
     assert "ai_forecast_runs" not in planning
     assert "target_scenarios" not in planning
-    assert "scenario.rule_set_hash ~ '^[0-9a-f]{64}$'" in planning
+    assert "scenario.metric = 'sales_value'" in planning
+    assert "ROW_NUMBER() OVER" in planning
+    assert "WHEN 'current_month' THEN 0" in planning
     assert "target_contract_invalid" in planning
 
 
@@ -94,8 +96,10 @@ def test_bootstrap_uses_view_only_sensitive_acl_and_audit_is_append_only() -> No
     assert "reporting_compensation_month_v1" in roles
     assert "reporting_finance_month_v1" in roles
     assert "reporting_planning_scenario_v1" in roles
+    assert "reporting_planning_scenario_v2" in roles
     assert "reporting_sales_day_v1" in roles
     assert "reporting_source_snapshot_v2" in roles
+    assert "reporting_source_snapshot_v3" in roles
     assert "reporting_visit_month_v2" in roles
     assert "'fieldops_visits'" in roles
     assert "ON TABLE salary_records" not in roles

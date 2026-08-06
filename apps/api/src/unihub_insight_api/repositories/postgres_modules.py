@@ -1673,37 +1673,53 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
 
     async def _planning_rows(self, scope: AnalyticsScope) -> Sequence[asyncpg.Record]:
         params: list[Any] = [shift_month(scope.period, -11), scope.period]
-        store_clauses = append_reporting_scope(scope, alias="scenario", params=params, include_agent=False)
+        store_clauses = append_reporting_scope(scope, alias="forecast", params=params, include_agent=False)
         scope_sql = " AND ".join(store_clauses) if store_clauses else "TRUE"
         async with self.pool.acquire() as connection:
             return await connection.fetch(
                 f"""
-                WITH planning AS (
-                    SELECT scenario.period AS forecast_month,
-                           scenario.site_code,
-                           MAX(scenario.locatie) AS locatie,
-                           MAX(scenario.firma) AS firma,
-                           MAX(scenario.regional) AS regional,
-                           MAX(scenario.asm) AS asm,
-                           SUM(scenario.forecast_value)
-                               FILTER (WHERE scenario.authority_kind = 'forecast') AS forecast_sales,
-                           SUM(scenario.target_value)
-                               FILTER (
-                                   WHERE scenario.authority_kind = 'target'
-                                     AND scenario.rule_set_hash ~ '^[0-9a-f]{64}$'
-                               ) AS target_value,
-                           BOOL_OR(
-                               scenario.authority_kind = 'target'
-                               AND (
-                                   scenario.rule_set_hash IS NULL
-                                   OR scenario.rule_set_hash !~ '^[0-9a-f]{64}$'
-                               )
-                           ) AS target_contract_invalid
-                    FROM reporting_planning_scenario_v1 scenario
+                WITH ranked_forecast AS (
+                    SELECT scenario.*,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY scenario.period, scenario.site_code
+                               ORDER BY
+                                   CASE scenario.horizon
+                                       WHEN 'current_month' THEN 0
+                                       ELSE 1
+                                   END,
+                                   scenario.forecast_run_id DESC
+                           ) AS selection_rank
+                    FROM reporting_planning_scenario_v2 scenario
                     WHERE scenario.period BETWEEN $1 AND $2
+                      AND scenario.authority_kind = 'forecast'
+                      AND scenario.metric = 'sales_value'
+                ), forecast AS (
+                    SELECT forecast.*
+                    FROM ranked_forecast AS forecast
+                    WHERE selection_rank = 1
                       AND {scope_sql}
+                ), target AS (
+                    SELECT scenario.period,
+                           scenario.site_code,
+                           SUM(scenario.target_value) AS target_value
+                    FROM reporting_planning_scenario_v2 scenario
+                    WHERE scenario.period BETWEEN $1 AND $2
+                      AND scenario.authority_kind = 'target'
                     GROUP BY scenario.period, scenario.site_code
-                    HAVING BOOL_OR(scenario.authority_kind = 'forecast')
+                ), planning AS (
+                    SELECT forecast.period AS forecast_month,
+                           forecast.site_code,
+                           forecast.locatie,
+                           forecast.firma,
+                           forecast.regional,
+                           forecast.asm,
+                           forecast.forecast_value AS forecast_sales,
+                           target.target_value,
+                           false AS target_contract_invalid
+                    FROM forecast
+                    LEFT JOIN target
+                      ON target.period = forecast.period
+                     AND target.site_code = forecast.site_code
                 ), actual AS (
                     SELECT agg.import_month, agg.site_code, SUM(agg.total_sales) AS actual_sales
                     FROM reporting_agent_month agg
@@ -1726,7 +1742,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             self._meta(
                 ModuleId.PLANNING,
                 scope,
-                "reporting_planning_scenario_v1",
+                "reporting_planning_scenario_v2",
                 (SourceDomain.SALES,),
             ),
         )

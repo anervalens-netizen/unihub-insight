@@ -314,7 +314,7 @@ async def specialized_differences(
             f"""
             SELECT COALESCE(SUM(row.forecast_value), 0) AS forecast,
                    COALESCE(SUM(row.target_value), 0) AS target
-            FROM reporting_planning_scenario_v1 row
+            FROM reporting_planning_scenario_v2 row
             WHERE row.period = $1 AND {scope_sql}
             """,
             *params,

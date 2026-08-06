@@ -19,7 +19,7 @@ Acesta este un singur plan persistent. Nu este împărțit în luni, proiecte su
 
 ## Stare candidat RC1
 
-La 2026-08-06, Retail SHA `0aef1b01e103b864455e537e71df786109f14d53` publică aditiv read-model-urile v1, Sales day v1 și Visits v2 pe autor Team Leader, cu regula de completion recalculată din cele 19 câmpuri FieldOps. Candidatul Insight `1.0.0-rc.1` implementează catalogul/query batch/inspect/export, `ChartSpec`, sub-view-urile specializate, Visits nativ și dashboard ACL/preset/versionare. Finance și Compensation rămân explicit `UNAVAILABLE` până când Retail promovează generații eligibile; datele legacy nu sunt declarate oficiale. Închiderea `1.0.0` rămâne condiționată de matricea reală Authentik, acceptarea vizuală owner și șapte zile curate de performanță/RUM pe exact SHA-ul final.
+La 2026-08-06, Retail SHA `b50f1f8dd9f40df744ff66aaacef4aa9e100d9c2` publică aditiv read-model-urile v1, Sales day v1, Visits v2 pe autor Team Leader și Planning v2 cu head de promovare CAS; completion-ul Visits este recalculat din cele 19 câmpuri FieldOps. Candidatul Insight `1.0.0-rc.1` implementează catalogul/query batch/inspect/export, `ChartSpec`, sub-view-urile specializate, Visits nativ și dashboard ACL/preset/versionare. Finance și Compensation rămân explicit `UNAVAILABLE`, iar Planning `partial`, până când Retail promovează generații/head-uri eligibile; datele legacy și run-urile doar `completed` nu sunt declarate oficiale. Închiderea `1.0.0` rămâne condiționată de matricea reală Authentik, acceptarea vizuală owner și șapte zile curate de performanță/RUM pe exact SHA-ul final.
 
 ## Adevărul de pornire
 
@@ -50,7 +50,7 @@ Inventarul a fost verificat read-only în PostgreSQL live la 2026-08-05 (Europe/
 | Workforce și Grile | lifecycle, profil agent, `grile_store_current_status`; 274 vizite FieldOps în intervalul 2026-03-19…2026-08-05 la snapshot | Visits v2 este publicat pe autor Team Leader și îmbogățire curentă de magazin; mișcările, rosterul și Grile analitice complete rămân contracte separate |
 | Compensații | 3.716 înregistrări lunare 2025-01…2026-06 la snapshot și legături agent-persoană | componentele salariale se expun numai prin view-uri agregate dedicate; CNP și identitatea privată nu intră în Insight; pragul de minimum 3 persoane rămâne fail-closed |
 | Finance/P&L | `store_pnl_monthly`, 2017-01…2026-06 la snapshot; tabelele noii autorități de generații nu au încă head live | fiecare valoare trebuie să arate `actual/estimate`, autoritatea, reconcilierea și coverage; Insight nu tratează shadow/generații nepromovate drept actuale |
-| Planning | forecast lunar 2026-07…2027-07 și scenarii Target 2026-06…2026-08 la snapshot | se publică view-uri read-only peste run-uri și snapshoturile înghețate ale scenariilor; Insight compară versiuni, nu mută/finalizează targeturi |
+| Planning | forecast lunar 2026-07…2027-07 și scenarii Target 2026-06…2026-08 la snapshot | v2 publică numai run-uri prin head aprobat și Targeturi cu snapshot exact; Insight compară versiuni, nu promovează/mută/finalizează date |
 
 ### Read-model-uri Retail necesare
 
@@ -71,7 +71,7 @@ Reguli de domeniu care nu pot fi pierdute în agregare:
 - Workforce folosește identitate stabilă effective-dated și evenimente oficiale; intrările/ieșirile nu se deduc din lipsa vânzărilor, iar vizitele păstrează snapshotul Team Leader;
 - Compensation elimină și revocă accesul Insight direct la `salary_records`, `agent_salary_links` și `full_name`; read-model-ul final este exclusiv agregat, fără persoane, iar filtrele/inspect/export nu permit diferențierea unei persoane. Totalul folosește toate rândurile, media numai valorile ≥2.000 RON, mediana toate valorile, iar cohortele de 1–2 persoane nu produc KPI, serie sau export;
 - Finance selectează explicit `actual` versus `estimated` la cheia companie–lună–magazin canonic; `__FINANCE_UNALLOCATED__` intră în totalul companiei, niciodată în magazin/RM, iar shadow/nepromovat nu devine oficial;
-- Planning fixează pentru forecast `run_id`, horizon, model/method, input cutoff și coverage, iar pentru Target `scenario_id`, revizie, status, rule-set hash și snapshot; drafturile nu devin implicit analiză partajată.
+- Planning fixează pentru forecast `run_id`, horizon, model/method, input cutoff și coverage; numai head-ul cu hash/row-count, approval artifact, revision CAS și ledger este eligibil. Pentru Target fixează `scenario_id`, revizie, status, rule-set hash și snapshot exact reconciliat cu registry-ul; drafturile și legacy-unversioned nu devin implicit analiză partajată.
 
 ## Experiența finală
 
