@@ -3,7 +3,7 @@ title: Plan integrat de dezvoltare UniHub Insight
 status: active
 baseline_date: 2026-08-05
 baseline_sha: 9fecf15b938954bb93567fa4b51e4b8f73cda76e
-retail_contract_sha: a335348c7a2c1bfd27ab587c2ddfb5242c515e51
+retail_contract_sha: 8f47db86532b72740a1b762e142e7bab5c75402f
 candidate: 1.0.0-rc.1
 ---
 
@@ -19,7 +19,7 @@ Acesta este un singur plan persistent. Nu este împărțit în luni, proiecte su
 
 ## Stare candidat RC1
 
-La 2026-08-05, Retail SHA `a335348c7a2c1bfd27ab587c2ddfb5242c515e51` a publicat aditiv read-model-urile v1 și resolverul de snapshot. Candidatul Insight `1.0.0-rc.1` implementează catalogul/query batch/inspect/export, `ChartSpec`, sub-view-urile specializate și dashboard ACL/preset/versionare. Finance și Compensation rămân explicit `UNAVAILABLE` până când Retail promovează generații eligibile; datele legacy nu sunt declarate oficiale. Închiderea `1.0.0` rămâne condiționată de deploy exact-SHA, reconciliere și matrice negativă live, backup/restore + rollback, acceptarea vizuală owner și șapte zile de performanță.
+La 2026-08-06, Retail SHA `8f47db86532b72740a1b762e142e7bab5c75402f` publică aditiv read-model-urile v1, Sales day v1 și Visits v2 pe autor Team Leader. Candidatul Insight `1.0.0-rc.1` implementează catalogul/query batch/inspect/export, `ChartSpec`, sub-view-urile specializate, Visits nativ și dashboard ACL/preset/versionare. Finance și Compensation rămân explicit `UNAVAILABLE` până când Retail promovează generații eligibile; datele legacy nu sunt declarate oficiale. Închiderea `1.0.0` rămâne condiționată de matricea reală Authentik, acceptarea vizuală owner și șapte zile curate de performanță/RUM pe exact SHA-ul final.
 
 ## Adevărul de pornire
 
@@ -47,7 +47,7 @@ Inventarul a fost verificat read-only în PostgreSQL live la 2026-08-05 (Europe/
 | Vânzări și performanță | `reporting_agent_month` și `reporting_item_month`, 2023-09…2026-08; zi/lună, categorie, subcategorie, brand, produs, bonuri și retururi | baza pentru Sales, Performance, Monthly Review și drill-down; nu se reimplementează formulele Retail |
 | Agenți | profile și lifecycle 2023-09…2026-08; targeturi pe agent și magazin | analiză longitudinală numai cu identitate stabilă; legăturile lipsă rămân explicit neasociate |
 | Campanii | Focus în reporting, campanii Incentive în DB; Promo, Concurs și Folii folosesc contracte/configurații/generații Retail dispersate | Retail trebuie să publice read-model-uri lunare canonice pentru fiecare mecanism; Insight nu citește fișierele interne și nu duplică regulile de eligibilitate |
-| Workforce și Grile | lifecycle, profil agent, `grile_store_current_status`; 274 vizite FieldOps în intervalul 2026-03-19…2026-08-05 la snapshot | se adaugă read-model-uri aprobate pentru mișcări, acoperire, Grile și vizite; vizitele păstrează autorul Team Leader, nu ASM-ul magazinului |
+| Workforce și Grile | lifecycle, profil agent, `grile_store_current_status`; 274 vizite FieldOps în intervalul 2026-03-19…2026-08-05 la snapshot | Visits v2 este publicat pe autor Team Leader și îmbogățire curentă de magazin; mișcările, rosterul și Grile analitice complete rămân contracte separate |
 | Compensații | 3.716 înregistrări lunare 2025-01…2026-06 la snapshot și legături agent-persoană | componentele salariale se expun numai prin view-uri agregate dedicate; CNP și identitatea privată nu intră în Insight; pragul de minimum 3 persoane rămâne fail-closed |
 | Finance/P&L | `store_pnl_monthly`, 2017-01…2026-06 la snapshot; tabelele noii autorități de generații nu au încă head live | fiecare valoare trebuie să arate `actual/estimate`, autoritatea, reconcilierea și coverage; Insight nu tratează shadow/generații nepromovate drept actuale |
 | Planning | forecast lunar 2026-07…2027-07 și scenarii Target 2026-06…2026-08 la snapshot | se publică view-uri read-only peste run-uri și snapshoturile înghețate ale scenariilor; Insight compară versiuni, nu mută/finalizează targeturi |
@@ -59,7 +59,7 @@ Noile suprafețe trebuie să fie Retail-owned, versionate și acordate explicit 
 - `reporting_campaign_month`: mecanism, campanie, perioadă/cutoff, scope, target, actual, coverage, adopție, discount, contribuție și statut `official/partial/unavailable`;
 - `reporting_workforce_month`: persoană opacă, rol, intrare/ieșire/transfer, vechime, zile lucrate, magazine acoperite și legătura de reporting;
 - `reporting_compensation_month`: numai agregate și componente aprobate, fără CNP sau identificatori privați;
-- `reporting_visit_month`: vizite și indicatori agregați, cu regula autorului Team Leader;
+- `reporting_visit_month_v2`: vizite și indicatori agregați la lună × Team Leader autor × magazin; v1 pe ASM rămâne numai rollback N-1;
 - `reporting_finance_month`: actual/estimate, category contract, coverage, reconciliation și generation authority;
 - `reporting_planning_scenario`: scenariu/rule-set/snapshot/forecast/target, versiune și status, fără drept de scriere.
 

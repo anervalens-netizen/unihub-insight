@@ -24,6 +24,7 @@ from unihub_insight_api.domain import (
     MatrixCell,
     MetricUnit,
     ModuleAnalyticsResponse,
+    ModuleAnalyticsSlice,
     ModuleId,
     OverviewMeta,
     RiskLevel,
@@ -332,6 +333,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         matrix: list[MatrixCell],
         calendar: list[CalendarCell] | None = None,
         alerts: list[InsightAlert],
+        visits: ModuleAnalyticsSlice | None = None,
     ) -> ModuleAnalyticsResponse:
         title, description, capability, axes, charts = MODULE_DEFINITIONS[module]
         return ModuleAnalyticsResponse(
@@ -349,6 +351,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             matrix=matrix,
             calendar=calendar or [],
             alerts=alerts,
+            visits=visits,
         )
 
     async def _sales_history(
@@ -636,11 +639,218 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             alerts=alerts,
         )
 
+    async def _visit_rows(
+        self,
+        scope: AnalyticsScope,
+        *,
+        start: str,
+        end: str,
+    ) -> Sequence[asyncpg.Record]:
+        params: list[Any] = [start, end]
+        clauses = ["visit.period BETWEEN $1 AND $2"]
+        clauses.extend(
+            append_reporting_scope(
+                scope,
+                alias="visit",
+                params=params,
+                include_agent=False,
+            )
+        )
+        async with self.pool.acquire() as connection:
+            return await connection.fetch(
+                f"""
+                SELECT visit.period, visit.team_leader_id, visit.team_leader_name,
+                       visit.site_code, visit.locatie, visit.firma, visit.regional,
+                       visit.asm, visit.total_visits, visit.avg_completion,
+                       visit.avg_duration, visit.distinct_stores,
+                       visit.checklist_score, visit.approved_pct
+                FROM reporting_visit_month_v2 visit
+                WHERE {" AND ".join(clauses)}
+                ORDER BY visit.period, visit.team_leader_name, visit.site_code
+                """,
+                *params,
+            )
+
+    @staticmethod
+    def _weighted_visit_value(rows: Sequence[asyncpg.Record], field: str) -> Decimal | None:
+        weighted = Decimal(0)
+        weight = Decimal(0)
+        for row in rows:
+            value = row[field]
+            if value is None:
+                continue
+            row_weight = Decimal(int(row["total_visits"] or 0))
+            weighted += Decimal(str(value)) * row_weight
+            weight += row_weight
+        return _percent(weighted / weight) if weight > 0 else None
+
+    async def _visit_slice(self, scope: AnalyticsScope) -> ModuleAnalyticsSlice:
+        rows = await self._visit_rows(
+            scope,
+            start=shift_month(scope.period, -11),
+            end=scope.period,
+        )
+        current = [row for row in rows if str(row["period"]) == scope.period]
+        total_visits = sum((Decimal(int(row["total_visits"] or 0)) for row in current), Decimal(0))
+        distinct_stores = len({str(row["site_code"]) for row in current})
+        avg_completion = self._weighted_visit_value(current, "avg_completion")
+        checklist_score = self._weighted_visit_value(current, "checklist_score")
+
+        monthly_rows: dict[str, list[asyncpg.Record]] = defaultdict(list)
+        for row in rows:
+            monthly_rows[str(row["period"])].append(row)
+        trend = [
+            TrendPoint(
+                key=period,
+                label=period,
+                primary=sum(
+                    (Decimal(int(row["total_visits"] or 0)) for row in period_rows),
+                    Decimal(0),
+                ),
+                secondary=self._weighted_visit_value(period_rows, "avg_completion"),
+            )
+            for period, period_rows in sorted(monthly_rows.items())
+        ]
+
+        leader_rows: dict[str, list[asyncpg.Record]] = defaultdict(list)
+        for row in current:
+            leader_rows[str(row["team_leader_id"])].append(row)
+        breakdown: list[BreakdownRow] = []
+        leader_totals: list[tuple[str, Decimal]] = []
+        leader_names: dict[str, str] = {}
+        for leader_id, items in leader_rows.items():
+            leader_name = str(items[0]["team_leader_name"])
+            leader_names[leader_id] = leader_name
+            visit_count = sum(
+                (Decimal(int(row["total_visits"] or 0)) for row in items),
+                Decimal(0),
+            )
+            store_count = len({str(row["site_code"]) for row in items})
+            completion = self._weighted_visit_value(items, "avg_completion")
+            checklist = self._weighted_visit_value(items, "checklist_score")
+            duration = self._weighted_visit_value(items, "avg_duration")
+            leader_totals.append((leader_name, visit_count))
+            breakdown.append(
+                BreakdownRow(
+                    id=leader_id,
+                    label=leader_name,
+                    context=(f"{store_count} magazine · durată medie {duration if duration is not None else '—'} h"),
+                    primary=visit_count,
+                    secondary=completion,
+                    tertiary=Decimal(store_count),
+                    progress_pct=checklist,
+                    risk=(
+                        RiskLevel.RISK
+                        if completion is not None and completion < Decimal("80")
+                        else RiskLevel.WATCH
+                        if completion is None
+                        else RiskLevel.HEALTHY
+                    ),
+                )
+            )
+        breakdown.sort(key=lambda item: item.primary, reverse=True)
+
+        top_leaders = {item.id for item in breakdown[:8]} or {str(row["team_leader_id"]) for row in rows}
+        matrix_totals: dict[tuple[str, str], Decimal] = defaultdict(Decimal)
+        matrix_names: dict[str, str] = dict(leader_names)
+        for row in rows:
+            leader_id = str(row["team_leader_id"])
+            if leader_id not in top_leaders:
+                continue
+            period = str(row["period"])
+            if period < shift_month(scope.period, -5):
+                continue
+            matrix_totals[(period, leader_id)] += Decimal(int(row["total_visits"] or 0))
+            matrix_names[leader_id] = str(row["team_leader_name"])
+        matrix = [
+            MatrixCell(
+                x=period,
+                y=matrix_names.get(leader_id, leader_id),
+                value=value,
+                label="Vizite",
+            )
+            for (period, leader_id), value in sorted(matrix_totals.items())
+        ]
+
+        alerts: list[InsightAlert] = []
+        if not current:
+            alerts.append(
+                InsightAlert(
+                    id="visits-missing",
+                    severity=AlertSeverity.INFO,
+                    title="Vizite neobservate",
+                    description="Nu există vizite FieldOps eligibile în scope și perioadă.",
+                )
+            )
+        elif avg_completion is not None and avg_completion < Decimal("80"):
+            alerts.append(
+                InsightAlert(
+                    id="visits-completion-low",
+                    severity=AlertSeverity.WARNING,
+                    title="Completion vizite sub prag",
+                    description=f"Completion mediu este {avg_completion}% în perioada selectată.",
+                )
+            )
+        kpis = (
+            [
+                KpiMetric(
+                    id="visits.total",
+                    label="Vizite",
+                    value=total_visits,
+                    unit=MetricUnit.INTEGER,
+                    supporting_value=Decimal(len(leader_rows)),
+                    supporting_label="Team Leaders observați",
+                ),
+                KpiMetric(
+                    id="visits.distinct_stores",
+                    label="Magazine vizitate",
+                    value=Decimal(distinct_stores),
+                    unit=MetricUnit.INTEGER,
+                ),
+                KpiMetric(
+                    id="visits.avg_completion",
+                    label="Completion mediu",
+                    value=avg_completion or Decimal(0),
+                    unit=MetricUnit.PERCENT,
+                    risk=_risk(avg_completion),
+                ),
+                KpiMetric(
+                    id="visits.checklist_score",
+                    label="Scor checklist",
+                    value=checklist_score or Decimal(0),
+                    unit=MetricUnit.PERCENT,
+                    risk=_risk(checklist_score),
+                ),
+            ]
+            if current
+            else []
+        )
+        return ModuleAnalyticsSlice(
+            axes=(
+                ValueAxis(key="primary", label="Vizite", unit=MetricUnit.INTEGER),
+                ValueAxis(key="secondary", label="Completion", unit=MetricUnit.PERCENT),
+                ValueAxis(key="tertiary", label="Magazine", unit=MetricUnit.INTEGER),
+            ),
+            supported_charts=(ChartKind.LINE, ChartKind.BAR, ChartKind.HEATMAP, ChartKind.TABLE),
+            kpis=kpis,
+            trend=trend,
+            distribution=shares(leader_totals),
+            breakdown=breakdown,
+            matrix=matrix,
+            alerts=alerts,
+        )
+
     async def _performance(self, scope: AnalyticsScope) -> ModuleAnalyticsResponse:
         start = shift_month(scope.period, -11)
-        history, meta = await asyncio.gather(
+        history, meta, visits = await asyncio.gather(
             self._sales_history(scope, start=start, end=scope.period),
-            self._meta(ModuleId.PERFORMANCE, scope, "reporting_agent_month/store_targets"),
+            self._meta(
+                ModuleId.PERFORMANCE,
+                scope,
+                "reporting_agent_month/store_targets",
+                (SourceDomain.VISITS,),
+            ),
+            self._visit_slice(scope),
         )
         current = [row for row in history if str(row["import_month"]) == scope.period]
         breakdown = self._store_breakdown(current)
@@ -727,6 +937,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             breakdown=breakdown,
             matrix=self._store_matrix(history, {shift_month(scope.period, offset) for offset in range(-5, 1)}),
             alerts=alerts,
+            visits=visits,
         )
 
     async def _campaign_rows(
@@ -1004,10 +1215,16 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         return alerts
 
     async def _workforce(self, scope: AnalyticsScope) -> ModuleAnalyticsResponse:
-        rows, grile_alerts, meta = await asyncio.gather(
+        rows, grile_alerts, meta, visits = await asyncio.gather(
             self._workforce_rows(scope),
             self._grile_alerts(scope),
-            self._meta(ModuleId.WORKFORCE, scope, "reporting_agent_month/reporting_agent_profile/grile"),
+            self._meta(
+                ModuleId.WORKFORCE,
+                scope,
+                "reporting_agent_month/reporting_agent_profile/grile",
+                (SourceDomain.VISITS,),
+            ),
+            self._visit_slice(scope),
         )
         current = [row for row in rows if str(row["import_month"]) == scope.period]
         headcount = len(current)
@@ -1122,6 +1339,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             breakdown=sorted(breakdown, key=lambda item: item.primary, reverse=True),
             matrix=matrix,
             alerts=alerts,
+            visits=visits,
         )
 
     async def _compensation_rows(self, scope: AnalyticsScope) -> Sequence[asyncpg.Record]:

@@ -13,6 +13,7 @@ from unihub_insight_api.domain import (
     DatasetDimension,
     MetricDefinition,
     ModuleAnalyticsResponse,
+    ModuleAnalyticsSlice,
     ModuleId,
     QueryBatchRequest,
     QueryBatchResponse,
@@ -29,7 +30,7 @@ from unihub_insight_api.domain import (
     WidgetQueryResult,
 )
 from unihub_insight_api.repositories.base import AnalyticsRepository
-from unihub_insight_api.services.metric_catalog import METRIC_CATALOG, MODULE_ENTITY_DIMENSIONS
+from unihub_insight_api.services.metric_catalog import METRIC_CATALOG, metric_entity_dimension
 from unihub_insight_api.services.scope import scope_label
 
 ALLOWED_FILTERS = frozenset({"firm", "regional", "asm", "stores", "agent"})
@@ -52,6 +53,14 @@ ALLOWED_SORT_FIELDS = frozenset(
     }
 )
 METRICS = {metric.id: metric for metric in METRIC_CATALOG}
+VISIT_METRICS = frozenset(
+    {
+        "visits.total",
+        "visits.distinct_stores",
+        "visits.avg_completion",
+        "visits.checklist_score",
+    }
+)
 MODULE_METRICS: dict[ModuleId, frozenset[str]] = {
     ModuleId.SALES: frozenset(
         {"sales.total", "target.progress_pct", "receipts.total", "receipts.average_value", "receipt_2plus_pct"}
@@ -62,13 +71,20 @@ MODULE_METRICS: dict[ModuleId, frozenset[str]] = {
             "performance.at_target",
             "performance.volatility",
             "performance.daily_productivity",
+            *VISIT_METRICS,
         }
     ),
     ModuleId.CAMPAIGNS: frozenset(
         {"campaigns.focus_sales", "campaigns.focus_share", "campaigns.active_stores", "campaigns.active_products"}
     ),
     ModuleId.WORKFORCE: frozenset(
-        {"workforce.headcount", "workforce.productivity", "workforce.coverage", "workforce.stability"}
+        {
+            "workforce.headcount",
+            "workforce.productivity",
+            "workforce.coverage",
+            "workforce.stability",
+            *VISIT_METRICS,
+        }
     ),
     ModuleId.COMPENSATION: frozenset(
         {"compensation.payroll", "compensation.average", "compensation.median", "compensation.sales_ratio"}
@@ -87,8 +103,14 @@ MODULE_SOURCE_DOMAINS: dict[ModuleId, SourceDomain] = {
 }
 
 
+def primary_source_domain(query: WidgetQuery) -> SourceDomain:
+    return SourceDomain.VISITS if query.metric_id in VISIT_METRICS else MODULE_SOURCE_DOMAINS[query.module]
+
+
 def required_source_domains(query: WidgetQuery) -> tuple[SourceDomain, ...]:
-    primary = MODULE_SOURCE_DOMAINS[query.module]
+    primary = primary_source_domain(query)
+    if query.metric_id in VISIT_METRICS:
+        return (primary,)
     if query.module in {ModuleId.CAMPAIGNS, ModuleId.COMPENSATION, ModuleId.PLANNING}:
         return (primary, SourceDomain.SALES)
     return (primary,)
@@ -116,6 +138,7 @@ SCALAR_ONLY_METRICS = frozenset(
         "workforce.stability",
         "compensation.sales_ratio",
         "planning.accuracy",
+        "visits.distinct_stores",
     }
 )
 
@@ -188,7 +211,7 @@ def _metric_for(query: WidgetQuery, user: UserContext) -> MetricDefinition:
     if len(query.dimensions) > 1 and query.visualization is not ChartKind.HEATMAP:
         raise QueryValidationFailure("Două dimensiuni sunt suportate numai de heatmap.")
     if query.visualization is ChartKind.HEATMAP and query.dimensions != (
-        MODULE_ENTITY_DIMENSIONS[query.module],
+        metric_entity_dimension(query.module, query.metric_id),
         "time",
     ):
         raise QueryValidationFailure("Heatmap cere exact dimensiunile entitate × time ale modulului.")
@@ -202,6 +225,8 @@ def _metric_for(query: WidgetQuery, user: UserContext) -> MetricDefinition:
         raise QueryValidationFailure("Compensation permite numai partiții agregate aprobate pe companie și timp.")
     if query.module in {ModuleId.FINANCE, ModuleId.PLANNING} and "agent" in query.filters:
         raise QueryValidationFailure(f"Filtrul agent nu este permis pentru {query.module.value}.")
+    if query.metric_id in VISIT_METRICS and "agent" in query.filters:
+        raise QueryValidationFailure("Filtrul agent nu este permis pentru vizitele atribuite Team Leader-ului autor.")
     return metric
 
 
@@ -284,6 +309,10 @@ def _field_for(module: ModuleId, metric_id: str, *, breakdown: bool = False) -> 
         "planning.actual": "comparison" if not breakdown else "secondary",
         "planning.target_gap": "primary",
         "planning.accuracy": "progress_pct" if breakdown else "primary",
+        "visits.total": "primary",
+        "visits.distinct_stores": "tertiary" if breakdown else "primary",
+        "visits.avg_completion": "secondary",
+        "visits.checklist_score": "progress_pct" if breakdown else "primary",
     }
     return mappings.get(metric_id, "primary")
 
@@ -294,12 +323,24 @@ def _decimal_or_none(value: object) -> Decimal | int | str | bool | None:
     return Decimal(str(value))
 
 
+def _data_for_metric(
+    response: ModuleAnalyticsResponse,
+    metric_id: str,
+) -> ModuleAnalyticsResponse | ModuleAnalyticsSlice:
+    if metric_id not in VISIT_METRICS:
+        return response
+    if response.visits is None:
+        raise RuntimeError("Visit analytics slice is unavailable.")
+    return response.visits
+
+
 def _dataset(
     query: WidgetQuery,
     response: ModuleAnalyticsResponse,
     comparison_responses: dict[QueryComparison, ModuleAnalyticsResponse] | None = None,
 ) -> QueryDataset:
-    metric = next((item for item in response.kpis if item.id == query.metric_id), None)
+    data = _data_for_metric(response, query.metric_id)
+    metric = next((item for item in data.kpis if item.id == query.metric_id), None)
     if query.visualization is ChartKind.KPI and query.metric_id == "target.progress_pct":
         actual = next((item for item in response.kpis if item.id == "sales.total"), None)
         target = metric.supporting_value if metric is not None else None
@@ -327,14 +368,12 @@ def _dataset(
         )
 
     if query.visualization is ChartKind.WATERFALL:
-        start_metric = next((item for item in response.kpis if item.id == "finance.revenue"), None)
-        total_metric = next((item for item in response.kpis if item.id == "finance.ebit"), None)
+        start_metric = next((item for item in data.kpis if item.id == "finance.revenue"), None)
+        total_metric = next((item for item in data.kpis if item.id == "finance.ebit"), None)
         rows: list[dict[str, str | Decimal | int | bool | None]] = []
         if start_metric is not None and total_metric is not None:
             rows.append({"label": start_metric.label, "value": start_metric.value, "step_kind": "start"})
-            rows.extend(
-                {"label": item.label, "value": -item.value, "step_kind": "delta"} for item in response.distribution
-            )
+            rows.extend({"label": item.label, "value": -item.value, "step_kind": "delta"} for item in data.distribution)
             rows.append({"label": total_metric.label, "value": total_metric.value, "step_kind": "total"})
         return QueryDataset(
             dimensions=[
@@ -355,7 +394,7 @@ def _dataset(
         rows = []
         if axis is not None:
             (x_field, x_label), (y_field, y_label) = axis
-            for item in response.breakdown:
+            for item in data.breakdown:
                 x_value = getattr(item, x_field, None)
                 y_value = getattr(item, y_field, None)
                 if x_value is not None and y_value is not None:
@@ -372,7 +411,7 @@ def _dataset(
                     label="Cheie",
                     kind="string",
                     role="key",
-                    source_dimension=MODULE_ENTITY_DIMENSIONS[query.module],
+                    source_dimension=metric_entity_dimension(query.module, query.metric_id),
                 ),
                 DatasetDimension(id="label", label="Entitate", kind="string", role="label"),
                 DatasetDimension(id="x", label=x_label, kind="number"),
@@ -384,8 +423,7 @@ def _dataset(
 
     if query.visualization is ChartKind.HEATMAP:
         heatmap_rows: list[dict[str, str | Decimal | int | bool | None]] = [
-            {"x": cell.x, "y": cell.y, "value": cell.value, "label": cell.label}
-            for cell in response.matrix[: query.limit]
+            {"x": cell.x, "y": cell.y, "value": cell.value, "label": cell.label} for cell in data.matrix[: query.limit]
         ]
         return QueryDataset(
             dimensions=[
@@ -395,7 +433,7 @@ def _dataset(
                     label="Entitate",
                     kind="string",
                     role="label",
-                    source_dimension=MODULE_ENTITY_DIMENSIONS[query.module],
+                    source_dimension=metric_entity_dimension(query.module, query.metric_id),
                 ),
                 DatasetDimension(id="value", label=query.metric_id, kind="number"),
                 DatasetDimension(id="label", label="Context", kind="string", role="metadata"),
@@ -417,7 +455,7 @@ def _dataset(
                 "observed_store_count": cell.observed_store_count,
                 "coverage_state": cell.coverage_state,
             }
-            for cell in response.calendar
+            for cell in data.calendar
             if query.time_range is None or query.time_range.start <= cell.date.strftime("%Y-%m") <= query.time_range.end
         ]
         return QueryDataset(
@@ -441,9 +479,9 @@ def _dataset(
     if "time" in query.dimensions or query.visualization in {ChartKind.LINE, ChartKind.AREA}:
         field = _field_for(query.module, query.metric_id)
         trend_rows: list[dict[str, str | Decimal | int | bool | None]] = []
-        points = response.trend
+        points = data.trend
         comparison_points = {
-            comparison: {point.key: point for point in comparison_response.trend}
+            comparison: {point.key: point for point in _data_for_metric(comparison_response, query.metric_id).trend}
             for comparison, comparison_response in (comparison_responses or {}).items()
         }
         primary_values: list[Decimal | None] = []
@@ -534,7 +572,7 @@ def _dataset(
                 DatasetDimension(id="share_pct", label="Pondere", kind="number", role="metadata"),
             ],
             rows=_sorted_rows(
-                [item.model_dump() for item in response.distribution],
+                [item.model_dump() for item in data.distribution],
                 query.sort,
                 min(query.limit, 30),
             ),
@@ -542,7 +580,7 @@ def _dataset(
 
     field = _field_for(query.module, query.metric_id, breakdown=True)
     breakdown_rows: list[dict[str, str | Decimal | int | bool | None]] = []
-    for row in response.breakdown:
+    for row in data.breakdown:
         value = _decimal_or_none(getattr(row, field, None))
         if query.metric_id == "workforce.headcount":
             value = 1
@@ -567,7 +605,7 @@ def _dataset(
                 label="Cheie",
                 kind="string",
                 role="key",
-                source_dimension=MODULE_ENTITY_DIMENSIONS[query.module],
+                source_dimension=metric_entity_dimension(query.module, query.metric_id),
             ),
             DatasetDimension(id="label", label="Entitate", kind="string", role="label"),
             DatasetDimension(id="context", label="Context", kind="string", role="metadata"),
@@ -677,7 +715,7 @@ async def execute_query_batch(
             comparison_responses = {
                 comparison: comparison_task.result() for comparison, comparison_task in widget_comparison_tasks.items()
             }
-            domain = MODULE_SOURCE_DOMAINS[query.module]
+            domain = primary_source_domain(query)
             source = snapshot.sources.get(domain.value)
             if source is None or source.status is SourceStatus.UNAVAILABLE:
                 raise RuntimeError("Source eligibility changed inside one immutable snapshot.")

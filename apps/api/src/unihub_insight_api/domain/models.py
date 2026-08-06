@@ -349,6 +349,18 @@ class CalendarCell(BaseModel):
     coverage_state: str = Field(pattern=r"^observed$")
 
 
+class ModuleAnalyticsSlice(BaseModel):
+    axes: tuple[ValueAxis, ...]
+    supported_charts: tuple[ChartKind, ...]
+    kpis: list[KpiMetric]
+    trend: list[TrendPoint]
+    distribution: list[DimensionShare]
+    breakdown: list[BreakdownRow]
+    matrix: list[MatrixCell]
+    calendar: list[CalendarCell] = Field(default_factory=list)
+    alerts: list[InsightAlert]
+
+
 class ModuleAnalyticsResponse(BaseModel):
     meta: OverviewMeta
     module: ModuleId
@@ -364,6 +376,7 @@ class ModuleAnalyticsResponse(BaseModel):
     matrix: list[MatrixCell]
     calendar: list[CalendarCell] = Field(default_factory=list)
     alerts: list[InsightAlert]
+    visits: ModuleAnalyticsSlice | None = None
 
 
 class DashboardLayout(BaseModel):

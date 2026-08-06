@@ -48,7 +48,7 @@ const kpiSchema = z.object({
   supporting_label: z.string().nullable().optional(),
 });
 
-export const moduleAnalyticsSchema = z.object({
+const moduleAnalyticsBaseSchema = z.object({
   meta: z.object({
     period: z.string(),
     comparison: z.enum(['previous-month', 'previous-year', 'none']),
@@ -135,6 +135,22 @@ export const moduleAnalyticsSchema = z.object({
       entity_label: z.string().nullable().optional(),
     }),
   ),
+});
+
+export const moduleAnalyticsSliceSchema = moduleAnalyticsBaseSchema.pick({
+  axes: true,
+  supported_charts: true,
+  kpis: true,
+  trend: true,
+  distribution: true,
+  breakdown: true,
+  matrix: true,
+  calendar: true,
+  alerts: true,
+});
+
+export const moduleAnalyticsSchema = moduleAnalyticsBaseSchema.extend({
+  visits: moduleAnalyticsSliceSchema.nullable().optional(),
 });
 
 export type ModuleAnalytics = z.infer<typeof moduleAnalyticsSchema>;

@@ -41,6 +41,9 @@ function nativeWidgetQuery(
 ): WidgetQuery | null {
   const spec = moduleWidgetQuerySpec(module, widgetId);
   if (!spec || !metric || metric.id !== spec.metricId) return null;
+  const entityDimension = spec.metricId.startsWith('visits.')
+    ? 'team_leader'
+    : moduleEntityDimension[module];
   let visualization: WidgetQuery['visualization'];
   let dimensions: string[];
   if (spec.kind === 'kpi') {
@@ -56,13 +59,13 @@ function nativeWidgetQuery(
     dimensions = [dimension];
   } else if (spec.kind === 'matrix') {
     visualization = 'heatmap';
-    dimensions = [moduleEntityDimension[module], 'time'];
+    dimensions = [entityDimension, 'time'];
   } else if (spec.kind === 'scatter') {
     visualization = 'scatter';
-    dimensions = [moduleEntityDimension[module]];
+    dimensions = [entityDimension];
   } else if (spec.kind === 'histogram') {
     visualization = 'histogram';
-    dimensions = [moduleEntityDimension[module]];
+    dimensions = [entityDimension];
   } else if (spec.kind === 'waterfall') {
     visualization = 'waterfall';
     dimensions = ['category'];
@@ -71,7 +74,7 @@ function nativeWidgetQuery(
     dimensions = ['time'];
   } else {
     visualization = 'table';
-    dimensions = [moduleEntityDimension[module]];
+    dimensions = [entityDimension];
   }
   if (
     !metric.allowed_shapes.includes(visualization) ||
@@ -113,6 +116,10 @@ function moduleExportParams(
   const params = analyticsSearchParams(input);
   if (snapshotId) params.set('snapshot_id', snapshotId);
   return params;
+}
+
+export function moduleSubviewData(data: ModuleAnalytics, subview: ModuleSubview): ModuleAnalytics {
+  return subview.id === 'visits' && data.visits ? { ...data, ...data.visits } : data;
 }
 
 function SubviewNavigation({
@@ -224,7 +231,8 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
     if (search.subview !== selectedSubview.id) updateSearch({ subview: selectedSubview.id }, true);
   }, [search.subview, selectedSubview.id, updateSearch]);
   const incompatibleAgent = Boolean(
-    search.agent && (module === 'finance' || module === 'planning'),
+    search.agent &&
+      (module === 'finance' || module === 'planning' || selectedSubview.id === 'visits'),
   );
   const query = useQuery({
     ...moduleAnalyticsQuery(module, input),
@@ -239,7 +247,11 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
     return (
       <ErrorState
         title="Filtru incompatibil"
-        message="Finance și Planning funcționează la nivel de rețea, structură și magazin, nu la nivel de agent."
+        message={
+          selectedSubview.id === 'visits'
+            ? 'Visits păstrează autorul Team Leader și scope-ul magazinului; filtrul agent nu este compatibil.'
+            : 'Finance și Planning funcționează la nivel de rețea, structură și magazin, nu la nivel de agent.'
+        }
         onRetry={() => updateSearch({ agent: undefined }, true)}
       />
     );
@@ -265,13 +277,14 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
   }
   const statuses = new Map(views.map((view) => [view.id, subviewStatus(data, view)]));
   const status = statuses.get(selectedSubview.id);
+  const displayData = moduleSubviewData(data, selectedSubview);
   const catalogMetrics = new Map(
     (catalogQuery.data?.metrics ?? []).map((metric) => [metric.id, metric]),
   );
   const widgetQueries = new Map<string, WidgetQuery>();
   const snapshotId = data.meta.analytical_snapshot_id;
   const widgets = (
-    status?.availability === 'unavailable' ? [] : moduleWidgets(data, selectedSubview.id)
+    status?.availability === 'unavailable' ? [] : moduleWidgets(displayData, selectedSubview.id)
   ).map((widget) => {
     const spec = moduleWidgetQuerySpec(module, widget.id);
     const widgetQuery = nativeWidgetQuery(
@@ -291,7 +304,7 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
   };
   return (
     <ModuleProvider
-      data={data}
+      data={displayData}
       onUrlStateChange={handleUrlState}
       onUrlStateChanges={(events) => updateSearch(crossFilterMultiPatch(search.drill, events))}
       onUrlRangeChange={(event) => updateSearch(crossFilterRangePatch(search.drill, event))}

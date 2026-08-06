@@ -42,7 +42,7 @@ Dependențele se implementează vertical: o suprafață ajunge `LIVE` numai cân
 
 ## Registru de workstream-uri
 
-- [ ] Read-model-uri Retail v1 sunt publicate aditiv; Sales Calendar folosește view-ul zilnic versionat și reconciliat, Workforce/Visits/Campaigns rămân `partial`, iar Finance/Compensation nu au încă head eligibil.
+- [ ] Read-model-uri Retail sunt publicate aditiv; Sales Calendar folosește view-ul zilnic reconciliat, Visits folosește contractul v2 oficial pe autor Team Leader, Workforce/Campaigns rămân `partial`, iar Finance/Compensation nu au încă head eligibil.
 - [ ] Catalogul și snapshotul sunt versionate; formulele au referințe versionate distincte, comparațiile native respectă allowlist-ul metricii, iar două dimensiuni sunt acceptate numai pentru heatmap-ul exact entitate × timp. Formele specializate încă lipsă rămân deschise.
 - [x] Query batch finit, snapshot fail-closed, deadline comun, izolare per widget, inspect și CSV server-side.
 - [x] Intervalele și URL state există; click-ul semantic acoperă timp și ierarhia firmă→RM→ASM→magazin→agent, heatmap aplică simultan entitate+timp, iar dataZoom și controlul accesibil aplică un interval custom exact, cu breadcrumb/reset/reload și allowlist de comparații per metrică. Deep-link-ul contextual deschide suprafața Retail potrivită și transferă perioada plus scope-ul fără a reduce arbitrar selecțiile multi-store.
@@ -60,6 +60,7 @@ Dependențele se implementează vertical: o suprafață ajunge `LIVE` numai cân
 - Finance și Compensation sunt corect `UNAVAILABLE` în producție: tabelele de generații/head nu publică încă o generație eligibilă. Datele legacy nu sunt promovate implicit.
 - Migrarea Retail 047 este aditivă pentru compatibilitatea N/N-1. Reader-ul Insight nu mai are granturi pe tabelele raw Finance/Planning; citește numai read-model-urile aprobate, iar preflight-ul blochează regresia.
 - Migrarea Retail 048 publică `reporting_sales_day_v1`; live 2026-08 reconciliază exact Sales lunar (`492.992,09` RON, `5.011` unități nete, `3.654` bonuri), expune `-52` unități retur și păstrează zilele absente drept missing. RUM-ul Web este inițializat, iar metricile/evaluatorul separă fail-closed exact SHA, suprafața și traficul real/sintetic; fereastra de șapte zile începe numai după deploy-ul acestei instrumentări și rămâne deschisă.
+- Migrarea Retail 049 publică aditiv `reporting_source_snapshot_v2` și `reporting_visit_month_v2`: 274/274 vizite eligibile din 2026-03…08 au autor Team Leader și magazin mapat; Performance/Workforce folosesc KPI, trend, breakdown și matrice dedicate, iar query/inspect/XLSX reutilizează aceeași felie.
 - RC1 este publicat ca artefact immutable, reconciliat live, restaurat izolat din copia NAS și acoperit de rollback real N→N-1→N cu schema forward-only. Release-urile incompatibile sunt refuzate înainte de schimbarea symlinkului.
 - Promovarea `1.0.0` mai cere acceptarea vizuală owner și șapte zile curate conform [Performance Acceptance](docs/PERFORMANCE_ACCEPTANCE.md).
 

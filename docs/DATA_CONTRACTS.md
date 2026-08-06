@@ -23,6 +23,10 @@ Saved widgets persist `metric_id`, `metric_version` and `query_contract_version`
 | `receipts.total` | Sum of canonical receipt counts | integer | same coverage rule as sales |
 | `receipt_2plus_pct` | `receipt_2plus_count / receipt_count * 100` | % | null when receipt count is zero |
 | `quantity.total` | Sum of net accessory quantity | integer | returns reduce quantity |
+| `visits.total` | Count of eligible FieldOps visits, grouped by visit-author Team Leader snapshot | integer | missing period remains missing |
+| `visits.distinct_stores` | Distinct visited `site_code` values in scope | integer | missing period remains missing |
+| `visits.avg_completion` | Visit-count-weighted FieldOps completion average | % | null without eligible visits |
+| `visits.checklist_score` | Visit-count-weighted mean of the five boolean checklist checks | % | null without eligible visits |
 
 The linear forecast is explicitly labeled run-rate; it is not the persisted AI forecast used elsewhere in UniHub.
 
@@ -47,6 +51,7 @@ For an open current period, future actual points are null, never repeated last v
 - `site_code` is the stable operational store key.
 - Current agent identity can use reporting label plus site scope only for the bounded current slice; stable effective-dated entity IDs are mandatory before cross-store longitudinal analysis.
 - Selected store can dominate historical parent filters where the Retail contract requires it.
+- Visits add `team_leader` as an analytical dimension. The stable key and label come from the visit-author snapshot; the store's current ASM never substitutes the author. Firm/RM/ASM/store filters use the current `stores` enrichment, while `agent` is incompatible and rejected.
 
 ## Retail invariants inherited
 
@@ -67,11 +72,12 @@ Initial alerts are deterministic rules, not machine-learning scores. They expose
 
 - Campaign mechanisms remain separate and carry their own cutoff/status/eligibility authority; they are not summed without a defined metric. Focus Top/Bottom folosește numai magazine observate și `campaigns.focus_share`; nu afirmă coverage, adopție sau cauzalitate.
 - Workforce movements come from official effective-dated events, never inferred only from missing sales.
+- Visits read only `reporting_visit_month_v2`; draft rows, distribution/`TR %` locations and `Cartele` are excluded. Performance and Workforce expose the same Visits slice and source metadata, so their native widgets, query batch, inspect and XLSX cannot drift to the legacy ASM projection.
 - Compensation reads an aggregate Retail view only. No direct `salary_records`, `agent_salary_links`, names or private IDs remain granted. Total uses all rows, average uses values at least 2,000 RON, median uses all values; cohorts of one or two are suppressed across KPI, series, inspect and export, including differencing attacks through filters.
 - Finance explicitly marks `actual`/`estimated` and authority. `__FINANCE_UNALLOCATED__` belongs in company totals and never in store/RM detail. Shadow or unpromoted generations are unavailable, not actual.
 - Planning forecast identifies run, horizon, method/model, input cutoff and coverage. Target scenarios identify scenario, revision, status, rule-set hash and snapshot; drafts are not implicitly shared truth. Accuracy păstrează KPI-ul server-side și vizualizează perechile Actual × Forecast publicate pe magazin; clientul nu recalculează o formulă alternativă.
 
-Retail migration 047 is intentionally additive for consumer N/N-1. Insight RC1 reads only the approved v1 views, while legacy Finance/Planning raw grants are revoked only after two compatible Insight releases and a verified B→A rollback. This temporary publisher compatibility does not authorize new Insight code to query raw tables.
+Retail migration 047 is intentionally additive for consumer N/N-1. Migration 049 adds `reporting_source_snapshot_v2` and `reporting_visit_month_v2` without changing v1; the new consumer selects v2 while the old Visits ASM projection remains only a rollback anchor. Legacy Finance/Planning raw grants are revoked only after two compatible Insight releases and a verified B→A rollback. This temporary publisher compatibility does not authorize new Insight code to query raw tables.
 
 ## Export contract
 

@@ -37,6 +37,10 @@ MODULE_ENTITY_DIMENSIONS: dict[ModuleId, str] = {
 }
 
 
+def metric_entity_dimension(module: ModuleId, metric_id: str) -> str:
+    return "team_leader" if metric_id.startswith("visits.") else MODULE_ENTITY_DIMENSIONS[module]
+
+
 def metric(
     metric_id: str,
     name: str,
@@ -260,6 +264,51 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         shapes=KPI_TABLE,
     ),
     metric(
+        "visits.total",
+        "Vizite",
+        "Numărul vizitelor FieldOps eligibile, atribuite autorului Team Leader din snapshot.",
+        MetricUnit.INTEGER,
+        aggregation="count",
+        dimensions=("firm", "regional", "asm", "store", "team_leader", "time"),
+        grains=("month",),
+        shapes=(ChartKind.KPI, ChartKind.LINE, ChartKind.BAR, ChartKind.HEATMAP, ChartKind.TABLE),
+        source_authority="reporting_visit_month_v2",
+    ),
+    metric(
+        "visits.distinct_stores",
+        "Magazine vizitate",
+        "Numărul distinct de magazine cu vizită FieldOps eligibilă în scope.",
+        MetricUnit.INTEGER,
+        aggregation="distinct-count",
+        dimensions=("firm", "regional", "asm", "store", "team_leader", "time"),
+        grains=("month",),
+        comparisons=(),
+        shapes=KPI_TABLE,
+        source_authority="reporting_visit_month_v2",
+    ),
+    metric(
+        "visits.avg_completion",
+        "Completion mediu vizite",
+        "Media ponderată cu numărul vizitelor a completion-ului FieldOps.",
+        MetricUnit.PERCENT,
+        aggregation="weighted-average",
+        dimensions=("firm", "regional", "asm", "store", "team_leader", "time"),
+        grains=("month",),
+        shapes=(ChartKind.KPI, ChartKind.LINE, ChartKind.BAR, ChartKind.TABLE),
+        source_authority="reporting_visit_month_v2",
+    ),
+    metric(
+        "visits.checklist_score",
+        "Scor checklist vizite",
+        "Media ponderată a celor cinci verificări booleene din vizitele FieldOps.",
+        MetricUnit.PERCENT,
+        aggregation="weighted-average",
+        dimensions=("firm", "regional", "asm", "store", "team_leader", "time"),
+        grains=("month",),
+        shapes=(ChartKind.KPI, ChartKind.BAR, ChartKind.TABLE),
+        source_authority="reporting_visit_month_v2",
+    ),
+    metric(
         "compensation.payroll",
         "Cost salarial",
         "Cost salarial total, inclusiv bonuri conform contractului Retail.",
@@ -454,6 +503,14 @@ DIMENSION_CATALOG: tuple[DimensionDefinition, ...] = (
         description="Identitate effective-dated; nu este disponibilă în Compensation.",
         stable_key="agent_entity_id",
         allowed_grains=("day", "week", "month", "quarter", "year"),
+    ),
+    DimensionDefinition(
+        id="team_leader",
+        display_name="Team Leader autor vizită",
+        description="Autorul păstrat în snapshotul vizitei; nu este ASM-ul curent al magazinului.",
+        stable_key="team_leader_id",
+        allowed_grains=("month", "quarter", "year"),
+        source_authority="reporting_visit_month_v2",
     ),
     DimensionDefinition(
         id="mechanism",

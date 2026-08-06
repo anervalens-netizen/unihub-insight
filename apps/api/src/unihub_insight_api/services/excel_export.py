@@ -417,6 +417,52 @@ def module_workbook(data: ModuleAnalyticsResponse) -> Path:
         ],
         data.calendar,
     )
+    if data.visits is not None:
+        builder.add_sheet(
+            "Visits KPI",
+            [
+                Column("id", "ID", width=28),
+                Column("label", "Indicator", width=32),
+                Column("value", "Valoare", "decimal", 18),
+                Column("unit", "Unitate", width=14),
+                Column("supporting_value", "Valoare suport", "decimal", 18),
+                Column("supporting_label", "Etichetă suport", width=28),
+                Column("risk", "Risc", width=14),
+            ],
+            data.visits.kpis,
+        )
+        builder.add_sheet(
+            "Visits Trend",
+            [
+                Column("key", "Perioadă", width=16),
+                Column("primary", "Vizite", "integer", 16),
+                Column("secondary", "Completion", "percent", 16),
+            ],
+            data.visits.trend,
+        )
+        builder.add_sheet(
+            "Visits Team Leader",
+            [
+                Column("id", "Team Leader ID", width=30),
+                Column("label", "Team Leader", width=32),
+                Column("context", "Context", width=44),
+                Column("primary", "Vizite", "integer", 16),
+                Column("secondary", "Completion", "percent", 16),
+                Column("tertiary", "Magazine", "integer", 16),
+                Column("progress_pct", "Scor checklist", "percent", 18),
+                Column("risk", "Risc", width=14),
+            ],
+            data.visits.breakdown,
+        )
+        builder.add_sheet(
+            "Visits Matrice",
+            [
+                Column("x", "Perioadă", width=16),
+                Column("y", "Team Leader", width=32),
+                Column("value", "Vizite", "integer", 16),
+            ],
+            data.visits.matrix,
+        )
     builder.add_sheet(
         "Alerte",
         [

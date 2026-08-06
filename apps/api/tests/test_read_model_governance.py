@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[3]
 def test_overview_snapshot_metadata_uses_only_the_governed_read_model() -> None:
     summary = inspect.getsource(PostgresAnalyticsRepository._fetch_summary)
 
-    assert "reporting_source_snapshot_v1" in summary
+    assert "reporting_source_snapshot_v2" in summary
     assert "import_snapshots" not in summary
 
 
@@ -47,6 +47,16 @@ def test_sales_calendar_reads_only_the_versioned_daily_contract() -> None:
     assert "reporting_agent_day" not in calendar
     assert "reporting_item_day" not in calendar
     assert "sales_transactions" not in calendar
+
+
+def test_visits_read_only_the_team_leader_v2_contract() -> None:
+    visits = inspect.getsource(PostgresInsightRepository._visit_rows)
+
+    assert "reporting_visit_month_v2" in visits
+    assert "fieldops_visits" not in visits
+    assert "visits_snapshot" not in visits
+    assert "team_leader_id" in visits
+    assert "team_leader_name" in visits
 
 
 def test_compensation_rejects_direct_differentiating_scope_and_export() -> None:
@@ -85,6 +95,9 @@ def test_bootstrap_uses_view_only_sensitive_acl_and_audit_is_append_only() -> No
     assert "reporting_finance_month_v1" in roles
     assert "reporting_planning_scenario_v1" in roles
     assert "reporting_sales_day_v1" in roles
+    assert "reporting_source_snapshot_v2" in roles
+    assert "reporting_visit_month_v2" in roles
+    assert "'fieldops_visits'" in roles
     assert "ON TABLE salary_records" not in roles
     assert "ON TABLE agent_salary_links" not in roles
     assert "store_pnl_monthly," not in roles

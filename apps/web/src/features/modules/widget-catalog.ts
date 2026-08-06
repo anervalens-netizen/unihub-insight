@@ -27,7 +27,10 @@ type RecipeKind =
   | 'forecast'
   | 'calendar'
   | 'focus-ranking'
-  | 'accuracy-scatter';
+  | 'accuracy-scatter'
+  | 'visits-trend'
+  | 'visits-breakdown'
+  | 'visits-matrix';
 type MetricSlot = 'primary' | 'secondary' | 'tertiary' | 'quaternary';
 interface Recipe {
   kind: RecipeKind;
@@ -151,6 +154,15 @@ export function moduleWidgetQuerySpec(
   if (widgetId === 'accuracy-scatter' && module === 'planning') {
     return { kind: 'scatter', metricId: 'planning.forecast' };
   }
+  if (widgetId === 'visits-trend') {
+    return { kind: 'trend', metricId: 'visits.total' };
+  }
+  if (widgetId === 'visits-breakdown') {
+    return { kind: 'breakdown', metricId: 'visits.total' };
+  }
+  if (widgetId === 'visits-matrix') {
+    return { kind: 'matrix', metricId: 'visits.total' };
+  }
   if (widgetId === 'distribution') {
     const metricId = distributionMetrics[module];
     return metricId ? { kind: 'distribution', metricId } : null;
@@ -239,9 +251,13 @@ const recipes: Partial<Record<ModuleSubviewId, readonly Recipe[]>> = {
     { kind: 'trend', title: 'Productivitate în timp' },
   ],
   visits: [
-    { kind: 'kpi', slot: 'primary' },
-    { kind: 'breakdown', title: 'Vizite / acoperire disponibilă' },
-    { kind: 'matrix', title: 'Vizite pe perioadă' },
+    { kind: 'kpi', metricId: 'visits.total' },
+    { kind: 'kpi', metricId: 'visits.distinct_stores' },
+    { kind: 'kpi', metricId: 'visits.avg_completion' },
+    { kind: 'kpi', metricId: 'visits.checklist_score' },
+    { kind: 'visits-trend', title: 'Vizite în timp' },
+    { kind: 'visits-breakdown', title: 'Vizite pe Team Leader autor' },
+    { kind: 'visits-matrix', title: 'Team Leader × perioadă' },
   ],
   promo: [{ kind: 'alerts', title: 'Promo indisponibil' }],
   incentive: [{ kind: 'alerts', title: 'Incentive indisponibil' }],
@@ -399,6 +415,9 @@ const componentByKind: Record<Exclude<RecipeKind, 'kpi'>, ComponentType> = {
   calendar: ModuleCalendarWidget,
   'focus-ranking': ModuleFocusRankingWidget,
   'accuracy-scatter': ModulePlanningAccuracyWidget,
+  'visits-trend': ModuleTrendWidget,
+  'visits-breakdown': ModuleBreakdownWidget,
+  'visits-matrix': ModuleMatrixWidget,
 };
 
 function kpiComponent(metricId: string): ComponentType {

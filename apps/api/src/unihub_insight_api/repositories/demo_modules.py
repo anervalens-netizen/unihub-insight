@@ -23,6 +23,7 @@ from unihub_insight_api.domain import (
     MatrixCell,
     MetricUnit,
     ModuleAnalyticsResponse,
+    ModuleAnalyticsSlice,
     ModuleId,
     OverviewMeta,
     RiskLevel,
@@ -678,6 +679,98 @@ def _alerts(module: ModuleId, rows: list[BreakdownRow]) -> list[InsightAlert]:
     return alerts
 
 
+def _visits(scope: AnalyticsScope) -> ModuleAnalyticsSlice:
+    rng = random.Random(_seed(ModuleId.WORKFORCE, scope, "visits"))
+    leaders = ["Team Leader 1", "Team Leader 2", "Team Leader 3"]
+    leader_totals = [Decimal(rng.randint(4, 14)) for _ in leaders]
+    total = sum(leader_totals, Decimal(0))
+    completion = _number(rng.uniform(82, 98))
+    checklist = _number(rng.uniform(80, 97))
+    breakdown = [
+        BreakdownRow(
+            id=f"demo-tl-{index}",
+            label=leader,
+            context=f"{rng.randint(2, 7)} magazine · autor Team Leader",
+            primary=leader_totals[index - 1],
+            secondary=_number(rng.uniform(78, 100)),
+            tertiary=Decimal(rng.randint(2, 7)),
+            progress_pct=_number(rng.uniform(76, 100)),
+            risk=RiskLevel.HEALTHY,
+        )
+        for index, leader in enumerate(leaders, 1)
+    ]
+    trend = [
+        TrendPoint(
+            key=(period := _shift_month(scope.period, offset)),
+            label=period,
+            primary=Decimal(rng.randint(18, 42)),
+            secondary=_number(rng.uniform(80, 98)),
+        )
+        for offset in range(-5, 1)
+    ]
+    matrix = [
+        MatrixCell(
+            x=point.key,
+            y=leader,
+            value=Decimal(rng.randint(3, 14)),
+            label="Vizite demo",
+        )
+        for point in trend
+        for leader in leaders
+    ]
+    return ModuleAnalyticsSlice(
+        axes=(
+            _axis("primary", "Vizite", MetricUnit.INTEGER),
+            _axis("secondary", "Completion", MetricUnit.PERCENT),
+            _axis("tertiary", "Magazine", MetricUnit.INTEGER),
+        ),
+        supported_charts=(ChartKind.LINE, ChartKind.BAR, ChartKind.HEATMAP, ChartKind.TABLE),
+        kpis=[
+            KpiMetric(
+                id="visits.total",
+                label="Vizite",
+                value=total,
+                unit=MetricUnit.INTEGER,
+                supporting_value=Decimal(len(leaders)),
+                supporting_label="Team Leaders observați",
+            ),
+            KpiMetric(
+                id="visits.distinct_stores",
+                label="Magazine vizitate",
+                value=Decimal(sum(int(row.tertiary or 0) for row in breakdown)),
+                unit=MetricUnit.INTEGER,
+            ),
+            KpiMetric(
+                id="visits.avg_completion",
+                label="Completion mediu",
+                value=completion,
+                unit=MetricUnit.PERCENT,
+                risk=_risk(completion),
+            ),
+            KpiMetric(
+                id="visits.checklist_score",
+                label="Scor checklist",
+                value=checklist,
+                unit=MetricUnit.PERCENT,
+                risk=_risk(checklist),
+            ),
+        ],
+        trend=trend,
+        distribution=[
+            DimensionShare(
+                id=f"demo-tl-{index}",
+                label=leader,
+                value=value,
+                share_pct=_number(value * Decimal("100") / total),
+            )
+            for index, (leader, value) in enumerate(zip(leaders, leader_totals, strict=True), 1)
+        ],
+        breakdown=breakdown,
+        matrix=matrix,
+        alerts=[],
+    )
+
+
 class DemoInsightRepository(DemoAnalyticsRepository):
     async def get_module(
         self,
@@ -697,11 +790,16 @@ class DemoInsightRepository(DemoAnalyticsRepository):
             ModuleId.PLANNING: SourceDomain.PLANNING,
         }[module]
         source_meta = snapshot.sources[domain.value]
+        sources = {domain: source_meta}
+        visits = None
+        if module in {ModuleId.PERFORMANCE, ModuleId.WORKFORCE}:
+            sources[SourceDomain.VISITS] = snapshot.sources[SourceDomain.VISITS.value]
+            visits = _visits(scope)
         meta = _meta(module, scope).model_copy(
             update={
                 "analytical_snapshot_id": snapshot.id,
                 "snapshot_contract_version": snapshot.contract_version,
-                "sources": {domain: source_meta},
+                "sources": sources,
                 "source": source_meta.source,
                 "as_of": source_meta.as_of,
                 "is_final": source_meta.is_final,
@@ -722,4 +820,5 @@ class DemoInsightRepository(DemoAnalyticsRepository):
             matrix=_matrix(module, scope, rows),
             calendar=_calendar(module, scope),
             alerts=_alerts(module, rows),
+            visits=visits,
         )

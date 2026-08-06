@@ -47,6 +47,7 @@ Orice stare non-inherited este vizibilă pe card. Share-ul este țintit per subj
 - Forecast run-rate is labeled separately from persisted AI forecast.
 - Missing data is not silently converted to zero.
 - Calendarul Sales arată numai zile observate până la cutoff. O celulă absentă rămâne missing; returul este cantitate negativă, iar numărul afișat de magazine este observat, nu coverage complet declarat.
+- Visits din Performance și Workforce folosește autorul Team Leader păstrat în vizită, nu ASM-ul magazinului. Filtrele firmă/RM/ASM/magazin folosesc ierarhia curentă; filtrul agent este incompatibil și trebuie eliminat înainte de deschiderea sub-view-ului.
 - Compensation citește numai read-model-ul agregat Retail; nu există persoană/nume/CNP în contract. Cohortele sub trei persoane sunt suprimate inclusiv în inspect și export.
 - `UNAVAILABLE` înseamnă că nu există o generație autoritativă eligibilă; UI nu transformă date legacy sau lipsa în zero.
 

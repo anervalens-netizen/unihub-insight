@@ -14,9 +14,17 @@ from unihub_insight_api.domain import (
     QueryBatchRequest,
     UserContext,
 )
-from unihub_insight_api.services.metric_catalog import METRIC_CATALOG, MODULE_ENTITY_DIMENSIONS
+from unihub_insight_api.services.metric_catalog import METRIC_CATALOG, metric_entity_dimension
 
 CATALOG_METRICS = {metric.id: metric for metric in METRIC_CATALOG}
+VISIT_METRICS = frozenset(
+    {
+        "visits.total",
+        "visits.distinct_stores",
+        "visits.avg_completion",
+        "visits.checklist_score",
+    }
+)
 
 MODULE_CAPABILITIES: dict[ModuleId, Capability] = {
     ModuleId.SALES: Capability.ANALYTICS,
@@ -44,6 +52,7 @@ MODULE_METRICS: dict[ModuleId, frozenset[str]] = {
             "performance.at_target",
             "performance.volatility",
             "performance.daily_productivity",
+            *VISIT_METRICS,
         }
     ),
     ModuleId.CAMPAIGNS: frozenset(
@@ -60,6 +69,7 @@ MODULE_METRICS: dict[ModuleId, frozenset[str]] = {
             "workforce.productivity",
             "workforce.coverage",
             "workforce.stability",
+            *VISIT_METRICS,
         }
     ),
     ModuleId.COMPENSATION: frozenset(
@@ -180,6 +190,7 @@ SCALAR_ONLY_METRICS = frozenset(
         "workforce.stability",
         "compensation.sales_ratio",
         "planning.accuracy",
+        "visits.distinct_stores",
     }
 )
 
@@ -330,7 +341,7 @@ def validate_dashboard(request: DashboardCreateRequest, user: UserContext) -> No
         if len(dimensions) > 1 and widget.visualization is not ChartKind.HEATMAP:
             errors.append(f"{prefix}.two dimensions require heatmap")
         if widget.visualization is ChartKind.HEATMAP and dimensions != (
-            MODULE_ENTITY_DIMENSIONS[widget.module],
+            metric_entity_dimension(widget.module, widget.metric_id),
             "time",
         ):
             errors.append(f"{prefix}.heatmap requires the module entity dimension and time")
@@ -370,5 +381,7 @@ def validate_dashboard(request: DashboardCreateRequest, user: UserContext) -> No
             errors.append(f"{prefix}.filters must be empty when filter_mode=ignore")
         if widget.module in {ModuleId.FINANCE, ModuleId.PLANNING} and "agent" in widget.filters:
             errors.append(f"{prefix}.filters.agent is incompatible with {widget.module.value}")
+        if widget.metric_id in VISIT_METRICS and "agent" in widget.filters:
+            errors.append(f"{prefix}.filters.agent is incompatible with Team Leader visits")
     if errors:
         raise DashboardValidationError(tuple(errors))

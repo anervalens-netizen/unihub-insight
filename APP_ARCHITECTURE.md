@@ -97,7 +97,7 @@ Adaptorul live folosește numai surse Retail aprobate, între care:
 - `reporting_agent_month`;
 - `reporting_item_month` și reporting categorie/Focus/lifecycle/profile;
 - targeturi agent/magazin și magazine;
-- status Grile și read-model-urile v1 pentru Campaigns, Workforce, Compensation, Visits, Finance și Planning;
+- status Grile, read-model-urile v1 pentru Campaigns, Workforce, Compensation, Finance și Planning și contractul Visits v2 pe autor Team Leader;
 - `import_snapshots` pentru coverage/cutoff unde contractul îl cere.
 
 Compensation citește exclusiv agregatul aprobat și nu expune persoane sau filtre diferențiatoare. Granturile raw Finance/Planning păstrate pentru compatibilitatea N/N-1 se revocă numai după două release-uri de produs acceptate și rollback B→A; API-ul Insight nu le folosește.
@@ -140,5 +140,7 @@ Overview și Monthly Review sunt suprafețe distincte. Cele șapte module au sub
 Retail publică read-model-uri versionate. Insight rezolvă un `analytical_snapshot_id`, apoi un query batch finit execută 8–12 widgeturi cu deadline comun, deduplicare și eroare izolată. Catalogul versionat de metrici/dimensiuni și `ChartSpec` alimentează identic modulele specializate, custom dashboards, inspectorul server-side și exporturile. Metadata de cutoff/finalitate rămâne per domeniu; nicio pagină Finance/HR/Planning nu moștenește metadata Sales.
 
 Sales Calendar citește exclusiv `reporting_sales_day_v1`. API-ul păstrează granulația zilnică observată, cantitatea retur negativă și numărul de magazine observate; nu generează zile lipsă și nu afirmă coverage zilnic complet. Același dataset alimentează widgetul Calendar, custom dashboards, inspect și XLSX.
+
+Performance și Workforce consumă aceeași felie Visits din `reporting_visit_month_v2`. Grain-ul Retail este lună × Team Leader autor × magazin; `team_leader_id/name` vin din snapshotul vizitei, iar firma/RM/ASM/locația sunt numai îmbogățirea curentă a magazinului. Felia are KPI, trend, breakdown, matrice, inspect și foi XLSX proprii; filtrul agent este refuzat explicit.
 
 Detaliile, ordinea de dependență și porțile sunt canonice în [Planul integrat](docs/PLAN_DEZVOLTARE_INTEGRAT.md).

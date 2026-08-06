@@ -43,12 +43,20 @@ def test_versioned_catalog_exposes_query_and_dimension_contract(client: TestClie
     payload = response.json()
     assert payload["version"] == 1
     assert payload["query_contract"]["max_widgets"] == 12
-    assert {item["id"] for item in payload["dimensions"]} >= {"time", "store", "agent"}
+    assert {item["id"] for item in payload["dimensions"]} >= {
+        "time",
+        "store",
+        "agent",
+        "team_leader",
+    }
     sales = next(item for item in payload["metrics"] if item["id"] == "sales.total")
     assert sales["version"] == 1
     assert sales["source_authority"] == "unihub-retail"
     assert "scatter" not in sales["allowed_shapes"]
     assert "treemap" in sales["allowed_shapes"]
+    visits = next(item for item in payload["metrics"] if item["id"] == "visits.total")
+    assert visits["source_authority"] == "reporting_visit_month_v2"
+    assert "team_leader" in visits["allowed_dimensions"]
     formula_references = [item["formula_reference"] for item in payload["metrics"]]
     assert len(formula_references) == len(set(formula_references))
     assert all(reference != "retail-reporting-contract" for reference in formula_references)
@@ -158,6 +166,50 @@ def test_campaign_focus_breakdown_returns_observed_store_rows(client: TestClient
     assert {"id", "label", "progress_pct"} <= dimensions.keys()
     assert dimensions["id"]["source_dimension"] == "store"
     assert result["dataset"]["rows"]
+
+
+def test_visits_query_uses_the_team_leader_slice_and_source(client: TestClient) -> None:
+    query = widget(
+        "visits-by-author",
+        module="performance",
+        metric_id="visits.total",
+        visualization="table",
+        dimensions=["team_leader"],
+    )
+    query["comparisons"] = []
+    response = client.post(
+        "/api/v1/query/batch",
+        params={"period": "2026-08"},
+        json={"widgets": [query]},
+    )
+
+    assert response.status_code == 200
+    result = response.json()["results"][0]
+    assert result["error"] is None
+    assert result["meta"]["source"]["domain"] == "visits"
+    dimensions = {item["id"]: item for item in result["dataset"]["dimensions"]}
+    assert dimensions["id"]["source_dimension"] == "team_leader"
+    assert result["dataset"]["rows"]
+
+
+def test_visits_query_rejects_agent_filter(client: TestClient) -> None:
+    query = widget(
+        "visits-agent",
+        module="workforce",
+        metric_id="visits.total",
+        visualization="table",
+        dimensions=["team_leader"],
+    )
+    query["comparisons"] = []
+    query["filters"] = {"agent": "Agent 01"}
+    response = client.post(
+        "/api/v1/query/batch",
+        params={"period": "2026-08"},
+        json={"widgets": [query]},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["results"][0]["error"]["code"] == "invalid-query"
 
 
 def test_calendar_returns_only_observed_daily_rows_with_return_and_coverage_context(

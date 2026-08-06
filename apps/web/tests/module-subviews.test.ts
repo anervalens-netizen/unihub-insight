@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { moduleSubviewData } from '../src/features/modules/AnalyticsModulePage';
 import type { ModuleAnalytics } from '../src/features/modules/schemas';
 import { subviewForId, subviewStatus } from '../src/features/modules/subviews';
 import { moduleWidgetQuerySpec, moduleWidgets } from '../src/features/modules/widget-catalog';
@@ -140,6 +141,18 @@ describe('module subview availability', () => {
       kind: 'scatter',
       metricId: 'planning.forecast',
     });
+    expect(moduleWidgetQuerySpec('performance', 'visits-trend')).toEqual({
+      kind: 'trend',
+      metricId: 'visits.total',
+    });
+    expect(moduleWidgetQuerySpec('workforce', 'visits-breakdown')).toEqual({
+      kind: 'breakdown',
+      metricId: 'visits.total',
+    });
+    expect(moduleWidgetQuerySpec('workforce', 'visits-matrix')).toEqual({
+      kind: 'matrix',
+      metricId: 'visits.total',
+    });
   });
 
   it('uses specialized recipes instead of the generic template where data supports them', () => {
@@ -205,5 +218,35 @@ describe('module subview availability', () => {
         (widget) => widget.id,
       ),
     ).toContain('accuracy-scatter');
+    const visitsSlice = {
+      axes: [],
+      supported_charts: [],
+      kpis: [
+        { id: 'visits.total' },
+        { id: 'visits.distinct_stores' },
+        { id: 'visits.avg_completion' },
+        { id: 'visits.checklist_score' },
+      ],
+      trend: [],
+      distribution: [],
+      breakdown: [],
+      matrix: [],
+      calendar: [],
+      alerts: [],
+    } as unknown as NonNullable<ModuleAnalytics['visits']>;
+    const visitsData = moduleSubviewData(
+      { ...base, module: 'performance', visits: visitsSlice } as ModuleAnalytics,
+      subviewForId('performance', 'visits'),
+    );
+    expect(visitsData.kpis[0]?.id).toBe('visits.total');
+    expect(moduleWidgets(visitsData, 'visits').map((widget) => widget.id)).toEqual([
+      'kpi:visits.total',
+      'kpi:visits.distinct_stores',
+      'kpi:visits.avg_completion',
+      'kpi:visits.checklist_score',
+      'visits-trend',
+      'visits-breakdown',
+      'visits-matrix',
+    ]);
   });
 });
