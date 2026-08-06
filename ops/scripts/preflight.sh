@@ -169,6 +169,9 @@ psql "$UNIHUB_INSIGHT_DATABASE_URL" -Atqc \
 psql "$UNIHUB_INSIGHT_DATABASE_URL" -Atqc \
   "SELECT has_table_privilege(current_user, 'public.sales_transactions', 'SELECT')" \
   | grep -qx f
+psql "$UNIHUB_INSIGHT_DATABASE_URL" -Atqc \
+  "SELECT COALESCE(bool_or(has_table_privilege(current_user, to_regclass('public.' || relation), 'SELECT')), false) FROM unnest(ARRAY['import_snapshots','sales_generation_heads','salary_records','salary_import_batches','agent_salary_links','visits_snapshot','store_pnl_monthly','store_pnl_generations','store_pnl_generation_heads','store_pnl_generation_scopes','store_pnl_generation_rows','store_pnl_site_links','ai_forecast_runs','ai_forecast_store_month','target_scenarios','target_scenario_rows']) AS relation" \
+  | grep -qx f
 psql "$UNIHUB_INSIGHT_METADATA_DATABASE_URL" -Atqc \
   "SELECT has_database_privilege(current_user, current_database(), 'CONNECT')" | grep -qx t
 psql "$UNIHUB_INSIGHT_METADATA_DATABASE_URL" -Atqc \

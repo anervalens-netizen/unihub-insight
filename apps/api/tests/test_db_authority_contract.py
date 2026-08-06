@@ -21,9 +21,21 @@ def test_role_bootstrap_uses_isolated_authorities_and_owner() -> None:
     assert "REVOKE TEMPORARY ON DATABASE unihub FROM" not in sql
     assert "GRANT SELECT ON TABLE sales_transactions TO unihub_insight_reader" not in sql
     assert "reporting_compensation_month_v1" in sql
-    assert "salary_records" not in sql
-    assert "agent_salary_links" not in sql
+    reader_grant = sql.split("GRANT SELECT ON TABLE", 1)[1].split("TO unihub_insight_reader;", 1)[0]
+    assert "salary_records" not in reader_grant
+    assert "agent_salary_links" not in reader_grant
     assert "person_id" not in sql
+    assert "REVOKE ALL PRIVILEGES ON TABLE public.%I FROM unihub_insight_reader" in sql
+    for raw_source in (
+        "sales_transactions",
+        "import_snapshots",
+        "salary_records",
+        "store_pnl_monthly",
+        "store_pnl_generation_rows",
+        "ai_forecast_runs",
+        "target_scenarios",
+    ):
+        assert f"'{raw_source}'" in sql
 
 
 def test_metadata_authority_is_limited_to_dashboards() -> None:

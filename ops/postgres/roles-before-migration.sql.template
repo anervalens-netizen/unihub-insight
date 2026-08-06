@@ -71,6 +71,43 @@ GRANT SELECT ON TABLE
     grile_store_current_status
 TO unihub_insight_reader;
 
+-- Fail closed if an older rollout granted the Insight authority any raw
+-- source used behind the approved reporting views. View owners retain the
+-- minimum underlying access; the API reader never receives it directly.
+DO $deny_raw_sources$
+DECLARE
+    raw_source TEXT;
+BEGIN
+    FOREACH raw_source IN ARRAY ARRAY[
+        'sales_transactions',
+        'import_snapshots',
+        'sales_generation_heads',
+        'salary_records',
+        'salary_import_batches',
+        'agent_salary_links',
+        'visits_snapshot',
+        'store_pnl_monthly',
+        'store_pnl_generations',
+        'store_pnl_generation_heads',
+        'store_pnl_generation_scopes',
+        'store_pnl_generation_rows',
+        'store_pnl_site_links',
+        'ai_forecast_runs',
+        'ai_forecast_store_month',
+        'target_scenarios',
+        'target_scenario_rows'
+    ]
+    LOOP
+        IF to_regclass(format('public.%I', raw_source)) IS NOT NULL THEN
+            EXECUTE format(
+                'REVOKE ALL PRIVILEGES ON TABLE public.%I FROM unihub_insight_reader',
+                raw_source
+            );
+        END IF;
+    END LOOP;
+END
+$deny_raw_sources$;
+
 -- The governed product/month view is owned by Insight. Its owner needs only
 -- the source columns used in the view, never access to Retail's public schema
 -- DDL surface. The reader gets the view in migration 002, not raw sales rows.

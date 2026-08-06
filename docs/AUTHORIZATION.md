@@ -22,6 +22,11 @@ It is absent from the API runtime environment; systemd reads it only for the
 one-shot migration service, while root-owned backup/restore scripts load it
 directly.
 
+The analytics reader receives only the enumerated reporting/read-model tables.
+Bootstrap explicitly revokes legacy grants on raw sales, salary, visit,
+Finance-generation and planning-authority tables; preflight fails if any such
+direct `SELECT` privilege reappears.
+
 At the 2026-08-05 baseline, application access is explicitly limited to Andrei, Alexandra and Bogdan. Release evidence must verify the exact Authentik application-group membership as well as capabilities; adding another identity is a security change, not a UI configuration.
 
 Capability defaults and required negative tests live in
