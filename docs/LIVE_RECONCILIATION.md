@@ -11,14 +11,20 @@ The bounded matrix has zero numeric differences for every available case:
 This is **not** authoritative acceptance: 0/19 and 0/18 cases pass the source
 authority gate. July is missing the historically transferred-store sample;
 August is missing that sample and a partial-month target agent. Campaigns,
-Workforce and Planning are `partial`, Finance and Compensation are
-`unavailable`, and July Sales is also `partial`. Visits v2 differences are zero
+Workforce and Planning remain `partial`; Finance and Compensation are now
+`official` where Retail has rows, while July Sales is still `partial`. Visits v2 differences are zero
 where eligible. Missing/partial sources and missing samples are never converted
 to success.
 
 The next integrated candidate is `1.0.0-rc.3`; it retains the Sales Portfolio
 contract below and adds Campaigns v3, canonical Contest v1 and Grile v2 selected atomically by snapshot v6.
-Finance, Compensation and Planning must expose existing canonical Retail rows with truthful provenance; only genuinely absent rows remain unavailable.
+Finance și Compensation folosesc acum contractele complete v2; Planning rămâne poartă deschisă. Numai lunile fără rânduri Retail rămân unavailable.
+
+### Compensation și Finance v2 — producție 2026-08-07
+
+- Compensation 2026-06: **170/170 rânduri**, **168 persoane** și **673.802,07 RON**, exact ca `salary_records`; toate rândurile legacy sunt vizibile, fără prag de 2.000 RON sau cohortă.
+- Finance: ianuarie–aprilie 2026 rămân `actual`; mai–iunie rămân `estimated`. Iunie publică **912 rânduri** și **5.244.409,28 RON**; **804** rânduri sunt mapate la magazine și **108** rămân vizibil nemapate.
+- Interogarea Finance pentru 12 luni rulează live în **0,10 s** după pushdown-ul pe `period_date`; reader-ul Insight citește exact aceleași 170/912 rânduri.
 
 ### Sales Portfolio control — entire network, 2026-06
 

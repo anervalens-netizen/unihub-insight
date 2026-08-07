@@ -99,7 +99,7 @@ export function WidgetEditorRow({
               ? widget.visualization
               : (nextMetric?.allowed_shapes[0] ?? 'table');
             const filters =
-              module === 'finance' || module === 'planning'
+              module === 'planning'
                 ? Object.fromEntries(
                     Object.entries(widget.filters).filter(([key]) => key !== 'agent'),
                   )
@@ -403,12 +403,7 @@ export function WidgetEditorRow({
         <div className="widget-local-filters">
           <span>Filtre locale</span>
           {filterFields
-            .filter(
-              (field) =>
-                (widget.module !== 'compensation' || field.key === 'firm') &&
-                (field.key !== 'agent' ||
-                  (widget.module !== 'finance' && widget.module !== 'planning')),
-            )
+            .filter((field) => field.key !== 'agent' || widget.module !== 'planning')
             .map((field) => (
               <label key={field.key}>
                 <small>{field.label}</small>

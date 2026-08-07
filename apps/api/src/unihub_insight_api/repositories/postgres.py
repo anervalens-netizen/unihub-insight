@@ -85,7 +85,7 @@ class PostgresAnalyticsRepository:
                        authority_head, contract_version, rule_version, status,
                        as_of, cutoff, is_final, coverage_numerator,
                        coverage_denominator, produced_at, warnings
-                FROM reporting_source_snapshot_v6
+                FROM reporting_source_snapshot_v7
                 WHERE period = $1
                 ORDER BY domain
                 """,
@@ -121,7 +121,7 @@ class PostgresAnalyticsRepository:
         )
         digest = hashlib.sha256(f"{scope.period}|{generation_material}".encode()).hexdigest()
         return AnalyticalSnapshot(
-            id=f"retail-v6-{scope.period}-{digest[:32]}",
+            id=f"retail-v7-{scope.period}-{digest[:32]}",
             period=scope.period,
             sources=sources,
         )
@@ -372,7 +372,7 @@ class PostgresAnalyticsRepository:
                 ),
                 snapshot AS (
                     SELECT is_final AS is_month_final
-                    FROM reporting_source_snapshot_v6
+                    FROM reporting_source_snapshot_v7
                     WHERE domain = 'sales' AND period = $1
                     ORDER BY produced_at DESC
                     LIMIT 1

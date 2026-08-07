@@ -5,7 +5,7 @@ export const moduleEntityDimension: Record<ModuleId, string> = {
   performance: 'store',
   campaigns: 'store',
   workforce: 'agent',
-  compensation: 'firm',
+  compensation: 'person',
   finance: 'store',
   planning: 'store',
 };

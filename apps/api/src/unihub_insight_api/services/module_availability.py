@@ -22,7 +22,7 @@ MODULE_SOURCE_DOMAINS: dict[ModuleId, tuple[SourceDomain, ...]] = {
     ModuleId.PERFORMANCE: (SourceDomain.SALES,),
     ModuleId.CAMPAIGNS: (SourceDomain.CAMPAIGNS, SourceDomain.CONTEST),
     ModuleId.WORKFORCE: (SourceDomain.WORKFORCE, SourceDomain.VISITS, SourceDomain.GRILE),
-    ModuleId.COMPENSATION: (SourceDomain.COMPENSATION, SourceDomain.SALES),
+    ModuleId.COMPENSATION: (SourceDomain.COMPENSATION,),
     ModuleId.FINANCE: (SourceDomain.FINANCE,),
     ModuleId.PLANNING: (SourceDomain.PLANNING, SourceDomain.SALES),
 }

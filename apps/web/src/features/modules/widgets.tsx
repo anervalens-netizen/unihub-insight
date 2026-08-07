@@ -111,7 +111,7 @@ export function ModuleKpiByMetric({ metricId }: { metricId: string }) {
     <EmptyState
       message={
         module === 'compensation'
-          ? 'Agregatul Compensation este lipsă sau suprimat conform pragului; nu se afișează cifre inventate.'
+          ? 'Retail nu conține date salariale pentru perioada și filtrele selectate.'
           : 'Metrica nu este disponibilă în contractul curent.'
       }
     />

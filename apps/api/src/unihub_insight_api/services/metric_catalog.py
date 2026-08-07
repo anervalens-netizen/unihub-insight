@@ -42,7 +42,7 @@ MODULE_ENTITY_DIMENSIONS: dict[ModuleId, str] = {
     ModuleId.PERFORMANCE: "store",
     ModuleId.CAMPAIGNS: "store",
     ModuleId.WORKFORCE: "agent",
-    ModuleId.COMPENSATION: "firm",
+    ModuleId.COMPENSATION: "person",
     ModuleId.FINANCE: "store",
     ModuleId.PLANNING: "store",
 }
@@ -573,9 +573,8 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         "Cost salarial total, inclusiv bonuri conform contractului Retail.",
         MetricUnit.CURRENCY,
         capability=Capability.HR,
-        dimensions=("firm", "time"),
-        suppressible=True,
-        source_authority="reporting_compensation_month_v1",
+        dimensions=("firm", "regional", "asm", "store", "agent", "person", "time"),
+        source_authority="reporting_compensation_person_month_v2",
         shapes=(
             ChartKind.KPI,
             ChartKind.LINE,
@@ -589,13 +588,12 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
     metric(
         "compensation.average",
         "Salariu mediu",
-        "Media lunară eligibilă conform pragului contractual.",
+        "Media lunară calculată peste toate persoanele vizibile în scope.",
         MetricUnit.CURRENCY,
         aggregation="average",
         capability=Capability.HR,
-        dimensions=("firm", "time"),
-        suppressible=True,
-        source_authority="reporting_compensation_month_v1",
+        dimensions=("firm", "regional", "asm", "store", "agent", "person", "time"),
+        source_authority="reporting_compensation_person_month_v2",
         shapes=(
             ChartKind.KPI,
             ChartKind.LINE,
@@ -613,9 +611,8 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         MetricUnit.CURRENCY,
         aggregation="median",
         capability=Capability.HR,
-        dimensions=("firm", "time"),
-        suppressible=True,
-        source_authority="reporting_compensation_month_v1",
+        dimensions=("firm", "regional", "asm", "store", "agent", "person", "time"),
+        source_authority="reporting_compensation_person_month_v2",
         shapes=(ChartKind.KPI, ChartKind.LINE, ChartKind.BAR, ChartKind.HISTOGRAM, ChartKind.BOXPLOT, ChartKind.TABLE),
     ),
     metric(
@@ -625,9 +622,8 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         MetricUnit.PERCENT,
         aggregation="ratio-of-sums",
         capability=Capability.HR,
-        suppressible=True,
-        source_authority="reporting_compensation_month_v1",
-        dimensions=("firm", "time"),
+        source_authority="reporting_compensation_person_month_v2",
+        dimensions=("firm", "regional", "asm", "store", "agent", "person", "time"),
         grains=("month",),
         shapes=KPI_TABLE,
     ),
@@ -637,6 +633,7 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         "Venit P&L din categoriile v1/v11/v2/v3.",
         MetricUnit.CURRENCY,
         capability=Capability.PNL,
+        source_authority="reporting_finance_month_v2",
         shapes=TREND,
     ),
     metric(
@@ -647,6 +644,7 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         aggregation="derived",
         capability=Capability.PNL,
         dimensions=("firm", "regional", "asm", "store", "category", "time"),
+        source_authority="reporting_finance_month_v2",
         shapes=(ChartKind.KPI, ChartKind.LINE, ChartKind.BAR, ChartKind.WATERFALL, ChartKind.TABLE),
     ),
     metric(
@@ -656,6 +654,7 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         MetricUnit.PERCENT,
         aggregation="ratio-of-sums",
         capability=Capability.PNL,
+        source_authority="reporting_finance_month_v2",
         shapes=(ChartKind.KPI, ChartKind.LINE, ChartKind.BAR, ChartKind.HEATMAP, ChartKind.TABLE),
     ),
     metric(
@@ -665,6 +664,7 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         MetricUnit.CURRENCY,
         capability=Capability.PNL,
         dimensions=("firm", "regional", "asm", "store", "category", "time"),
+        source_authority="reporting_finance_month_v2",
         shapes=(ChartKind.KPI, ChartKind.BAR, ChartKind.DONUT, ChartKind.TREEMAP, ChartKind.TABLE),
     ),
     metric(

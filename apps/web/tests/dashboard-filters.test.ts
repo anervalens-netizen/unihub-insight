@@ -53,12 +53,13 @@ describe('widget filter resolution', () => {
       }),
     ).toEqual({ period: '2026-08', comparison: 'previous-year', firm: 'MOBICELL' });
   });
-  it('ignores business filters and removes agent from unsupported modules', () => {
+  it('ignores business filters and removes agent only from unsupported Planning', () => {
     expect(resolveWidgetSearch(global, { ...widget, filter_mode: 'ignore' })).toEqual({
       period: '2026-08',
       comparison: 'previous-year',
     });
-    expect(resolveWidgetSearch(global, { ...widget, module: 'finance' })).not.toHaveProperty(
+    expect(resolveWidgetSearch(global, { ...widget, module: 'finance' })).toHaveProperty('agent');
+    expect(resolveWidgetSearch(global, { ...widget, module: 'planning' })).not.toHaveProperty(
       'agent',
     );
   });

@@ -177,7 +177,6 @@ MODULE_SOURCE_DOMAINS: dict[ModuleId, SourceDomain] = {
 REVENUE_CODES = {"v1", "v11", "v2", "v3"}
 COGS_CODES = {"c1", "c11", "c2"}
 OPERATING_CODES = {"c3", "c4", "c5", "c6"}
-MIN_COMPENSATION_POPULATION = 3
 CATEGORY_LABELS = {
     "v1": "Venit accesorii",
     "v11": "Alte venituri",
@@ -196,14 +195,6 @@ CATEGORY_LABELS = {
 
 async def _empty_records() -> Sequence[asyncpg.Record]:
     return ()
-
-
-def compensation_is_suppressed(person_count: int) -> bool:
-    return 0 < person_count < MIN_COMPENSATION_POPULATION
-
-
-def filter_visible_compensation_rows(rows: Sequence[Any]) -> list[Any]:
-    return [row for row in rows if not compensation_is_suppressed(int(row["eligible_person_count"]))]
 
 
 def shift_month(period: str, offset: int) -> str:
@@ -2441,22 +2432,42 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
     async def _compensation_rows(self, scope: AnalyticsScope) -> Sequence[asyncpg.Record]:
         start = shift_month(scope.period, -11)
         params: list[Any] = [start, scope.period]
-        firm_filter = ""
-        if scope.firm:
-            params.append(scope.firm)
-            firm_filter = f"AND LOWER(compensation.company_name) = LOWER(${len(params)})"
+        filters: list[str] = []
+        if scope.stores:
+            params.append(list(scope.stores))
+            filters.append(f"compensation.site_code = ANY(${len(params)}::text[])")
+        else:
+            if scope.firm:
+                params.append(scope.firm)
+                filters.append(f"LOWER(compensation.company_name) = LOWER(${len(params)})")
+            if scope.regional:
+                params.append(list(scope.regional))
+                filters.append(f"compensation.regional = ANY(${len(params)}::text[])")
+            if scope.asm:
+                params.append(scope.asm)
+                filters.append(f"compensation.asm = ${len(params)}")
+        if scope.agent:
+            params.append(list(scope.agent))
+            filters.append(f"compensation.linked_agent_codes && ${len(params)}::text[]")
+        filter_sql = " AND ".join(filters) if filters else "TRUE"
         async with self.pool.acquire() as connection:
             return await connection.fetch(
                 f"""
-                SELECT compensation.period, compensation.company_name,
-                       compensation.eligible_person_count,
-                       compensation.payroll_total,
-                       compensation.average_salary_eligible,
-                       compensation.median_salary
-                FROM reporting_compensation_month_v1 compensation
+                SELECT compensation.salary_row_id, compensation.period,
+                       compensation.person_id, compensation.full_name,
+                       compensation.total_salary, compensation.company_name,
+                       compensation.site_code,
+                       COALESCE(compensation.store_location, compensation.salary_location, 'Fără magazin') AS locatie,
+                       compensation.regional, compensation.asm,
+                       compensation.linked_agent_codes,
+                       compensation.record_source_state,
+                       compensation.source_file, compensation.source_sheet,
+                       compensation.source_row
+                FROM reporting_compensation_person_month_v2 compensation
                 WHERE compensation.period BETWEEN $1 AND $2
-                  {firm_filter}
-                ORDER BY compensation.period, compensation.company_name
+                  AND {filter_sql}
+                ORDER BY compensation.period, compensation.full_name,
+                         compensation.salary_row_id
                 """,
                 *params,
             )
@@ -2468,76 +2479,105 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             self._meta(
                 ModuleId.COMPENSATION,
                 scope,
-                "reporting_compensation_month_v1",
+                "reporting_compensation_person_month_v2",
                 (SourceDomain.SALES,),
             ),
         )
-        visible_compensation_rows = filter_visible_compensation_rows(compensation_rows)
-        selected_company = scope.firm or "__ALL__"
-        current = [
-            row
-            for row in visible_compensation_rows
-            if str(row["period"]) == scope.period and str(row["company_name"]).casefold() == selected_company.casefold()
-        ]
-        current_row = current[0] if current else None
-        payroll = _money(current_row["payroll_total"]) if current_row else Decimal(0)
-        average = _money(current_row["average_salary_eligible"]) if current_row else Decimal(0)
-        median = _money(current_row["median_salary"]) if current_row else Decimal(0)
+        person_month: dict[tuple[str, str], dict[str, Any]] = {}
+        for row in compensation_rows:
+            period = str(row["period"])
+            person_key = str(row["person_id"] or f"salary-row:{row['salary_row_id']}")
+            item = person_month.setdefault(
+                (period, person_key),
+                {
+                    "period": period,
+                    "person_id": person_key,
+                    "label": str(row["full_name"]),
+                    "total": Decimal(0),
+                    "companies": set(),
+                    "locations": set(),
+                    "regionals": set(),
+                    "agents": set(),
+                    "source_states": set(),
+                    "record_count": 0,
+                },
+            )
+            item["total"] += _money(row["total_salary"])
+            item["companies"].add(str(row["company_name"]))
+            item["locations"].add(str(row["locatie"]))
+            if row["regional"]:
+                item["regionals"].add(str(row["regional"]))
+            item["agents"].update(str(agent) for agent in (row["linked_agent_codes"] or ()))
+            item["source_states"].add(str(row["record_source_state"]))
+            item["record_count"] += 1
+
+        def statistics(items: Sequence[dict[str, Any]]) -> tuple[Decimal, Decimal, Decimal]:
+            values = sorted(_money(item["total"]) for item in items)
+            if not values:
+                return Decimal(0), Decimal(0), Decimal(0)
+            total = _money(sum(values, Decimal(0)))
+            average = _money(total / Decimal(len(values)))
+            middle = len(values) // 2
+            median = values[middle] if len(values) % 2 else _money((values[middle - 1] + values[middle]) / Decimal(2))
+            return total, average, median
+
+        current = [item for item in person_month.values() if item["period"] == scope.period]
+        payroll, average, median = statistics(current)
         sales = sum(
             (_money(row["total_sales"]) for row in sales_rows if str(row["import_month"]) == scope.period),
             Decimal(0),
         )
         ratio = _ratio(payroll, sales)
-        selected_rows = [
-            row
-            for row in visible_compensation_rows
-            if str(row["company_name"]).casefold() == selected_company.casefold()
-        ]
-        trend = [
-            TrendPoint(
-                key=str(row["period"]),
-                label=str(row["period"]),
-                primary=_money(row["payroll_total"]),
-                secondary=_money(row["average_salary_eligible"]),
-                comparison=_money(row["median_salary"]),
+        by_period: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for item in person_month.values():
+            by_period[item["period"]].append(item)
+        trend = []
+        for period, items in sorted(by_period.items()):
+            period_total, period_average, period_median = statistics(items)
+            trend.append(
+                TrendPoint(
+                    key=period,
+                    label=period,
+                    primary=period_total,
+                    secondary=period_average,
+                    comparison=period_median,
+                )
             )
-            for row in selected_rows
-        ]
-        company_rows = [
-            row
-            for row in visible_compensation_rows
-            if str(row["period"]) == scope.period and str(row["company_name"]) != "__ALL__"
-        ]
         breakdown = [
             BreakdownRow(
-                id=str(row["company_name"]),
-                label=str(row["company_name"]),
-                context=f"{int(row['eligible_person_count'])} persoane eligibile",
-                primary=_money(row["payroll_total"]),
-                secondary=_money(row["average_salary_eligible"]),
-                tertiary=_money(row["median_salary"]),
+                id=str(item["person_id"]),
+                label=str(item["label"]),
+                context=(
+                    f"{', '.join(sorted(item['companies']))} · "
+                    f"{', '.join(sorted(item['locations']))} · "
+                    f"{', '.join(sorted(item['agents'])) if item['agents'] else 'fără agent asociat'} · "
+                    f"{item['record_count']} rând(uri) · {', '.join(sorted(item['source_states']))}"
+                ),
+                primary=_money(item["total"]),
+                secondary=_money(item["total"]),
+                tertiary=_money(item["total"]),
                 risk=RiskLevel.HEALTHY,
             )
-            for row in company_rows
+            for item in current
         ]
         matrix = [
             MatrixCell(
-                x=str(row["period"]),
-                y=str(row["company_name"]),
-                value=_money(row["payroll_total"]),
+                x=str(item["period"]),
+                y=f"{item['label']} · {', '.join(sorted(item['companies']))}",
+                value=_money(item["total"]),
                 risk=RiskLevel.HEALTHY,
             )
-            for row in visible_compensation_rows
-            if str(row["company_name"]) != "__ALL__" and str(row["period"]) >= shift_month(scope.period, -5)
+            for item in person_month.values()
+            if str(item["period"]) >= shift_month(scope.period, -5)
         ]
         alerts: list[InsightAlert] = []
         if not current:
             alerts.append(
                 InsightAlert(
-                    id="compensation-suppressed-or-missing",
+                    id="compensation-missing",
                     severity=AlertSeverity.WARNING,
-                    title="Date agregate indisponibile",
-                    description="Luna nu are un batch aprobat sau pragul fail-closed de minimum trei persoane nu este îndeplinit.",
+                    title="Nu există salarii în perioada selectată",
+                    description="Retail nu conține niciun rând salarial pentru perioada și filtrele selectate.",
                 )
             )
         kpis = (
@@ -2553,6 +2593,8 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                     label="Salariu mediu",
                     value=average,
                     unit=MetricUnit.CURRENCY,
+                    supporting_value=Decimal(len(current)),
+                    supporting_label="Toate persoanele vizibile",
                 ),
                 KpiMetric(
                     id="compensation.median",
@@ -2571,12 +2613,16 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             if current
             else []
         )
+        company_totals: dict[str, Decimal] = defaultdict(Decimal)
+        for row in compensation_rows:
+            if str(row["period"]) == scope.period:
+                company_totals[str(row["company_name"])] += _money(row["total_salary"])
         return self._response(
             ModuleId.COMPENSATION,
             meta,
             kpis=kpis,
             trend=trend,
-            distribution=shares([(row.label, row.primary) for row in breakdown]),
+            distribution=shares(list(company_totals.items())),
             breakdown=sorted(breakdown, key=lambda item: item.primary, reverse=True),
             matrix=matrix,
             alerts=alerts,
@@ -2608,12 +2654,13 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                 f"""
                 SELECT row.period, row.company_name, row.source_site_code,
                        row.source_location_name, row.site_code AS canonical_site_code,
+                       row.locatie,
                        row.category_code, row.amount, row.data_kind,
                        COALESCE(row.regional, 'Nealocat') AS regional,
                        COALESCE(row.asm, 'Nealocat') AS asm,
-                       row.is_unallocated
-                FROM reporting_finance_month_v1 row
-                WHERE row.period BETWEEN $1 AND $2
+                       row.is_unallocated, row.is_unmapped
+                FROM reporting_finance_month_v2 row
+                WHERE row.period_date BETWEEN to_date($1, 'YYYY-MM') AND to_date($2, 'YYYY-MM')
                   AND {filter_sql}
                 ORDER BY row.period, row.company_name, row.site_code, row.category_code
                 """,
@@ -2623,7 +2670,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
     async def _finance(self, scope: AnalyticsScope) -> ModuleAnalyticsResponse:
         rows, meta = await asyncio.gather(
             self._finance_rows(scope),
-            self._meta(ModuleId.FINANCE, scope, "reporting_finance_month_v1"),
+            self._meta(ModuleId.FINANCE, scope, "reporting_finance_month_v2"),
         )
         monthly_amounts: dict[str, dict[str, Decimal]] = defaultdict(lambda: defaultdict(Decimal))
         monthly_estimate: dict[str, bool] = defaultdict(bool)
@@ -2638,11 +2685,9 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             monthly_estimate[period] |= str(row["data_kind"]) == "estimated"
             if period == scope.period:
                 category_current[category] += amount
-            if row["is_unallocated"]:
-                continue
             key = (str(row["company_name"]), str(row["canonical_site_code"]))
             store_amounts[key][category] += amount
-            store_labels[key] = (str(row["source_location_name"]), str(row["regional"]))
+            store_labels[key] = (str(row["locatie"]), str(row["regional"]))
         current_metrics = finance_metrics(monthly_amounts.get(scope.period, {}))
         margin = _ratio(current_metrics["ebit"], current_metrics["revenue"])
         trend = []
@@ -2679,8 +2724,6 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         matrix: list[MatrixCell] = []
         by_store_month: dict[tuple[str, str], dict[str, Decimal]] = defaultdict(lambda: defaultdict(Decimal))
         for row in rows:
-            if row["is_unallocated"]:
-                continue
             period = str(row["period"])
             identifier = f"{row['company_name']}:{row['canonical_site_code']}"
             if identifier in top_stores and period >= shift_month(scope.period, -5):
@@ -2720,6 +2763,15 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                     severity=AlertSeverity.WARNING,
                     title="Perioadă estimată",
                     description="Cel puțin o componentă P&L este estimată; actualele au prioritate unde există.",
+                )
+            )
+        if scope.agent:
+            alerts.append(
+                InsightAlert(
+                    id="finance-agent-not-allocated",
+                    severity=AlertSeverity.INFO,
+                    title="P&L nu este alocat pe agent",
+                    description="Filtrul Agent nu restrânge P&L; sunt afișate toate rândurile celorlalte filtre selectate.",
                 )
             )
         if not rows:

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
@@ -9,20 +8,16 @@ from typing import Any
 from unihub_insight_api.domain import (
     AlertSeverity,
     AnalyticsScope,
-    BreakdownRow,
     InsightAlert,
     KpiMetric,
     ModuleAnalyticsResponse,
     RiskLevel,
 )
-from unihub_insight_api.repositories.postgres import _money, _percent, _ratio
+from unihub_insight_api.repositories.postgres import _money, _percent
 from unihub_insight_api.repositories.postgres_modules import (
     PostgresInsightRepository,
     append_reporting_scope,
-    finance_metrics,
 )
-
-MIN_SALARY_FOR_AVERAGE = Decimal("2000")
 
 
 @dataclass(frozen=True)
@@ -36,8 +31,7 @@ class SalaryStatistics:
 def salary_statistics(values: Sequence[Decimal]) -> SalaryStatistics:
     salaries = sorted(_money(value) for value in values)
     total = sum(salaries, Decimal(0))
-    eligible = [value for value in salaries if value >= MIN_SALARY_FOR_AVERAGE]
-    average = _money(sum(eligible, Decimal(0)) / Decimal(len(eligible))) if eligible else Decimal(0)
+    average = _money(total / Decimal(len(salaries))) if salaries else Decimal(0)
     if not salaries:
         median = Decimal(0)
     else:
@@ -49,12 +43,12 @@ def salary_statistics(values: Sequence[Decimal]) -> SalaryStatistics:
         total=_money(total),
         average=average,
         median=median,
-        eligible_average_count=len(eligible),
+        eligible_average_count=len(salaries),
     )
 
 
 class PostgresHardenedInsightRepository(PostgresInsightRepository):
-    """Final read adapter with privacy and period-consistency corrections."""
+    """Final read adapter with period-consistency corrections."""
 
     async def _workforce_coverage(self, scope: AnalyticsScope) -> tuple[int, int]:
         eligible_params: list[Any] = []
@@ -135,81 +129,3 @@ class PostgresHardenedInsightRepository(PostgresInsightRepository):
                 )
             )
         return response.model_copy(update={"kpis": kpis, "alerts": alerts[:8]})
-
-    async def _compensation(self, scope: AnalyticsScope) -> ModuleAnalyticsResponse:
-        response = await super()._compensation(scope)
-        rows = await self._compensation_rows(scope)
-        selected_company = scope.firm or "__ALL__"
-        current = next(
-            (
-                row
-                for row in rows
-                if str(row["period"]) == scope.period
-                and str(row["company_name"]).casefold() == selected_company.casefold()
-            ),
-            None,
-        )
-        if current is None:
-            return response
-        eligible_count = Decimal(int(current["eligible_person_count"]))
-        kpis = [
-            kpi.model_copy(
-                update={
-                    "supporting_value": eligible_count,
-                    "supporting_label": "Persoane în agregatul aprobat",
-                }
-            )
-            if kpi.id == "compensation.average"
-            else kpi
-            for kpi in response.kpis
-        ]
-        return response.model_copy(update={"kpis": kpis})
-
-    async def _finance(self, scope: AnalyticsScope) -> ModuleAnalyticsResponse:
-        response = await super()._finance(scope)
-        rows = await self._finance_rows(scope)
-        current_rows = [
-            row
-            for row in rows
-            if row["period"].strftime("%Y-%m") == scope.period
-            and str(row["source_site_code"]) != "__FINANCE_UNALLOCATED__"
-        ]
-        amounts_by_store: dict[tuple[str, str], dict[str, Decimal]] = defaultdict(lambda: defaultdict(Decimal))
-        labels: dict[tuple[str, str], tuple[str, str]] = {}
-        for row in current_rows:
-            key = (str(row["company_name"]), str(row["canonical_site_code"]))
-            amounts_by_store[key][str(row["category_code"])] += _money(row["amount"])
-            labels[key] = (str(row["source_location_name"]), str(row["regional"]))
-
-        breakdown: list[BreakdownRow] = []
-        for key, amounts in amounts_by_store.items():
-            metrics = finance_metrics(amounts)
-            label, regional = labels[key]
-            margin = _ratio(metrics["ebit"], metrics["revenue"])
-            breakdown.append(
-                BreakdownRow(
-                    id=f"{key[0]}:{key[1]}",
-                    label=label,
-                    context=f"{key[0]} · {regional} · {scope.period}",
-                    primary=metrics["revenue"],
-                    secondary=metrics["ebit"],
-                    tertiary=metrics["operating_costs"],
-                    progress_pct=margin,
-                    risk=(RiskLevel.RISK if metrics["ebit"] < 0 else RiskLevel.HEALTHY),
-                )
-            )
-        breakdown.sort(key=lambda item: item.secondary or Decimal(0))
-
-        alerts = [alert for alert in response.alerts if alert.id != "finance-negative"]
-        negative_count = sum(1 for item in breakdown if item.secondary is not None and item.secondary < 0)
-        if negative_count:
-            alerts.insert(
-                0,
-                InsightAlert(
-                    id="finance-negative",
-                    severity=AlertSeverity.CRITICAL,
-                    title="Magazine cu EBIT negativ",
-                    description=(f"{negative_count} magazine au EBIT negativ în luna {scope.period}."),
-                ),
-            )
-        return response.model_copy(update={"breakdown": breakdown, "alerts": alerts[:8]})

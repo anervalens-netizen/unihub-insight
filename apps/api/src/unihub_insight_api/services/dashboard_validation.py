@@ -416,7 +416,7 @@ def validate_dashboard(request: DashboardCreateRequest, user: UserContext) -> No
             errors.append(f"{prefix} references an unsupported contract version")
         if widget.filter_mode is FilterMode.IGNORE and widget.filters:
             errors.append(f"{prefix}.filters must be empty when filter_mode=ignore")
-        if widget.module in {ModuleId.FINANCE, ModuleId.PLANNING} and "agent" in widget.filters:
+        if widget.module is ModuleId.PLANNING and "agent" in widget.filters:
             errors.append(f"{prefix}.filters.agent is incompatible with {widget.module.value}")
         if widget.metric_id in VISIT_METRICS and "agent" in widget.filters:
             errors.append(f"{prefix}.filters.agent is incompatible with Team Leader visits")

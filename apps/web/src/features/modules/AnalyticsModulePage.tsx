@@ -233,8 +233,7 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
     if (search.subview !== selectedSubview.id) updateSearch({ subview: selectedSubview.id }, true);
   }, [search.subview, selectedSubview.id, updateSearch]);
   const incompatibleAgent = Boolean(
-    search.agent &&
-      (module === 'finance' || module === 'planning' || selectedSubview.id === 'visits'),
+    search.agent && (module === 'planning' || selectedSubview.id === 'visits'),
   );
   const moduleQuery = useQuery({
     ...moduleAnalyticsQuery(module, input),

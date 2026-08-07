@@ -538,13 +538,13 @@ def test_inspect_requires_and_reuses_the_same_snapshot(client: TestClient) -> No
     assert payload["total_rows"] >= len(payload["dataset"]["rows"])
 
 
-def test_compensation_rejects_differentiating_filter(client: TestClient) -> None:
+def test_compensation_accepts_differentiating_filter(client: TestClient) -> None:
     body = widget(
         "salary",
         module="compensation",
         metric_id="compensation.payroll",
         visualization="table",
-        dimensions=["time"],
+        dimensions=["person"],
     )
     body["filters"] = {"agent": "private"}
     response = client.post(
@@ -554,7 +554,7 @@ def test_compensation_rejects_differentiating_filter(client: TestClient) -> None
     )
 
     assert response.status_code == 200
-    assert response.json()["results"][0]["error"]["code"] == "invalid-query"
+    assert response.json()["results"][0]["error"] is None
 
 
 def test_cross_domain_metrics_publish_all_source_provenance(client: TestClient) -> None:

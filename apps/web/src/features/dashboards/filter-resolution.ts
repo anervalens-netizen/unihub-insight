@@ -45,7 +45,7 @@ export function resolveWidgetSearch(
       ...(global.drill ? { drill: global.drill } : {}),
     };
   }
-  if (widget.module === 'finance' || widget.module === 'planning') {
+  if (widget.module === 'planning') {
     const { agent: _agent, ...withoutAgent } = resolved;
     return withoutAgent;
   }

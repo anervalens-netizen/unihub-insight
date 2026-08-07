@@ -6,7 +6,7 @@
 
 ## Starea curentă
 
-Producția existentă rămâne operațională, iar `1.0.0-rc.3` este candidatul integrat curent. RC3 păstrează Sales Portfolio din RC2 și adaugă Campaigns v3, Concurs canonic, Folii, Grile fenced și felii Workforce bazate pe activitatea comercială observată. Nu este încă `1.0`: Compensation și Finance ascund în prezent date Retail existente prin contracte prea restrictive, Planning nu expune toate run-urile disponibile, iar pilotul vizual owner și poarta de șapte zile rămân deschise.
+Producția existentă rămâne operațională, iar `1.0.0-rc.3` este candidatul integrat curent. Peste RC3, snapshot v7 și read-model-urile v2 publică acum toate persoanele/rândurile salariale Retail și P&L `actual/estimated`, inclusiv rândurile nemapate/nealocate, fără praguri ori head-uri care ascund date. Nu este încă `1.0`: Planning nu expune toate run-urile disponibile, iar pilotul vizual owner și poarta de șapte zile rămân deschise.
 
 | Suprafață | Stare |
 | --- | --- |
@@ -17,7 +17,7 @@ Producția existentă rămâne operațională, iar `1.0.0-rc.3` este candidatul 
 | Sales, Performance, Campaigns, Workforce, Compensation, Finance, Planning | `PARȚIAL` — sub-view-uri distincte și stare server-side per felie; contractele lipsă rămân `UNAVAILABLE` |
 | Custom Dashboards, preseturi, clone, versiuni și permisiuni layout | `RC1` |
 | `ChartSpec` ECharts Canvas, URL drill, backing table și PNG sigur | `PARȚIAL` — formele fără dataset autoritativ revin la tabel |
-| Compensation și Finance live | `DEFECT DESCHIS` — trebuie să expună datele acceptate de Retail, inclusiv persoane și P&L `actual/estimated`, fără praguri/head-uri care le ascund |
+| Compensation și Finance live | `LIVE` — persoane și salarii complete; P&L `actual/estimated`, nemapat și nealocat; fără praguri/head-uri de excludere |
 | Reconciliere completă, pilot owner, șapte zile de performanță | `POARTĂ 1.0` |
 
 Ținta completă, research-ul ECharts și regulile de execuție Luna/Terra sunt în [Planul integrat](docs/PLAN_DEZVOLTARE_INTEGRAT.md), iar statusul compact este în [Roadmap](ROADMAP.md).

@@ -739,7 +739,7 @@ export function ModuleWaterfallWidget() {
       formula_reference: 'unihub-insight:metric:finance.ebit:v1',
       allowed_shapes: ['waterfall'],
       suppressible: false,
-      source_authority: 'reporting_finance_month_v1',
+      source_authority: 'reporting_finance_month_v2',
       query_contract_version: 1,
       effective_from: null,
       effective_to: null,

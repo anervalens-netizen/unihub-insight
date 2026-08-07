@@ -460,7 +460,7 @@ const recipes: Partial<Record<ModuleSubviewId, readonly Recipe[]>> = {
   people: [
     { kind: 'kpi', slot: 'primary' },
     { kind: 'trend', metricId: 'workforce.headcount', title: 'Persoane observate în timp' },
-    { kind: 'breakdown', title: 'People agregat' },
+    { kind: 'breakdown', title: 'Persoane și salarii' },
     { kind: 'alerts', title: 'Limită de interpretare' },
   ],
   movements: [
@@ -486,9 +486,9 @@ const recipes: Partial<Record<ModuleSubviewId, readonly Recipe[]>> = {
   ],
   distribution: [
     { kind: 'kpi', slot: 'primary' },
-    { kind: 'distribution', title: 'Distribuție agregată' },
-    { kind: 'histogram', title: 'Profilul agregatelor eligibile' },
-    { kind: 'breakdown', title: 'Cohorte agregate' },
+    { kind: 'distribution', title: 'Distribuție salarială' },
+    { kind: 'histogram', title: 'Profilul salariilor' },
+    { kind: 'breakdown', title: 'Persoane și valori' },
   ],
   'payroll-ratios': [
     { kind: 'kpi', slot: 'primary' },

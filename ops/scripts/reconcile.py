@@ -399,8 +399,7 @@ async def specialized_differences(
     required_domains = {"sales", "planning", "contest", "grile"}
     if not scope.agent:
         required_domains.update({"campaigns", "workforce", "finance", "visits"})
-        if not (scope.regional or scope.asm or scope.stores):
-            required_domains.add("compensation")
+        required_domains.add("compensation")
     source_statuses = {
         domain: (
             snapshot.sources[domain].status.value
@@ -438,6 +437,32 @@ async def specialized_differences(
             finance_params.append(scope.asm)
             finance_clauses.append(f"row.asm = ${len(finance_params)}")
     finance_scope_sql = " AND ".join(finance_clauses) if finance_clauses else "TRUE"
+    compensation_params: list[Any] = [scope.period]
+    compensation_clauses: list[str] = []
+    if scope.stores:
+        compensation_params.append(list(scope.stores))
+        compensation_clauses.append(
+            f"row.site_code = ANY(${len(compensation_params)}::text[])"
+        )
+    else:
+        if scope.firm:
+            compensation_params.append(scope.firm)
+            compensation_clauses.append(
+                f"LOWER(row.company_name) = LOWER(${len(compensation_params)})"
+            )
+        if scope.regional:
+            compensation_params.append(list(scope.regional))
+            compensation_clauses.append(
+                f"row.regional = ANY(${len(compensation_params)}::text[])"
+            )
+        if scope.asm:
+            compensation_params.append(scope.asm)
+            compensation_clauses.append(
+                f"row.asm = ${len(compensation_params)}"
+            )
+    compensation_scope_sql = (
+        " AND ".join(compensation_clauses) if compensation_clauses else "TRUE"
+    )
     async with pool.acquire() as connection:
         campaign_rows = await connection.fetch(
             f"""
@@ -602,8 +627,8 @@ async def specialized_differences(
             finance_rows = await connection.fetch(
                 f"""
                 SELECT row.category_code, COALESCE(SUM(row.amount), 0) AS amount
-                FROM reporting_finance_month_v1 row
-                WHERE row.period = $1 AND {finance_scope_sql}
+                FROM reporting_finance_month_v2 row
+                WHERE row.period_date = to_date($1, 'YYYY-MM') AND {finance_scope_sql}
                 GROUP BY row.category_code
                 """,
                 *finance_params,
@@ -628,15 +653,21 @@ async def specialized_differences(
                 *params,
             )
         compensation = None
-        if "compensation" in eligible_domains and not (
-            scope.regional or scope.asm or scope.stores
-        ):
-            compensation_params: list[Any] = [scope.period, scope.firm or "__ALL__"]
+        if "compensation" in eligible_domains:
             compensation = await connection.fetchrow(
-                """
-                SELECT payroll_total, average_salary_eligible, median_salary
-                FROM reporting_compensation_month_v1
-                WHERE period = $1 AND LOWER(company_name) = LOWER($2)
+                f"""
+                WITH person AS (
+                    SELECT row.person_id, SUM(row.total_salary) AS total_salary
+                    FROM reporting_compensation_person_month_v2 row
+                    WHERE row.period = $1 AND {compensation_scope_sql}
+                    GROUP BY row.person_id
+                )
+                SELECT COALESCE(SUM(total_salary), 0) AS payroll_total,
+                       COALESCE(AVG(total_salary), 0) AS average_salary,
+                       COALESCE(percentile_cont(0.5) WITHIN GROUP (
+                           ORDER BY total_salary
+                       ), 0) AS median_salary
+                FROM person
                 """,
                 *compensation_params,
             )
@@ -907,7 +938,7 @@ async def specialized_differences(
                 "compensation.average": metric_value(
                     compensation_module.kpis, "compensation.average"
                 )
-                - decimal(compensation["average_salary_eligible"]),
+                - decimal(compensation["average_salary"]),
                 "compensation.median": metric_value(
                     compensation_module.kpis, "compensation.median"
                 )

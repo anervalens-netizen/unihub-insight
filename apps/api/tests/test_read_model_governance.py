@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[3]
 def test_overview_snapshot_metadata_uses_only_the_governed_read_model() -> None:
     summary = inspect.getsource(PostgresAnalyticsRepository._fetch_summary)
 
-    assert "reporting_source_snapshot_v6" in summary
+    assert "reporting_source_snapshot_v7" in summary
     assert "import_snapshots" not in summary
 
 
@@ -23,13 +23,13 @@ def test_sensitive_modules_read_only_versioned_reporting_contracts() -> None:
     finance = inspect.getsource(PostgresInsightRepository._finance_rows)
     planning = inspect.getsource(PostgresInsightRepository._planning_rows)
 
-    assert "reporting_compensation_month_v1" in compensation
+    assert "reporting_compensation_person_month_v2" in compensation
     assert "salary_records" not in compensation
     assert "agent_salary_links" not in compensation
-    assert "full_name" not in compensation
-    assert "person_id" not in compensation
+    assert "full_name" in compensation
+    assert "person_id" in compensation
 
-    assert "reporting_finance_month_v1" in finance
+    assert "reporting_finance_month_v2" in finance
     assert "store_pnl_monthly" not in finance
     assert "store_pnl_generation_rows" not in finance
 
@@ -89,7 +89,7 @@ def test_contest_and_grile_use_only_the_published_read_models() -> None:
     assert "grile_store_current_status" not in grile
 
 
-def test_compensation_rejects_direct_differentiating_scope_and_export() -> None:
+def test_compensation_accepts_person_store_and_agent_scope_and_export() -> None:
     settings = Settings(
         environment="test",
         data_mode="demo",
@@ -113,8 +113,8 @@ def test_compensation_rejects_direct_differentiating_scope_and_export() -> None:
             headers=headers,
         )
 
-    assert module_response.status_code == 422
-    assert export_response.status_code == 422
+    assert module_response.status_code == 200
+    assert export_response.status_code == 200
 
 
 def test_bootstrap_uses_view_only_sensitive_acl_and_audit_is_append_only() -> None:
@@ -122,7 +122,10 @@ def test_bootstrap_uses_view_only_sensitive_acl_and_audit_is_append_only() -> No
     migration = (ROOT / "apps/api/migrations/003_dashboard_acl_and_query_contract.sql").read_text()
 
     assert "reporting_compensation_month_v1" in roles
+    assert "reporting_compensation_person_month_v2" in roles
+    assert "reporting_compensation_month_v2" in roles
     assert "reporting_finance_month_v1" in roles
+    assert "reporting_finance_month_v2" in roles
     assert "reporting_planning_scenario_v1" in roles
     assert "reporting_planning_scenario_v2" in roles
     assert "reporting_sales_day_v1" in roles
@@ -130,6 +133,7 @@ def test_bootstrap_uses_view_only_sensitive_acl_and_audit_is_append_only() -> No
     assert "reporting_source_snapshot_v3" in roles
     assert "reporting_source_snapshot_v4" in roles
     assert "reporting_source_snapshot_v6" in roles
+    assert "reporting_source_snapshot_v7" in roles
     assert "reporting_visit_month_v2" in roles
     assert "reporting_campaign_month_v2" in roles
     assert "reporting_campaign_month_v3" in roles

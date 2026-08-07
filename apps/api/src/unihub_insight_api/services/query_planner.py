@@ -147,7 +147,9 @@ def required_source_domains(query: WidgetQuery) -> tuple[SourceDomain, ...]:
     primary = primary_source_domain(query)
     if query.metric_id in {*VISIT_METRICS, *CONTEST_METRICS, *GRILE_METRICS}:
         return (primary,)
-    if query.module in {ModuleId.COMPENSATION, ModuleId.PLANNING}:
+    if query.module is ModuleId.COMPENSATION and query.metric_id == "compensation.sales_ratio":
+        return (primary, SourceDomain.SALES)
+    if query.module is ModuleId.PLANNING:
         return (primary, SourceDomain.SALES)
     if query.module is ModuleId.CAMPAIGNS and query.metric_id.startswith("campaigns.focus_"):
         return (primary, SourceDomain.SALES)
@@ -286,11 +288,7 @@ def _metric_for(query: WidgetQuery, user: UserContext) -> MetricDefinition:
         not query.dimensions or "time" in query.dimensions
     ):
         raise QueryValidationFailure("Distribuția/relația cere o dimensiune de entitate, nu time.")
-    if query.module is ModuleId.COMPENSATION and (
-        set(query.filters) - {"firm"} or set(query.dimensions) - {"firm", "time"}
-    ):
-        raise QueryValidationFailure("Compensation permite numai partiții agregate aprobate pe companie și timp.")
-    if query.module in {ModuleId.FINANCE, ModuleId.PLANNING} and "agent" in query.filters:
+    if query.module is ModuleId.PLANNING and "agent" in query.filters:
         raise QueryValidationFailure(f"Filtrul agent nu este permis pentru {query.module.value}.")
     if query.metric_id in VISIT_METRICS and "agent" in query.filters:
         raise QueryValidationFailure("Filtrul agent nu este permis pentru vizitele atribuite Team Leader-ului autor.")
@@ -807,7 +805,7 @@ async def execute_query_batch(
                 raise QueryValidationFailure(
                     "Scope-ul agent moștenit nu este permis pentru vizitele atribuite Team Leader-ului autor."
                 )
-            if query.module in {ModuleId.FINANCE, ModuleId.PLANNING} and query_scope.agent:
+            if query.module is ModuleId.PLANNING and query_scope.agent:
                 raise QueryValidationFailure(f"Scope-ul agent nu este permis pentru {query.module.value}.")
             unavailable_domains = [
                 domain.value

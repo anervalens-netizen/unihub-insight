@@ -240,13 +240,13 @@ export const moduleSubviewConfig: Record<ModuleId, readonly ModuleSubview[]> = {
     {
       id: 'overview',
       label: 'Overview',
-      description: 'Agregate aprobate și praguri de suprimare.',
+      description: 'Cost total și fiecare persoană din datele Retail.',
       sourceDomain: 'compensation',
     },
     {
       id: 'distribution',
       label: 'Distribution',
-      description: 'Distribuție agregată, fără identificarea persoanelor.',
+      description: 'Distribuție completă, cu detaliu pe persoană.',
       sourceDomain: 'compensation',
     },
     {
