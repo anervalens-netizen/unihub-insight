@@ -187,7 +187,7 @@ async def control_totals(
 
         target_params = list(params)
         if scope.agent:
-            target_params.append(scope.agent)
+            target_params.append(list(scope.agent))
             agent_placeholder = f"${len(target_params)}"
             target = await connection.fetchval(
                 f"""
@@ -213,7 +213,10 @@ async def control_totals(
                       to_jsonb(target)->>'agent_code',
                       to_jsonb(target)->>'agent_name',
                       ''
-                  ))) = LOWER(BTRIM({agent_placeholder}))
+                  ))) IN (
+                      SELECT LOWER(BTRIM(selected.value))
+                      FROM UNNEST({agent_placeholder}::text[]) AS selected(value)
+                  )
                 """,
                 *target_params,
             )

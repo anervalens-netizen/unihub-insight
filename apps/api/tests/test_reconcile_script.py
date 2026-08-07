@@ -158,6 +158,14 @@ def test_promo_control_excludes_the_dedicated_folii_variant() -> None:
     assert "folii_control = await connection.fetchrow" in source
 
 
+def test_agent_target_control_binds_the_scope_as_a_text_array() -> None:
+    reconcile = load_reconcile_module()
+    source = inspect.getsource(reconcile.control_totals)
+
+    assert "target_params.append(list(scope.agent))" in source
+    assert "FROM UNNEST({agent_placeholder}::text[])" in source
+
+
 def test_authoritative_acceptance_refuses_partial_or_unavailable_sources() -> None:
     reconcile = load_reconcile_module()
     result = reconcile.ReconciliationResult(
