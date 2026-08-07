@@ -690,7 +690,7 @@ def test_production_load_fixture_stays_valid_against_the_metric_catalog(client: 
     assert all(error["code"] == "unavailable" for error in errors)
 
 
-def test_dashboard_ceiling_applies_to_widget_filter_overrides(client: TestClient) -> None:
+def test_legacy_dashboard_ceiling_does_not_restrict_widget_data(client: TestClient) -> None:
     dashboard = client.post(
         "/api/v1/dashboards",
         json={
@@ -719,5 +719,4 @@ def test_dashboard_ceiling_applies_to_widget_filter_overrides(client: TestClient
         json={"dashboard_id": dashboard["id"], "widgets": [query]},
     )
 
-    assert response.status_code == 403
-    assert response.json()["detail"] == "Widget scope exceeds dashboard ceiling."
+    assert response.status_code == 200

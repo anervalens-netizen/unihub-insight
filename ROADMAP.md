@@ -75,7 +75,7 @@ Dependențele se implementează vertical: o suprafață ajunge `LIVE` numai cân
 
 | Restricție actuală | Efect | Corecție obligatorie |
 | --- | --- | --- |
-| grupuri/capabilități HR și P&L separate | 403 și module ascunse chiar pentru un utilizator al aplicației | un singur allowlist owner + director general; ambii primesc toate capabilitățile legacy |
+| grupuri/capabilități HR, P&L și management separate | 403 și module ascunse chiar pentru un utilizator al aplicației | rezolvat: orice subiect admis de Authentik folosește `insight:analytics` pentru toate modulele; capabilitățile legacy nu mai restrâng datele |
 | Compensation v1 numai agregat, grain firmă/timp | fără persoane, magazine, ierarhie și componente în UI/inspect/export | read-model person-month v2 complet și aceleași dimensiuni în API/catalog/UI/export |
 | `HAVING COUNT >= 3` și prag suplimentar Insight | ascunde cohorte și rânduri reale | eliminare totală a suprimării; orice medie alternativă rămâne metrică etichetată |
 | salary batch `applied` + approval artifact + `person_id` obligatoriu | toate salariile legacy 2026 dispar, deși Retail le afișează | includerea tuturor rândurilor canonice Retail, cu provenance/mapping warnings vizibile |

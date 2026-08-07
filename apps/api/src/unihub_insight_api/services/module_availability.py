@@ -27,10 +27,8 @@ MODULE_SOURCE_DOMAINS: dict[ModuleId, tuple[SourceDomain, ...]] = {
     ModuleId.PLANNING: (SourceDomain.PLANNING, SourceDomain.SALES),
 }
 
-# These modules compose independent, governed sub-views.  The route must let
-# the repository expose each slice's own availability when at least one source
-# is eligible.  Sensitive modules deliberately remain outside this set: their
-# complete source contracts fail closed before any read is attempted.
+# These modules compose independent, governed sub-views. The route lets the
+# repository expose each slice's own availability when at least one source is eligible.
 MIXED_SLICE_MODULES = frozenset({ModuleId.CAMPAIGNS, ModuleId.WORKFORCE})
 
 MODULE_PRESENTATION: dict[ModuleId, tuple[str, str, Capability]] = {
@@ -48,22 +46,22 @@ MODULE_PRESENTATION: dict[ModuleId, tuple[str, str, Capability]] = {
     ModuleId.WORKFORCE: (
         "Workforce",
         "Activitate comercială observată, productivitate și Grile; nu reprezintă registru oficial de personal.",
-        Capability.MANAGEMENT,
+        Capability.ANALYTICS,
     ),
     ModuleId.COMPENSATION: (
         "Compensation",
         "Cost salarial, distribuție și relația cu performanța.",
-        Capability.HR,
+        Capability.ANALYTICS,
     ),
     ModuleId.FINANCE: (
         "Finance & P&L",
         "Venit, cost, profit, marjă și reconciliere actual/estimat.",
-        Capability.PNL,
+        Capability.ANALYTICS,
     ),
     ModuleId.PLANNING: (
         "Planning",
         "Forecast, target, acuratețe și scenarii comerciale.",
-        Capability.MANAGEMENT,
+        Capability.ANALYTICS,
     ),
 }
 

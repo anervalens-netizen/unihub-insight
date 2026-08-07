@@ -40,7 +40,7 @@ def test_rejects_duplicate_widget_ids(client: TestClient) -> None:
     assert response.status_code == 422
 
 
-def test_manager_cannot_save_finance_widget() -> None:
+def test_authenticated_manager_can_save_finance_widget() -> None:
     settings = Settings(environment="test", data_mode="demo", auth_mode="proxy", trusted_proxy_secret="secret")
     headers = {
         "X-UniHub-Proxy-Secret": "secret",
@@ -50,7 +50,7 @@ def test_manager_cannot_save_finance_widget() -> None:
     widget = {**BASE_WIDGET, "module": "finance", "metric_id": "finance.revenue"}
     with TestClient(create_app(settings)) as client:
         response = client.post("/api/v1/dashboards", json=payload(widget), headers=headers)
-    assert response.status_code == 403
+    assert response.status_code == 201
 
 
 def test_ignore_mode_cannot_hide_embedded_filters(client: TestClient) -> None:

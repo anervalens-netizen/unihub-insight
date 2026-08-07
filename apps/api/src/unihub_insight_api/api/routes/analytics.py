@@ -27,16 +27,6 @@ from unihub_insight_api.services.module_window import allowed_module_window, app
 
 router = APIRouter(prefix="/api/v1", tags=["analytics"])
 
-MODULE_CAPABILITIES: dict[ModuleId, Capability] = {
-    ModuleId.SALES: Capability.ANALYTICS,
-    ModuleId.PERFORMANCE: Capability.ANALYTICS,
-    ModuleId.CAMPAIGNS: Capability.ANALYTICS,
-    ModuleId.WORKFORCE: Capability.MANAGEMENT,
-    ModuleId.COMPENSATION: Capability.HR,
-    ModuleId.FINANCE: Capability.PNL,
-    ModuleId.PLANNING: Capability.MANAGEMENT,
-}
-
 
 @router.get("/filters/options", response_model=FilterOptionsResponse)
 async def filter_options(
@@ -65,12 +55,6 @@ async def module_analytics(
     user: Annotated[UserContext, Depends(require_capability(Capability.ANALYTICS))],
 ) -> ModuleAnalyticsResponse:
     window = allowed_module_window(module, window)
-    required = MODULE_CAPABILITIES[module]
-    if required not in user.capabilities:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Capability {required.value} is required.",
-        )
     if module is ModuleId.PLANNING and scope.agent:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,

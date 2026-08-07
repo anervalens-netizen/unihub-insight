@@ -24,10 +24,15 @@ export const navigationItems = [
   { to: '/sales', label: 'Sales', icon: ChartNoAxesCombined, capability: 'insight:analytics' },
   { to: '/performance', label: 'Performance', icon: Gauge, capability: 'insight:analytics' },
   { to: '/campaigns', label: 'Campaigns', icon: Megaphone, capability: 'insight:analytics' },
-  { to: '/workforce', label: 'Workforce', icon: UsersRound, capability: 'insight:management' },
-  { to: '/compensation', label: 'Compensation', icon: WalletCards, capability: 'insight:hr' },
-  { to: '/finance', label: 'Finance', icon: BadgeDollarSign, capability: 'insight:pnl' },
-  { to: '/planning', label: 'Planning', icon: Sparkles, capability: 'insight:management' },
+  { to: '/workforce', label: 'Workforce', icon: UsersRound, capability: 'insight:analytics' },
+  {
+    to: '/compensation',
+    label: 'Compensation',
+    icon: WalletCards,
+    capability: 'insight:analytics',
+  },
+  { to: '/finance', label: 'Finance', icon: BadgeDollarSign, capability: 'insight:analytics' },
+  { to: '/planning', label: 'Planning', icon: Sparkles, capability: 'insight:analytics' },
   { to: '/dashboards', label: 'Custom', icon: SlidersHorizontal, capability: 'insight:analytics' },
 ] as const satisfies ReadonlyArray<{
   to:

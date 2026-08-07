@@ -114,7 +114,7 @@ PROFILES: dict[ModuleId, ModuleProfile] = {
     ModuleId.WORKFORCE: ModuleProfile(
         title="Workforce",
         description="Headcount, acoperire, stabilitate și productivitate.",
-        capability=Capability.MANAGEMENT,
+        capability=Capability.ANALYTICS,
         axes=(
             _axis("primary", "Headcount activ", MetricUnit.INTEGER),
             _axis("secondary", "Productivitate / agent", MetricUnit.CURRENCY),
@@ -135,7 +135,7 @@ PROFILES: dict[ModuleId, ModuleProfile] = {
     ModuleId.COMPENSATION: ModuleProfile(
         title="Compensation",
         description="Cost salarial, distribuție și relația cu performanța.",
-        capability=Capability.HR,
+        capability=Capability.ANALYTICS,
         axes=(
             _axis("primary", "Cost salarial", MetricUnit.CURRENCY),
             _axis("secondary", "Salariu mediu", MetricUnit.CURRENCY),
@@ -157,7 +157,7 @@ PROFILES: dict[ModuleId, ModuleProfile] = {
     ModuleId.FINANCE: ModuleProfile(
         title="Finance & P&L",
         description="Venit, cost, profit, marjă și reconciliere.",
-        capability=Capability.PNL,
+        capability=Capability.ANALYTICS,
         axes=(
             _axis("primary", "Venit net", MetricUnit.CURRENCY),
             _axis("secondary", "EBIT", MetricUnit.CURRENCY),
@@ -177,7 +177,7 @@ PROFILES: dict[ModuleId, ModuleProfile] = {
     ModuleId.PLANNING: ModuleProfile(
         title="Planning",
         description="Forecast, target, acuratețe și scenarii versionabile.",
-        capability=Capability.MANAGEMENT,
+        capability=Capability.ANALYTICS,
         axes=(
             _axis("primary", "Forecast", MetricUnit.CURRENCY),
             _axis("secondary", "Actual / target", MetricUnit.CURRENCY),

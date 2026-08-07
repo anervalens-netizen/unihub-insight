@@ -61,7 +61,7 @@ export const dashboardTemplates: DashboardTemplate[] = [
     name: 'Director comercial',
     description: 'Vânzări, target, performanță, forecast și risc într-un singur cockpit.',
     visibility: 'private',
-    requiredCapabilities: ['insight:analytics', 'insight:management'],
+    requiredCapabilities: ['insight:analytics'],
     widgets: [
       widget('director-sales', 'sales', 'Vânzări', 'sales.total', 'kpi', 0, 0, 6, 5),
       widget(
@@ -150,7 +150,7 @@ export const dashboardTemplates: DashboardTemplate[] = [
     name: 'Finance',
     description: 'Venit, EBIT, costuri și trend de profitabilitate.',
     visibility: 'private',
-    requiredCapabilities: ['insight:pnl'],
+    requiredCapabilities: ['insight:analytics'],
     widgets: [
       widget('fin-revenue', 'finance', 'Venit net', 'finance.revenue', 'kpi', 0, 0, 8, 5),
       widget('fin-ebit', 'finance', 'EBIT', 'finance.ebit', 'kpi', 8, 0, 8, 5),
@@ -174,7 +174,7 @@ export const dashboardTemplates: DashboardTemplate[] = [
     name: 'Magazine în risc',
     description: 'Performanță, volatilitate, personal și semnale care cer intervenție.',
     visibility: 'private',
-    requiredCapabilities: ['insight:management'],
+    requiredCapabilities: ['insight:analytics'],
     widgets: [
       widget(
         'risk-performance',

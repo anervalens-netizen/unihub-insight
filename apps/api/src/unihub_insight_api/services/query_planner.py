@@ -160,10 +160,10 @@ MODULE_CAPABILITIES: dict[ModuleId, Capability] = {
     ModuleId.SALES: Capability.ANALYTICS,
     ModuleId.PERFORMANCE: Capability.ANALYTICS,
     ModuleId.CAMPAIGNS: Capability.ANALYTICS,
-    ModuleId.WORKFORCE: Capability.MANAGEMENT,
-    ModuleId.COMPENSATION: Capability.HR,
-    ModuleId.FINANCE: Capability.PNL,
-    ModuleId.PLANNING: Capability.MANAGEMENT,
+    ModuleId.WORKFORCE: Capability.ANALYTICS,
+    ModuleId.COMPENSATION: Capability.ANALYTICS,
+    ModuleId.FINANCE: Capability.ANALYTICS,
+    ModuleId.PLANNING: Capability.ANALYTICS,
 }
 SCALAR_ONLY_METRICS = frozenset(
     {

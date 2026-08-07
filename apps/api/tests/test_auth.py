@@ -107,6 +107,42 @@ def test_proxy_identity_parses_authentik_pipe_separated_groups() -> None:
     }
 
 
+def test_allowlisted_analytics_user_can_read_and_export_every_module() -> None:
+    settings = Settings(
+        environment="test",
+        data_mode="demo",
+        auth_mode="proxy",
+        trusted_proxy_secret="test-secret",
+        analytics_groups="unihub-insight-access",
+        management_groups="unihub-manager",
+        hr_groups="unihub-hr",
+        pnl_groups="unihub-pnl",
+        admin_groups="unihub-admin",
+    )
+    headers = {
+        "X-UniHub-Proxy-Secret": "test-secret",
+        "X-Authentik-Uid": "allowlisted-user",
+        "X-Authentik-Groups": "unihub-insight-access",
+    }
+    with TestClient(create_app(settings)) as proxy_client:
+        for module in ("sales", "performance", "campaigns", "workforce", "compensation", "finance", "planning"):
+            assert (
+                proxy_client.get(
+                    f"/api/v1/modules/{module}?period=2026-08",
+                    headers=headers,
+                ).status_code
+                == 200
+            )
+        for module in ("compensation", "finance"):
+            assert (
+                proxy_client.get(
+                    f"/api/v1/exports/modules/{module}.xlsx?period=2026-08",
+                    headers=headers,
+                ).status_code
+                == 200
+            )
+
+
 def test_admin_group_does_not_bypass_hr_or_pnl_group_configuration() -> None:
     settings = Settings(
         environment="test",

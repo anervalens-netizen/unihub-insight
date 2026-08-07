@@ -735,7 +735,7 @@ export function ModuleWaterfallWidget() {
       comparison_policy: 'none',
       allowed_comparisons: [],
       missing_policy: 'null',
-      required_capability: 'insight:pnl',
+      required_capability: 'insight:analytics',
       formula_reference: 'unihub-insight:metric:finance.ebit:v1',
       allowed_shapes: ['waterfall'],
       suppressible: false,

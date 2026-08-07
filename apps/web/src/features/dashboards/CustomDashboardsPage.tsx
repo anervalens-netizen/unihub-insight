@@ -40,10 +40,10 @@ const moduleCapability: Record<ModuleId, Capability> = {
   sales: 'insight:analytics',
   performance: 'insight:analytics',
   campaigns: 'insight:analytics',
-  workforce: 'insight:management',
-  compensation: 'insight:hr',
-  finance: 'insight:pnl',
-  planning: 'insight:management',
+  workforce: 'insight:analytics',
+  compensation: 'insight:analytics',
+  finance: 'insight:analytics',
+  planning: 'insight:analytics',
 };
 
 function cloneDocument(document: DashboardDocument): DashboardDocument {

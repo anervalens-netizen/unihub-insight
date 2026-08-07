@@ -82,7 +82,7 @@ export function DashboardEditor({
           <div className="dashboard-section-heading">
             <div>
               <span>ACL țintit</span>
-              <h3 id="dashboard-sharing-title">Partajare și scope ceiling</h3>
+              <h3 id="dashboard-sharing-title">Partajare dashboard</h3>
             </div>
             <UserRound size={17} />
           </div>
@@ -114,19 +114,6 @@ export function DashboardEditor({
                     </option>
                   ))}
               </select>
-            </label>
-            <label>
-              <span>Allow agent în scope</span>
-              <input
-                type="checkbox"
-                checked={draft.scope_ceiling.allow_agent}
-                onChange={(event) =>
-                  onDraftChange({
-                    ...draft,
-                    scope_ceiling: { ...draft.scope_ceiling, allow_agent: event.target.checked },
-                  })
-                }
-              />
             </label>
           </div>
           <div className="dashboard-acl-list">
@@ -169,34 +156,10 @@ export function DashboardEditor({
               </div>
             ))}
           </div>
-          <div className="dashboard-ceiling-fields">
-            {(['firms', 'regionals', 'asms', 'stores'] as const).map((key) => (
-              <label key={key}>
-                <span>{key} ceiling</span>
-                <input
-                  value={draft.scope_ceiling[key].join(',')}
-                  placeholder="Gol = fără restricție"
-                  onChange={(event) =>
-                    onDraftChange({
-                      ...draft,
-                      scope_ceiling: {
-                        ...draft.scope_ceiling,
-                        [key]: event.target.value
-                          .split(',')
-                          .map((value) => value.trim())
-                          .filter(Boolean),
-                      },
-                    })
-                  }
-                />
-              </label>
-            ))}
-          </div>
         </section>
       ) : (
         <div className="dashboard-readonly-note">
-          Permisiunile și scope ceiling sunt păstrate. Doar owner/admin poate reshare sau șterge
-          dashboardul.
+          Permisiunile sunt păstrate. Doar owner/admin poate redistribui sau șterge dashboardul.
         </div>
       )}
 

@@ -26,6 +26,8 @@ The analytics reader receives only enumerated, versioned reporting/read-model ta
 
 The target production allowlist contains exactly two roles: owner and general director. Their exact Authentik subjects are verified during deployment, and both receive the same complete data access. Adding any other identity remains an explicit security change.
 
+Once Authentik admits either allowlisted subject, `insight:analytics` is the only data-read capability used by module routes, query planning, custom dashboards and exports. Legacy `management`, `hr` and `pnl` claims may remain in the identity payload for compatibility, but they do not hide modules or rows.
+
 Allowlist mapping and required negative tests live in [ops/authentik/README.md](../ops/authentik/README.md). Production must verify no-session redirect, forged-header 401, non-allowlisted identity 403, complete module visibility for both authorized users and public 404 responses for `/livez`, `/readyz`, `/metrics`, `/docs`, `/redoc` and `/openapi.json`.
 
 Dashboard sharing does not replace application authorization. `dashboard_acl` may control read/edit/admin over a saved layout, but it must not reduce the business-data visibility of an allowlisted user. Revocation is server-side and versioned. Production acceptance verifies the two authorized subjects plus one non-allowlisted negative identity.

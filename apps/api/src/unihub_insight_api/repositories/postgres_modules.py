@@ -96,7 +96,7 @@ MODULE_DEFINITIONS: dict[ModuleId, tuple[str, str, Capability, tuple[ValueAxis, 
     ModuleId.WORKFORCE: (
         "Workforce",
         "Activitate comercială observată, productivitate și Grile; nu reprezintă registru oficial de personal.",
-        Capability.MANAGEMENT,
+        Capability.ANALYTICS,
         (
             ValueAxis(key="primary", label="Headcount", unit=MetricUnit.INTEGER),
             ValueAxis(key="secondary", label="Productivitate", unit=MetricUnit.CURRENCY),
@@ -115,7 +115,7 @@ MODULE_DEFINITIONS: dict[ModuleId, tuple[str, str, Capability, tuple[ValueAxis, 
     ModuleId.COMPENSATION: (
         "Compensation",
         "Cost salarial, distribuție și relația cu performanța.",
-        Capability.HR,
+        Capability.ANALYTICS,
         (
             ValueAxis(key="primary", label="Cost salarial", unit=MetricUnit.CURRENCY),
             ValueAxis(key="secondary", label="Salariu mediu", unit=MetricUnit.CURRENCY),
@@ -135,7 +135,7 @@ MODULE_DEFINITIONS: dict[ModuleId, tuple[str, str, Capability, tuple[ValueAxis, 
     ModuleId.FINANCE: (
         "Finance & P&L",
         "Venit, cost, profit, marjă și reconciliere actual/estimat.",
-        Capability.PNL,
+        Capability.ANALYTICS,
         (
             ValueAxis(key="primary", label="Venit net", unit=MetricUnit.CURRENCY),
             ValueAxis(key="secondary", label="EBIT", unit=MetricUnit.CURRENCY),
@@ -153,7 +153,7 @@ MODULE_DEFINITIONS: dict[ModuleId, tuple[str, str, Capability, tuple[ValueAxis, 
     ModuleId.PLANNING: (
         "Planning",
         "Forecast, target, acuratețe și scenarii comerciale.",
-        Capability.MANAGEMENT,
+        Capability.ANALYTICS,
         (
             ValueAxis(key="primary", label="Forecast", unit=MetricUnit.CURRENCY),
             ValueAxis(key="secondary", label="Actual / target", unit=MetricUnit.CURRENCY),

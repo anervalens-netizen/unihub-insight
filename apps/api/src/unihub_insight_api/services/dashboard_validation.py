@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from unihub_insight_api.domain import (
-    AnalyticsScope,
     Capability,
     ChartKind,
     DashboardCreateRequest,
@@ -42,10 +41,10 @@ MODULE_CAPABILITIES: dict[ModuleId, Capability] = {
     ModuleId.SALES: Capability.ANALYTICS,
     ModuleId.PERFORMANCE: Capability.ANALYTICS,
     ModuleId.CAMPAIGNS: Capability.ANALYTICS,
-    ModuleId.WORKFORCE: Capability.MANAGEMENT,
-    ModuleId.COMPENSATION: Capability.HR,
-    ModuleId.FINANCE: Capability.PNL,
-    ModuleId.PLANNING: Capability.MANAGEMENT,
+    ModuleId.WORKFORCE: Capability.ANALYTICS,
+    ModuleId.COMPENSATION: Capability.ANALYTICS,
+    ModuleId.FINANCE: Capability.ANALYTICS,
+    ModuleId.PLANNING: Capability.ANALYTICS,
 }
 
 MODULE_METRICS: dict[ModuleId, frozenset[str]] = {
@@ -267,19 +266,6 @@ def user_can_admin(document: DashboardDocument, user: UserContext) -> bool:
         return True
     permission = next((entry.permission for entry in document.acl if entry.subject == user.subject), None)
     return permission is not None and permission.value == "admin"
-
-
-def dashboard_allows_scope(document: DashboardDocument, scope: AnalyticsScope) -> bool:
-    ceiling = document.scope_ceiling
-    if ceiling.firms and scope.firm not in ceiling.firms:
-        return False
-    if ceiling.regionals and (not scope.regional or not set(scope.regional).issubset(ceiling.regionals)):
-        return False
-    if ceiling.asms and scope.asm not in ceiling.asms:
-        return False
-    if ceiling.stores and (not scope.stores or not set(scope.stores).issubset(ceiling.stores)):
-        return False
-    return ceiling.allow_agent or not scope.agent
 
 
 def validate_batch_for_dashboard(document: DashboardDocument, request: QueryBatchRequest) -> None:

@@ -26,18 +26,13 @@ from unihub_insight_api.domain import (
     QueryBatchResponse,
     QueryErrorCode,
 )
-from unihub_insight_api.services.dashboard_validation import (
-    dashboard_allows_scope,
-    user_can_read,
-    validate_batch_for_dashboard,
-)
+from unihub_insight_api.services.dashboard_validation import user_can_read, validate_batch_for_dashboard
 from unihub_insight_api.services.excel_export import query_workbook
 from unihub_insight_api.services.metric_catalog import METRIC_CATALOG
 from unihub_insight_api.services.query_planner import (
     SnapshotConflictError,
     dataset_page,
     execute_query_batch,
-    resolve_query_scope,
 )
 
 router = APIRouter(prefix="/api/v1/query", tags=["query"])
@@ -83,10 +78,6 @@ async def _authorize_dashboard(
     document = await store.get(request.dashboard_id)
     if document is None or not user_can_read(document, user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dashboard not found.")
-    if not dashboard_allows_scope(document, scope):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Scope exceeds dashboard ceiling.")
-    if any(not dashboard_allows_scope(document, resolve_query_scope(scope, query)) for query in request.widgets):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Widget scope exceeds dashboard ceiling.")
     try:
         validate_batch_for_dashboard(document, request)
     except ValueError as exc:
