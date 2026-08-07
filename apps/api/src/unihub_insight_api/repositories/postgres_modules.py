@@ -380,6 +380,15 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         return SourceStatus.OFFICIAL
 
     @classmethod
+    def _govern_slices(
+        cls,
+        slices: dict[str, ModuleAnalyticsSlice],
+        sources: dict[SourceDomain, SourceMetadata],
+    ) -> dict[str, ModuleAnalyticsSlice]:
+        status = cls._slice_status(sources)
+        return {key: slice_.model_copy(update={"status": status, "sources": sources}) for key, slice_ in slices.items()}
+
+    @classmethod
     def _unavailable_slice(
         cls,
         *,
@@ -862,6 +871,11 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             self._sales_calendar(scope),
             self._meta(ModuleId.SALES, scope, "reporting_agent_month/reporting_category_month"),
             self._sales_portfolio(scope),
+        )
+        sales_source = meta.sources.get(SourceDomain.SALES)
+        portfolio = self._govern_slices(
+            portfolio,
+            {SourceDomain.SALES: sales_source} if sales_source is not None else {},
         )
         current = [row for row in history if str(row["import_month"]) == scope.period]
         total_sales = sum((_money(row["total_sales"]) for row in current), Decimal(0))

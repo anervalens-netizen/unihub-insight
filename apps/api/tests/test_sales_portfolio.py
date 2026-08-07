@@ -4,7 +4,15 @@ from types import SimpleNamespace
 
 import pytest
 
-from unihub_insight_api.domain import Capability, ChartKind, UserContext, WidgetQuery
+from unihub_insight_api.domain import (
+    Capability,
+    ChartKind,
+    SourceDomain,
+    SourceMetadata,
+    SourceStatus,
+    UserContext,
+    WidgetQuery,
+)
 from unihub_insight_api.repositories.postgres_modules import PostgresInsightRepository
 from unihub_insight_api.services.metric_catalog import METRIC_CATALOG
 from unihub_insight_api.services.query_planner import QueryValidationFailure, _dataset, _metric_for
@@ -63,6 +71,30 @@ def test_category_and_subcategory_slices_conserve_network_sales_and_quantity() -
         assert values["sales.portfolio_net_quantity"] == NETWORK_QUANTITY
         assert slice_.entity_dimension == dimension
         assert slice_.distribution_dimension == dimension
+
+
+def test_portfolio_slices_inherit_the_governed_sales_source_state() -> None:
+    slice_ = PostgresInsightRepository._portfolio_slice(
+        dimension="category",
+        rows=[portfolio_row("audio", "Audio", sales=NETWORK_SALES, quantity=NETWORK_QUANTITY)],
+        item_detail=False,
+    )
+    source = SourceMetadata(
+        domain=SourceDomain.SALES,
+        source="import_snapshots",
+        period="2026-06",
+        authority="legacy_completed_snapshot",
+        status=SourceStatus.PARTIAL,
+    )
+
+    governed = PostgresInsightRepository._govern_slices(
+        {"category": slice_},
+        {SourceDomain.SALES: source},
+    )["category"]
+
+    assert governed.status is SourceStatus.PARTIAL
+    assert governed.sources == {SourceDomain.SALES: source}
+    assert metric_values(governed)["sales.portfolio_sales"] == NETWORK_SALES
 
 
 def test_product_slice_preserves_signed_returns_and_only_exposes_sku_receipt_incidence() -> None:
