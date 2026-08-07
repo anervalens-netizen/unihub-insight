@@ -3,7 +3,7 @@ title: Plan integrat de dezvoltare UniHub Insight
 status: active
 baseline_date: 2026-08-05
 baseline_sha: 9fecf15b938954bb93567fa4b51e4b8f73cda76e
-retail_contract_sha: 0aef1b01e103b864455e537e71df786109f14d53
+retail_contract_sha: e9b9f81623beacc241ea6aeac0ddd0f85a916c51
 candidate: 1.0.0-rc.3
 ---
 
