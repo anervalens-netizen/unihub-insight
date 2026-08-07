@@ -443,6 +443,10 @@ async def specialized_differences(
                 FROM reporting_campaign_month_v3 row
                 WHERE row.period = $1
                   AND row.status <> 'unavailable'
+                  AND NOT (
+                      row.mechanism = 'promo'
+                      AND row.mechanism_variant = 'same_model_screen_camera'
+                  )
                   AND {scope_sql}
             )
             SELECT row.mechanism,

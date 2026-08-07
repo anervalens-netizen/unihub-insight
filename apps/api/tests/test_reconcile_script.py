@@ -149,6 +149,15 @@ def test_focus_product_control_counts_result_items_not_largest_store_or_campaign
     assert "decimal(focus_active_products)" in source
 
 
+def test_promo_control_excludes_the_dedicated_folii_variant() -> None:
+    reconcile = load_reconcile_module()
+    source = inspect.getsource(reconcile.specialized_differences)
+
+    assert "row.mechanism_variant = 'same_model_screen_camera'" in source
+    assert "AND NOT (" in source
+    assert "folii_control = await connection.fetchrow" in source
+
+
 def test_authoritative_acceptance_refuses_partial_or_unavailable_sources() -> None:
     reconcile = load_reconcile_module()
     result = reconcile.ReconciliationResult(
