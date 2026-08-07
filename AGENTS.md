@@ -30,7 +30,7 @@ For an explicitly requested implementation task, execute end-to-end: inspect rel
 - `Cartele` and distribution/TR locations stay outside normal Retail KPI calculations unless a dedicated metric says otherwise.
 - Quantities are net; returns reduce volume.
 - Large scans need a measured reason and a bounded deadline.
-- Dashboard widgets in one render use one eligible analytical snapshot; metadata cutoff/finality is per source domain.
+- Dashboard widgets in one render use one coherent analytical snapshot; promoted authority is preferred without hiding canonical Retail rows, and metadata cutoff/finality/provenance is per source domain.
 - Compensation uses a versioned, read-only Retail contract that preserves person identity, salary values/components and all useful business dimensions in UI, inspect and export. It must not apply cohort suppression, identity masking or legacy-batch eligibility rules that hide rows already accepted by Retail.
 
 ## Architecture rules
