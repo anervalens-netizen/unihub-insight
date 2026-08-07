@@ -129,7 +129,7 @@ def test_native_module_does_not_fetch_an_unavailable_source(client: TestClient) 
     assert payload["alerts"][0]["id"] == "finance-source-unavailable"
 
 
-def test_campaigns_declares_sales_denominator_and_does_not_fetch_without_it(
+def test_campaigns_routes_to_eligible_contest_when_native_campaign_source_is_unavailable(
     client: TestClient,
 ) -> None:
     repository = client.app.state.analytics_repository
@@ -137,10 +137,10 @@ def test_campaigns_declares_sales_denominator_and_does_not_fetch_without_it(
     original_get_module = repository.get_module
     campaign_fetches = 0
 
-    async def unavailable_sales(scope):
+    async def unavailable_campaigns(scope):
         snapshot = await original_resolve(scope)
-        sales = snapshot.sources["sales"].model_copy(update={"status": SourceStatus.UNAVAILABLE})
-        return snapshot.model_copy(update={"sources": {**snapshot.sources, "sales": sales}})
+        campaigns = snapshot.sources["campaigns"].model_copy(update={"status": SourceStatus.UNAVAILABLE})
+        return snapshot.model_copy(update={"sources": {**snapshot.sources, "campaigns": campaigns}})
 
     async def counted_get_module(module, scope):
         nonlocal campaign_fetches
@@ -148,13 +148,42 @@ def test_campaigns_declares_sales_denominator_and_does_not_fetch_without_it(
             campaign_fetches += 1
         return await original_get_module(module, scope)
 
-    repository.resolve_snapshot = unavailable_sales
+    repository.resolve_snapshot = unavailable_campaigns
     repository.get_module = counted_get_module
     response = client.get("/api/v1/modules/campaigns", params={"period": "2026-08"})
 
     assert response.status_code == 200
-    assert campaign_fetches == 0
+    assert campaign_fetches == 1
     payload = response.json()
-    assert payload["kpis"] == []
-    assert payload["meta"]["sources"]["sales"]["status"] == "unavailable"
-    assert payload["alerts"][0]["id"] == "campaigns-source-unavailable"
+    assert payload["kpis"]
+    assert all(alert["id"] != "campaigns-source-unavailable" for alert in payload["alerts"])
+
+
+def test_workforce_routes_to_eligible_visits_or_grile_when_activity_source_is_unavailable(
+    client: TestClient,
+) -> None:
+    repository = client.app.state.analytics_repository
+    original_resolve = repository.resolve_snapshot
+    original_get_module = repository.get_module
+    workforce_fetches = 0
+
+    async def unavailable_workforce(scope):
+        snapshot = await original_resolve(scope)
+        workforce = snapshot.sources["workforce"].model_copy(update={"status": SourceStatus.UNAVAILABLE})
+        return snapshot.model_copy(update={"sources": {**snapshot.sources, "workforce": workforce}})
+
+    async def counted_get_module(module, scope):
+        nonlocal workforce_fetches
+        if module.value == "workforce":
+            workforce_fetches += 1
+        return await original_get_module(module, scope)
+
+    repository.resolve_snapshot = unavailable_workforce
+    repository.get_module = counted_get_module
+    response = client.get("/api/v1/modules/workforce", params={"period": "2026-08"})
+
+    assert response.status_code == 200
+    assert workforce_fetches == 1
+    payload = response.json()
+    assert payload["kpis"]
+    assert all(alert["id"] != "workforce-source-unavailable" for alert in payload["alerts"])

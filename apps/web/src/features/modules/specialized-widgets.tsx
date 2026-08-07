@@ -10,7 +10,7 @@ import {
 } from '../../components/charts/distribution';
 import { EChart, type EChartEvent } from '../../components/charts/EChart';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { formatCurrency, formatPercent } from '../../lib/format';
+import { formatCurrency, formatInteger, formatPercent } from '../../lib/format';
 import type { MetricDefinition, QueryDataset } from '../query/schemas';
 import {
   useModuleData,
@@ -343,6 +343,104 @@ export function ModuleFocusRankingWidget() {
       pngExport={{ filename: `campaigns-${data.meta.period}-focus-ranking`, pixelRatio: 2 }}
       onEvent={handleRow}
       onDoubleEvent={openRow}
+      {...(onUrlStateReset ? { onBlankReset: onUrlStateReset } : {})}
+    />
+  );
+}
+
+function formatCampaignValue(value: number, unit: string): string {
+  if (unit === 'currency') return formatCurrency(value, true);
+  if (unit === 'percent') return formatPercent(value);
+  if (unit === 'integer') return formatInteger(value);
+  return value.toLocaleString('ro-RO', { maximumFractionDigits: 2 });
+}
+
+/** A mechanism-neutral ranking used by Promo, Incentive, Folii and Concurs. */
+export function ModuleCampaignRankingWidget() {
+  const data = useModuleData();
+  const onEntityOpen = useModuleEntityOpen();
+  const onUrlStateChange = useModuleUrlStateChange();
+  const onUrlStateReset = useModuleUrlStateReset();
+  const rows = useMemo(
+    () => [...data.breakdown].sort((left, right) => right.primary - left.primary).slice(0, 10),
+    [data.breakdown],
+  );
+  const axis = data.axes[0];
+  const dimension = data.entity_dimension ?? moduleEntityDimension[data.module];
+  const option = useMemo<EChartsCoreOption>(
+    () => ({
+      animationDuration: 220,
+      aria: {
+        enabled: true,
+        description: `Clasament ${data.title} după ${axis?.label ?? 'valoare'}.`,
+      },
+      grid: { top: 8, right: 24, bottom: 30, left: 128 },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+        formatter: (input: unknown) => {
+          const item = input as { dataIndex?: number };
+          const row = item.dataIndex === undefined ? undefined : rows[item.dataIndex];
+          return row
+            ? [
+                row.label,
+                `${axis?.label ?? 'Valoare'}: ${formatCampaignValue(row.primary, axis?.unit ?? 'decimal')}`,
+                row.context,
+              ].join('<br/>')
+            : '';
+        },
+      },
+      xAxis: {
+        type: 'value',
+        axisLabel: {
+          color: '#64748b',
+          fontSize: 9,
+          formatter: (value: number) => formatCampaignValue(value, axis?.unit ?? 'decimal'),
+        },
+      },
+      yAxis: {
+        type: 'category',
+        inverse: true,
+        data: rows.map((row) => row.label),
+        axisLabel: { color: '#64748b', fontSize: 9, width: 118, overflow: 'truncate' },
+      },
+      series: [
+        {
+          type: 'bar',
+          data: rows.map((row) => ({
+            value: row.primary,
+            itemStyle: {
+              color: row.risk === 'risk' ? '#e11d48' : row.risk === 'watch' ? '#d97706' : '#4f46e5',
+              borderRadius: [0, 5, 5, 0],
+            },
+          })),
+        },
+      ],
+    }),
+    [axis, data.title, rows],
+  );
+  if (rows.length === 0)
+    return <EmptyState message="Nu există entități eligibile pentru mecanism." />;
+  const interaction = (event: EChartEvent) => {
+    const row = event.dataIndex === undefined ? undefined : rows[event.dataIndex];
+    if (!row) return undefined;
+    const value = dimension === 'agent' ? row.label : (row.id.split(':').at(-1) ?? row.id);
+    return { dimensionId: dimension, value, label: row.label };
+  };
+  return (
+    <EChart
+      option={option}
+      className="chart--fill"
+      ariaLabel={`Clasament ${data.title}`}
+      pngExport={{ filename: `${data.module}-${data.meta.period}-campaign-ranking`, pixelRatio: 2 }}
+      onEvent={(event) => {
+        const item = interaction(event);
+        if (item) onUrlStateChange?.(item);
+      }}
+      onDoubleEvent={(event) => {
+        const item = interaction(event);
+        if (item) onEntityOpen?.(item);
+      }}
       {...(onUrlStateReset ? { onBlankReset: onUrlStateReset } : {})}
     />
   );

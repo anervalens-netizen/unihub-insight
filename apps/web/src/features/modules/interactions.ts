@@ -12,7 +12,7 @@ export const moduleEntityDimension: Record<ModuleId, string> = {
 
 export const moduleDistributionDimension: Partial<Record<ModuleId, string>> = {
   sales: 'category',
-  campaigns: 'category',
+  campaigns: 'subcategory',
   workforce: 'tenure',
   compensation: 'firm',
   finance: 'category',

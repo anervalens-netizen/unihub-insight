@@ -49,7 +49,13 @@ MODULE_ENTITY_DIMENSIONS: dict[ModuleId, str] = {
 
 
 def metric_entity_dimension(module: ModuleId, metric_id: str) -> str:
-    return "team_leader" if metric_id.startswith("visits.") else MODULE_ENTITY_DIMENSIONS[module]
+    if metric_id.startswith("visits."):
+        return "team_leader"
+    if metric_id.startswith("campaigns.contest_"):
+        return "agent"
+    if metric_id.startswith("grile."):
+        return "store"
+    return MODULE_ENTITY_DIMENSIONS[module]
 
 
 def metric(
@@ -89,7 +95,8 @@ def metric(
 
 
 def commercial_campaign_metrics(mechanism: str, label: str) -> tuple[MetricDefinition, ...]:
-    dimensions = ("firm", "regional", "asm", "store", "mechanism", "category", "time")
+    is_promo = mechanism in {"promo", "folii"}
+    dimensions = ("firm", "regional", "asm", "store", "mechanism", "campaign", "time")
     prefix = f"campaigns.{mechanism}"
     return (
         metric(
@@ -111,8 +118,8 @@ def commercial_campaign_metrics(mechanism: str, label: str) -> tuple[MetricDefin
             missing="null-without-campaign-publication",
         ),
         metric(
-            f"{prefix}_{'discount' if mechanism == 'promo' else 'reward'}",
-            "Discount Promo" if mechanism == "promo" else "Recompensă Incentive",
+            f"{prefix}_{'discount' if is_promo else 'reward'}",
+            f"Discount {label}" if is_promo else "Recompensă Incentive",
             "Valoarea calculată de evaluatorul canonic Retail.",
             MetricUnit.CURRENCY,
             dimensions=dimensions,
@@ -142,8 +149,8 @@ def commercial_campaign_metrics(mechanism: str, label: str) -> tuple[MetricDefin
             missing="null-without-campaign-publication",
         ),
         metric(
-            f"{prefix}_{'qualifying_receipts' if mechanism == 'promo' else 'qualified_quantity'}",
-            "Bonuri eligibile Promo" if mechanism == "promo" else "Cantitate calificată Incentive",
+            f"{prefix}_{'qualifying_receipts' if is_promo else 'qualified_quantity'}",
+            f"Bonuri eligibile {label}" if is_promo else "Cantitate calificată Incentive",
             "Volumul calificat de evaluatorul canonic Retail.",
             MetricUnit.INTEGER,
             dimensions=dimensions,
@@ -151,8 +158,8 @@ def commercial_campaign_metrics(mechanism: str, label: str) -> tuple[MetricDefin
             missing="null-without-campaign-publication",
         ),
         metric(
-            f"{prefix}_{'discounted_units' if mechanism == 'promo' else 'eligible_quantity'}",
-            "Unități cu discount Promo" if mechanism == "promo" else "Cantitate eligibilă Incentive",
+            f"{prefix}_{'discounted_units' if is_promo else 'eligible_quantity'}",
+            f"Unități cu discount {label}" if is_promo else "Cantitate eligibilă Incentive",
             "Volumul eligibil materializat de evaluatorul canonic Retail.",
             MetricUnit.INTEGER,
             dimensions=dimensions,
@@ -315,7 +322,7 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         "Vânzări Focus",
         "Vânzările produselor Focus active.",
         MetricUnit.CURRENCY,
-        dimensions=("firm", "regional", "asm", "store", "mechanism", "category", "time"),
+        dimensions=("firm", "regional", "asm", "store", "mechanism", "subcategory", "time"),
         shapes=TREND_MIX,
     ),
     metric(
@@ -324,7 +331,7 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         "Cantitatea Focus din cantitatea totală.",
         MetricUnit.PERCENT,
         aggregation="ratio-of-sums",
-        dimensions=("firm", "regional", "asm", "store", "mechanism", "category", "time"),
+        dimensions=("firm", "regional", "asm", "store", "mechanism", "subcategory", "time"),
         shapes=(ChartKind.KPI, ChartKind.LINE, ChartKind.BAR, ChartKind.HEATMAP, ChartKind.TABLE),
     ),
     metric(
@@ -343,17 +350,88 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
         "Numărul de produse distincte cu rezultat Focus în perioada acoperită.",
         MetricUnit.INTEGER,
         aggregation="distinct-count",
-        dimensions=("firm", "regional", "asm", "store", "mechanism", "category", "time"),
+        dimensions=("firm", "regional", "asm", "store", "mechanism", "subcategory", "time"),
         grains=("month",),
         shapes=KPI_TABLE,
         missing="null-without-focus-contract",
     ),
     *commercial_campaign_metrics("promo", "Promo"),
     *commercial_campaign_metrics("incentive", "Incentive"),
+    *commercial_campaign_metrics("folii", "Folii"),
+    metric(
+        "campaigns.contest_points_total",
+        "Puncte totale Concurs",
+        "Totalul canonic de puncte din read-model-ul Concurs, fără date de persoană.",
+        MetricUnit.INTEGER,
+        dimensions=("firm", "regional", "asm", "store", "agent", "contest", "time"),
+        shapes=TREND_MIX,
+        missing="null-without-contest-publication",
+        source_authority="reporting_contest_month_v1",
+    ),
+    metric(
+        "campaigns.contest_focus_units",
+        "Unități Focus Concurs",
+        "Unități Focus publicate de evaluatorul canonic Concurs.",
+        MetricUnit.INTEGER,
+        dimensions=("firm", "regional", "asm", "store", "agent", "contest", "time"),
+        shapes=KPI_TABLE,
+        missing="null-without-contest-publication",
+        source_authority="reporting_contest_month_v1",
+    ),
+    metric(
+        "campaigns.contest_promo_units",
+        "Unități Promo Concurs",
+        "Unități Promo publicate de evaluatorul canonic Concurs.",
+        MetricUnit.INTEGER,
+        dimensions=("firm", "regional", "asm", "store", "agent", "contest", "time"),
+        shapes=KPI_TABLE,
+        missing="null-without-contest-publication",
+        source_authority="reporting_contest_month_v1",
+    ),
+    metric(
+        "campaigns.contest_price_units",
+        "Unități Price Concurs",
+        "Unități Price publicate de evaluatorul canonic Concurs.",
+        MetricUnit.INTEGER,
+        dimensions=("firm", "regional", "asm", "store", "agent", "contest", "time"),
+        shapes=KPI_TABLE,
+        missing="null-without-contest-publication",
+        source_authority="reporting_contest_month_v1",
+    ),
+    metric(
+        "campaigns.contest_focus_points",
+        "Puncte Focus Concurs",
+        "Puncte Focus publicate de evaluatorul canonic Concurs.",
+        MetricUnit.INTEGER,
+        dimensions=("firm", "regional", "asm", "store", "agent", "contest", "time"),
+        shapes=KPI_TABLE,
+        missing="null-without-contest-publication",
+        source_authority="reporting_contest_month_v1",
+    ),
+    metric(
+        "campaigns.contest_promo_points",
+        "Puncte Promo Concurs",
+        "Puncte Promo publicate de evaluatorul canonic Concurs.",
+        MetricUnit.INTEGER,
+        dimensions=("firm", "regional", "asm", "store", "agent", "contest", "time"),
+        shapes=KPI_TABLE,
+        missing="null-without-contest-publication",
+        source_authority="reporting_contest_month_v1",
+    ),
+    metric(
+        "campaigns.contest_price_points",
+        "Puncte Price Concurs",
+        "Puncte Price publicate de evaluatorul canonic Concurs.",
+        MetricUnit.INTEGER,
+        dimensions=("firm", "regional", "asm", "store", "agent", "contest", "time"),
+        shapes=KPI_TABLE,
+        missing="null-without-contest-publication",
+        source_authority="reporting_contest_month_v1",
+    ),
     metric(
         "workforce.headcount",
-        "Headcount activ",
-        "Agenți activi în perioada acoperită.",
+        "Persoane active observate",
+        "Persoane observate în activitate comercială; nu este registru oficial de personal.",
         MetricUnit.INTEGER,
         aggregation="distinct-count",
         capability=Capability.MANAGEMENT,
@@ -379,8 +457,8 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
     ),
     metric(
         "workforce.coverage",
-        "Acoperire magazine",
-        "Magazine active cu personal în perioada selectată.",
+        "Acoperire magazine selectate observată",
+        "Magazine selectate cu activitate comercială observată; nu este acoperire de roster oficial.",
         MetricUnit.PERCENT,
         aggregation="ratio-of-counts",
         capability=Capability.MANAGEMENT,
@@ -389,14 +467,60 @@ METRIC_CATALOG: tuple[MetricDefinition, ...] = (
     ),
     metric(
         "workforce.stability",
-        "Stabilitate workforce",
-        "Ponderea populației active păstrate conform read-model-ului workforce.",
+        "Stabilitate activitate observată",
+        "Ponderea activității comerciale observate fără nou/reactivat; nu include plecări sau transferuri.",
         MetricUnit.PERCENT,
         aggregation="ratio-of-counts",
         capability=Capability.MANAGEMENT,
-        missing="null-without-effective-dated-roster",
+        missing="partial-observed-commercial-activity",
         grains=("month",),
         shapes=KPI_TABLE,
+    ),
+    metric(
+        "workforce.new_agents",
+        "Nou observați",
+        "Agenți nou observați în activitatea comercială; nu reprezintă angajări oficiale.",
+        MetricUnit.INTEGER,
+        capability=Capability.MANAGEMENT,
+        dimensions=("firm", "regional", "asm", "store", "agent", "time"),
+        grains=("month",),
+        shapes=KPI_TABLE,
+        missing="partial-observed-commercial-activity",
+    ),
+    metric(
+        "workforce.reactivated_agents",
+        "Reactivați observați",
+        "Agenți reactivați în activitatea comercială; plecările și transferurile nu sunt publicate.",
+        MetricUnit.INTEGER,
+        capability=Capability.MANAGEMENT,
+        dimensions=("firm", "regional", "asm", "store", "agent", "time"),
+        grains=("month",),
+        shapes=KPI_TABLE,
+        missing="partial-observed-commercial-activity",
+    ),
+    metric(
+        "grile.observed_stores",
+        "Magazine observate Grile",
+        "Magazine din sursa Grile v2 aleasă atomic pentru luna selectată.",
+        MetricUnit.INTEGER,
+        capability=Capability.MANAGEMENT,
+        dimensions=("firm", "regional", "asm", "store", "time"),
+        grains=("month",),
+        shapes=KPI_TABLE,
+        missing="null-without-fenced-grile-observation",
+        source_authority="reporting_grile_month_v2",
+    ),
+    metric(
+        "grile.problem_stores",
+        "Magazine cu neconcordanțe Grile",
+        "Magazine cu cel puțin o verificare Grile diferită de OK.",
+        MetricUnit.INTEGER,
+        capability=Capability.MANAGEMENT,
+        dimensions=("firm", "regional", "asm", "store", "time"),
+        grains=("month",),
+        shapes=KPI_TABLE,
+        missing="null-without-fenced-grile-observation",
+        source_authority="reporting_grile_month_v2",
     ),
     metric(
         "visits.total",
@@ -653,6 +777,22 @@ DIMENSION_CATALOG: tuple[DimensionDefinition, ...] = (
         description="Promo, Incentive, Concurs, Focus și Folii rămân separate.",
         stable_key="mechanism_id",
         allowed_grains=("month",),
+    ),
+    DimensionDefinition(
+        id="campaign",
+        display_name="Campanie",
+        description="Cheia canonică a campaniei publicată de Retail, fără inferență din titlu.",
+        stable_key="campaign_key",
+        allowed_grains=("month",),
+        source_authority="reporting_campaign_month_v3",
+    ),
+    DimensionDefinition(
+        id="contest",
+        display_name="Concurs",
+        description="Cheia canonică a concursului publicată de Retail, fără inferență din titlu.",
+        stable_key="contest_key",
+        allowed_grains=("month",),
+        source_authority="reporting_contest_month_v1",
     ),
     DimensionDefinition(
         id="category",

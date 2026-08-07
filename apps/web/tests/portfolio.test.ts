@@ -143,6 +143,35 @@ describe('Sales Portfolio web contract', () => {
     }
   });
 
+  it('uses the published Campaigns distribution dimensions', () => {
+    const search = { period: '2026-08', comparison: 'none' as const };
+    const campaignMetric = {
+      ...metric,
+      id: 'campaigns.promo_discount',
+      allowed_dimensions: ['campaign'],
+    } satisfies MetricDefinition;
+    const focusMetric = {
+      ...metric,
+      id: 'campaigns.focus_sales',
+      allowed_dimensions: ['subcategory'],
+    } satisfies MetricDefinition;
+    const contestMetric = {
+      ...metric,
+      id: 'campaigns.contest_points_total',
+      allowed_dimensions: ['contest'],
+    } satisfies MetricDefinition;
+
+    expect(
+      nativeWidgetQuery('campaigns', 'distribution', search, campaignMetric, 'promo')?.dimensions,
+    ).toEqual(['campaign']);
+    expect(
+      nativeWidgetQuery('campaigns', 'distribution', search, focusMetric, 'focus')?.dimensions,
+    ).toEqual(['subcategory']);
+    expect(
+      nativeWidgetQuery('campaigns', 'distribution', search, contestMetric, 'contest')?.dimensions,
+    ).toEqual(['contest']);
+  });
+
   it('renders the required portfolio widgets and omits product distribution', () => {
     const base = {
       module: 'sales',

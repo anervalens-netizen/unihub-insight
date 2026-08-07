@@ -393,7 +393,7 @@ async def specialized_differences(
         for domain, source in snapshot.sources.items()
         if source.status.value != "unavailable"
     }
-    required_domains = {"sales", "planning"}
+    required_domains = {"sales", "planning", "contest", "grile"}
     if not scope.agent:
         required_domains.update({"campaigns", "workforce", "finance", "visits"})
         if not (scope.regional or scope.asm or scope.stores):
@@ -440,8 +440,10 @@ async def specialized_differences(
             f"""
             WITH campaign_base AS MATERIALIZED (
                 SELECT row.*
-                FROM reporting_campaign_month_v2 row
-                WHERE row.period = $1 AND {scope_sql}
+                FROM reporting_campaign_month_v3 row
+                WHERE row.period = $1
+                  AND row.status <> 'unavailable'
+                  AND {scope_sql}
             )
             SELECT row.mechanism,
                    COALESCE(SUM(row.actual_sales), 0) AS sales,
@@ -471,6 +473,8 @@ async def specialized_differences(
                    ), 0)::numeric AS products,
                    COALESCE(SUM(row.promo_qualifying_bons), 0)::numeric
                        AS promo_qualifying_bons,
+                   COUNT(row.promo_qualifying_bons)::numeric
+                       AS promo_qualifying_bons_published,
                    COALESCE(SUM(row.promo_discounted_units), 0)::numeric
                        AS promo_discounted_units,
                    COALESCE(SUM(row.promo_discount_value), 0)
@@ -485,6 +489,50 @@ async def specialized_differences(
             """,
             *params,
         )
+        folii_control = await connection.fetchrow(
+            f"""
+            SELECT
+                COUNT(*)::numeric AS rows,
+                COALESCE(SUM(row.actual_sales), 0) AS sales,
+                COALESCE(SUM(row.actual_quantity), 0)::numeric AS quantity,
+                COALESCE(SUM(row.promo_discount_value), 0) AS discount,
+                COUNT(DISTINCT row.site_code) FILTER (
+                    WHERE COALESCE(row.promo_qualifying_bons, 0) > 0
+                       OR COALESCE(row.promo_discounted_units, 0) > 0
+                       OR COALESCE(row.promo_discount_value, 0) > 0
+                )::numeric AS stores,
+                COALESCE(SUM(row.promo_discounted_units), 0)::numeric AS discounted_units,
+                COALESCE(SUM(row.promo_qualifying_bons), 0)::numeric AS qualifying_receipts,
+                COUNT(row.promo_qualifying_bons)::numeric AS qualifying_receipts_published
+            FROM reporting_campaign_month_v3 AS row
+            WHERE row.period = $1
+              AND row.mechanism = 'promo'
+              AND row.mechanism_variant = 'same_model_screen_camera'
+              AND row.status <> 'unavailable'
+              AND {scope_sql}
+            """,
+            *params,
+        )
+        contest_control = None
+        if "contest" in eligible_domains:
+            contest_control = await connection.fetchrow(
+                f"""
+                SELECT
+                    COUNT(*)::numeric AS rows,
+                    COALESCE(SUM(row.focus_units), 0)::numeric AS focus_units,
+                    COALESCE(SUM(row.promo_units), 0)::numeric AS promo_units,
+                    COALESCE(SUM(row.price_units), 0)::numeric AS price_units,
+                    COALESCE(SUM(row.focus_points), 0)::numeric AS focus_points,
+                    COALESCE(SUM(row.promo_points), 0)::numeric AS promo_points,
+                    COALESCE(SUM(row.price_points), 0)::numeric AS price_points,
+                    COALESCE(SUM(row.total_points), 0)::numeric AS points_total
+                FROM reporting_contest_month_v1 AS row
+                WHERE row.period = $1
+                  AND row.status <> 'unavailable'
+                  AND {scope_sql}
+                """,
+                *params,
+            )
         focus_active_products = await connection.fetchval(
             f"""
             SELECT COUNT(DISTINCT row.item_code)::numeric
@@ -501,6 +549,24 @@ async def specialized_differences(
             """,
             *params,
         )
+        grile_control = None
+        if "grile" in eligible_domains:
+            grile_control = await connection.fetchrow(
+                f"""
+                SELECT
+                    COUNT(*)::numeric AS observed_stores,
+                    COUNT(*) FILTER (
+                        WHERE lower(COALESCE(row.fill_status, '')) <> 'completat'
+                           OR lower(COALESCE(row.target_status, '')) <> 'ok'
+                           OR lower(COALESCE(row.sales_status, '')) <> 'ok'
+                    )::numeric AS problem_stores
+                FROM reporting_grile_month_v2 AS row
+                WHERE row.run_month = $1
+                  AND row.status <> 'unavailable'
+                  AND {scope_sql}
+                """,
+                *params,
+            )
         visits = await connection.fetchrow(
             f"""
             SELECT COALESCE(SUM(row.total_visits), 0)::numeric AS total_visits,
@@ -524,24 +590,36 @@ async def specialized_differences(
             """,
             *params,
         )
-        finance_rows = await connection.fetch(
-            f"""
-            SELECT row.category_code, COALESCE(SUM(row.amount), 0) AS amount
-            FROM reporting_finance_month_v1 row
-            WHERE row.period = $1 AND {finance_scope_sql}
-            GROUP BY row.category_code
-            """,
-            *finance_params,
-        )
-        planning = await connection.fetchrow(
-            f"""
-            SELECT COALESCE(SUM(row.forecast_value), 0) AS forecast,
-                   COALESCE(SUM(row.target_value), 0) AS target
-            FROM reporting_planning_scenario_v2 row
-            WHERE row.period = $1 AND {scope_sql}
-            """,
-            *params,
-        )
+        finance_rows: list[asyncpg.Record] = []
+        if "finance" in eligible_domains:
+            finance_rows = await connection.fetch(
+                f"""
+                SELECT row.category_code, COALESCE(SUM(row.amount), 0) AS amount
+                FROM reporting_finance_month_v1 row
+                WHERE row.period = $1 AND {finance_scope_sql}
+                GROUP BY row.category_code
+                """,
+                *finance_params,
+            )
+        planning = None
+        if "planning" in eligible_domains:
+            planning = await connection.fetchrow(
+                f"""
+                SELECT
+                    COALESCE(SUM(row.forecast_value) FILTER (
+                        WHERE row.authority_kind = 'forecast'
+                          AND row.metric = 'sales_value'
+                          AND row.status <> 'unavailable'
+                    ), 0) AS forecast,
+                    COALESCE(SUM(row.target_value) FILTER (
+                        WHERE row.authority_kind = 'target'
+                          AND row.status <> 'unavailable'
+                    ), 0) AS target
+                FROM reporting_planning_scenario_v2 row
+                WHERE row.period = $1 AND {scope_sql}
+                """,
+                *params,
+            )
         compensation = None
         if "compensation" in eligible_domains and not (
             scope.regional or scope.asm or scope.stores
@@ -560,7 +638,9 @@ async def specialized_differences(
         (domain, module)
         for domain, module in (
             ("campaigns", ModuleId.CAMPAIGNS),
+            ("contest", ModuleId.CAMPAIGNS),
             ("workforce", ModuleId.WORKFORCE),
+            ("grile", ModuleId.WORKFORCE),
             ("finance", ModuleId.FINANCE),
             ("planning", ModuleId.PLANNING),
             ("visits", ModuleId.PERFORMANCE),
@@ -639,11 +719,6 @@ async def specialized_differences(
                         campaign_slice.kpis, f"{prefix}_active_products"
                     )
                     - decimal(control["products"]),
-                    f"{prefix}_{'qualifying_receipts' if mechanism == 'promo' else 'qualified_quantity'}": metric_value(
-                        campaign_slice.kpis,
-                        f"{prefix}_{'qualifying_receipts' if mechanism == 'promo' else 'qualified_quantity'}",
-                    )
-                    - decimal(control[qualifying_field]),
                     f"{prefix}_{'discounted_units' if mechanism == 'promo' else 'eligible_quantity'}": metric_value(
                         campaign_slice.kpis,
                         f"{prefix}_{'discounted_units' if mechanism == 'promo' else 'eligible_quantity'}",
@@ -651,11 +726,132 @@ async def specialized_differences(
                     - decimal(control[eligible_field]),
                 }
             )
+            qualifying_metric = f"{prefix}_{'qualifying_receipts' if mechanism == 'promo' else 'qualified_quantity'}"
+            qualifying_value = optional_metric_value(
+                campaign_slice.kpis, qualifying_metric
+            )
+            if (
+                mechanism == "promo"
+                and decimal(control["promo_qualifying_bons_published"]) == 0
+            ):
+                differences[f"{qualifying_metric}.presence"] = Decimal(
+                    int(qualifying_value is not None)
+                )
+            else:
+                differences[qualifying_metric] = decimal(qualifying_value) - decimal(
+                    control[qualifying_field]
+                )
+        folii_slice = campaigns.campaigns.get("folii")
+        if folii_slice is None:
+            differences["campaigns.folii.presence"] = Decimal(-1)
+        elif decimal(folii_control["rows"] if folii_control else None) == 0:
+            differences["campaigns.folii.presence"] = Decimal(
+                int(bool(folii_slice.kpis))
+            )
+        else:
+            folii_metrics = folii_slice.kpis
+            differences.update(
+                {
+                    "campaigns.folii_sales": metric_value(
+                        folii_metrics, "campaigns.folii_sales"
+                    )
+                    - decimal(folii_control["sales"]),
+                    "campaigns.folii_quantity": metric_value(
+                        folii_metrics, "campaigns.folii_quantity"
+                    )
+                    - decimal(folii_control["quantity"]),
+                    "campaigns.folii_discount": metric_value(
+                        folii_metrics, "campaigns.folii_discount"
+                    )
+                    - decimal(folii_control["discount"]),
+                    "campaigns.folii_active_stores": metric_value(
+                        folii_metrics, "campaigns.folii_active_stores"
+                    )
+                    - decimal(folii_control["stores"]),
+                    "campaigns.folii_discounted_units": metric_value(
+                        folii_metrics, "campaigns.folii_discounted_units"
+                    )
+                    - decimal(folii_control["discounted_units"]),
+                }
+            )
+            receipt = optional_metric_value(
+                folii_metrics, "campaigns.folii_qualifying_receipts"
+            )
+            if decimal(folii_control["qualifying_receipts_published"]) == 0:
+                differences["campaigns.folii_qualifying_receipts.presence"] = Decimal(
+                    int(receipt is not None)
+                )
+            else:
+                differences["campaigns.folii_qualifying_receipts"] = decimal(
+                    receipt
+                ) - decimal(folii_control["qualifying_receipts"])
+    contest_module = modules.get("contest")
+    if contest_module is not None and contest_control is not None:
+        contest_slice = contest_module.campaigns.get("contest")
+        if contest_slice is None:
+            differences["campaigns.contest.presence"] = Decimal(-1)
+        elif decimal(contest_control["rows"]) == 0:
+            differences["campaigns.contest.presence"] = Decimal(
+                int(bool(contest_slice.kpis))
+            )
+        else:
+            differences.update(
+                {
+                    "campaigns.contest_points_total": metric_value(
+                        contest_slice.kpis, "campaigns.contest_points_total"
+                    )
+                    - decimal(contest_control["points_total"]),
+                    "campaigns.contest_focus_units": metric_value(
+                        contest_slice.kpis, "campaigns.contest_focus_units"
+                    )
+                    - decimal(contest_control["focus_units"]),
+                    "campaigns.contest_promo_units": metric_value(
+                        contest_slice.kpis, "campaigns.contest_promo_units"
+                    )
+                    - decimal(contest_control["promo_units"]),
+                    "campaigns.contest_price_units": metric_value(
+                        contest_slice.kpis, "campaigns.contest_price_units"
+                    )
+                    - decimal(contest_control["price_units"]),
+                    "campaigns.contest_focus_points": metric_value(
+                        contest_slice.kpis, "campaigns.contest_focus_points"
+                    )
+                    - decimal(contest_control["focus_points"]),
+                    "campaigns.contest_promo_points": metric_value(
+                        contest_slice.kpis, "campaigns.contest_promo_points"
+                    )
+                    - decimal(contest_control["promo_points"]),
+                    "campaigns.contest_price_points": metric_value(
+                        contest_slice.kpis, "campaigns.contest_price_points"
+                    )
+                    - decimal(contest_control["price_points"]),
+                }
+            )
     workforce_module = modules.get("workforce")
     if workforce_module is not None:
         differences["workforce.headcount"] = metric_value(
             workforce_module.kpis, "workforce.headcount"
         ) - decimal(workforce["headcount"] if workforce else None)
+    grile_module = modules.get("grile")
+    if grile_module is not None and grile_control is not None:
+        grile_slice = grile_module.subviews.get("grile")
+        if grile_slice is None:
+            differences["grile.presence"] = Decimal(-1)
+        elif decimal(grile_control["observed_stores"]) == 0:
+            differences["grile.presence"] = Decimal(int(bool(grile_slice.kpis)))
+        else:
+            differences.update(
+                {
+                    "grile.observed_stores": metric_value(
+                        grile_slice.kpis, "grile.observed_stores"
+                    )
+                    - decimal(grile_control["observed_stores"]),
+                    "grile.problem_stores": metric_value(
+                        grile_slice.kpis, "grile.problem_stores"
+                    )
+                    - decimal(grile_control["problem_stores"]),
+                }
+            )
     performance_module = modules.get("visits")
     if performance_module is not None and visits is not None:
         differences.update(visit_metric_differences(dict(visits), performance_module))

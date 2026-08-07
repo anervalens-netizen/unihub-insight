@@ -32,6 +32,7 @@ import { openRetailContext, retailContextUrl, retailEntityContextUrl } from './r
 import type { ModuleAnalytics, ModuleId } from './schemas';
 import {
   type ModuleSubview,
+  moduleSliceForSubview,
   moduleSubviewConfig,
   portfolioDimensionForSubview,
   specializedSubviewActions,
@@ -61,7 +62,7 @@ export function nativeWidgetQuery(
   metric: MetricDefinition | undefined,
   selectedSubviewId?: ModuleSubview['id'],
 ): WidgetQuery | null {
-  const spec = moduleWidgetQuerySpec(module, widgetId);
+  const spec = moduleWidgetQuerySpec(module, widgetId, selectedSubviewId);
   if (!spec || !metric || metric.id !== spec.metricId) return null;
   const portfolioDimension = selectedSubviewId
     ? portfolioDimensionForSubview(selectedSubviewId)
@@ -70,7 +71,11 @@ export function nativeWidgetQuery(
   if (isPortfolioMetric && !portfolioDimension) return null;
   const entityDimension = spec.metricId.startsWith('visits.')
     ? 'team_leader'
-    : (portfolioDimension ?? moduleEntityDimension[module]);
+    : selectedSubviewId === 'contest'
+      ? 'agent'
+      : selectedSubviewId === 'grile'
+        ? 'store'
+        : (portfolioDimension ?? moduleEntityDimension[module]);
   let visualization: WidgetQuery['visualization'];
   let dimensions: string[];
   if (spec.kind === 'kpi') {
@@ -81,7 +86,20 @@ export function nativeWidgetQuery(
     dimensions = ['time'];
   } else if (spec.kind === 'distribution') {
     visualization = 'donut';
-    const dimension = portfolioDimension ?? moduleDistributionDimension[module];
+    const campaignDimension =
+      module === 'campaigns'
+        ? selectedSubviewId === 'focus'
+          ? 'subcategory'
+          : selectedSubviewId === 'contest'
+            ? 'contest'
+            : selectedSubviewId === 'promo' ||
+                selectedSubviewId === 'incentive' ||
+                selectedSubviewId === 'folii'
+              ? 'campaign'
+              : undefined
+        : undefined;
+    const dimension =
+      portfolioDimension ?? campaignDimension ?? moduleDistributionDimension[module];
     if (!dimension) return null;
     dimensions = [dimension];
   } else if (spec.kind === 'matrix') {
@@ -151,12 +169,17 @@ function moduleExportParams(
 }
 
 export function moduleSubviewData(data: ModuleAnalytics, subview: ModuleSubview): ModuleAnalytics {
-  if (subview.id === 'visits' && data.visits) return { ...data, ...data.visits };
-  const campaignSlice = data.campaigns?.[subview.id];
-  if (campaignSlice) return { ...data, ...campaignSlice };
-  const portfolioDimension = portfolioDimensionForSubview(subview.id);
-  const portfolioSlice = portfolioDimension ? data.portfolio?.[portfolioDimension] : undefined;
-  return portfolioSlice ? { ...data, ...portfolioSlice } : data;
+  const slice = moduleSliceForSubview(data, subview);
+  if (!slice) return data;
+  const sliceSources = slice.sources ?? {};
+  return {
+    ...data,
+    ...slice,
+    meta: {
+      ...data.meta,
+      ...(Object.keys(sliceSources).length > 0 ? { sources: sliceSources } : {}),
+    },
+  };
 }
 
 function SubviewNavigation({
@@ -241,7 +264,7 @@ export function AnalyticsModulePage({ module }: { module: ModuleId }) {
   const widgetQueryList = useMemo(
     () =>
       candidateWidgets.flatMap((widget) => {
-        const spec = moduleWidgetQuerySpec(module, widget.id);
+        const spec = moduleWidgetQuerySpec(module, widget.id, selectedSubview.id);
         const widgetQuery = nativeWidgetQuery(
           module,
           widget.id,

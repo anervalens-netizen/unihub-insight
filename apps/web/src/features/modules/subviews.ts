@@ -1,5 +1,5 @@
 import type { SourceMetadata } from '../../lib/analytics-contracts';
-import type { ModuleAnalytics, ModuleId } from './schemas';
+import type { ModuleAnalytics, ModuleAnalyticsSlice, ModuleId } from './schemas';
 
 export type ModuleSubviewId =
   | 'pace'
@@ -44,8 +44,8 @@ export interface ModuleSubview {
   readonly label: string;
   readonly description: string;
   readonly sourceDomain: string;
-  readonly mechanism?: readonly string[];
-  readonly blockedByWarnings?: readonly string[];
+  /** Specialized views must prove their own server-side slice. */
+  readonly requiresSlice?: boolean;
 }
 
 export const moduleSubviewConfig: Record<ModuleId, readonly ModuleSubview[]> = {
@@ -155,66 +155,65 @@ export const moduleSubviewConfig: Record<ModuleId, readonly ModuleSubview[]> = {
       label: 'Promo',
       description: 'Mecanism separat; nu este dedus din Focus.',
       sourceDomain: 'campaigns',
-      mechanism: ['promo'],
+      requiresSlice: true,
     },
     {
       id: 'incentive',
       label: 'Incentive',
       description: 'Mecanism separat; regulile de eligibilitate nu sunt reconstituite în UI.',
       sourceDomain: 'campaigns',
-      mechanism: ['incentive'],
+      requiresSlice: true,
     },
     {
       id: 'contest',
       label: 'Concurs',
       description:
-        'Retail poate avea mecanismul, dar Insight nu are head/read-model oficial eligibil; Focus nu îl substituie.',
-      sourceDomain: 'campaigns',
-      mechanism: ['contest', 'concurs'],
+        'Clasamentul și punctajul din read-model-ul canonic Retail; Focus nu îl substituie.',
+      sourceDomain: 'contest',
+      requiresSlice: true,
     },
     {
       id: 'focus',
       label: 'Focus',
       description: 'Rezultatul Focus din read-model-ul disponibil.',
       sourceDomain: 'campaigns',
-      mechanism: ['focus'],
     },
     {
       id: 'folii',
       label: 'Folii',
       description: 'Mecanism separat; nu este substituit cu altă campanie.',
       sourceDomain: 'campaigns',
-      mechanism: ['folii', 'foil'],
+      requiresSlice: true,
     },
   ],
   workforce: [
     {
       id: 'people',
       label: 'People',
-      description: 'Headcount și identitate opacă din read-model.',
+      description: 'Agenți observați în activitate comercială; nu este un roster oficial.',
       sourceDomain: 'workforce',
-      blockedByWarnings: ['not an official workforce roster'],
+      requiresSlice: true,
     },
     {
       id: 'movements',
       label: 'Mișcări',
-      description: 'Intrări, ieșiri și transferuri oficiale.',
+      description: 'Agenți nou observați sau reactivați; fără ieșiri și transferuri oficiale.',
       sourceDomain: 'workforce',
-      blockedByWarnings: ['not an official workforce roster'],
+      requiresSlice: true,
     },
     {
       id: 'stability',
       label: 'Stability',
-      description: 'Vechime și stabilitate în perioada selectată.',
+      description: 'Continuitatea activității comerciale observate în perioada selectată.',
       sourceDomain: 'workforce',
-      blockedByWarnings: ['not an official workforce roster'],
+      requiresSlice: true,
     },
     {
       id: 'coverage',
       label: 'Coverage',
       description: 'Acoperirea magazinelor livrată de sursă.',
       sourceDomain: 'workforce',
-      blockedByWarnings: ['not an official workforce roster'],
+      requiresSlice: true,
     },
     {
       id: 'productivity',
@@ -227,13 +226,14 @@ export const moduleSubviewConfig: Record<ModuleId, readonly ModuleSubview[]> = {
       label: 'Visits',
       description: 'Vizite cu autorul Team Leader păstrat de sursă.',
       sourceDomain: 'visits',
+      requiresSlice: true,
     },
     {
       id: 'grile',
       label: 'Grile',
       description: 'Statusul grilelor numai din contractul Grile.',
       sourceDomain: 'grile',
-      blockedByWarnings: ['unavailable'],
+      requiresSlice: true,
     },
   ],
   compensation: [
@@ -286,14 +286,12 @@ export const moduleSubviewConfig: Record<ModuleId, readonly ModuleSubview[]> = {
       label: 'Reconciliation',
       description: 'Reconciliere și autoritatea generației.',
       sourceDomain: 'finance',
-      mechanism: ['reconcil'],
     },
     {
       id: 'break-even',
       label: 'Break-even',
       description: 'Disponibil numai dacă metrica este publicată de sursă.',
       sourceDomain: 'finance',
-      mechanism: ['break-even', 'breakeven'],
     },
   ],
   planning: [
@@ -320,14 +318,14 @@ export const moduleSubviewConfig: Record<ModuleId, readonly ModuleSubview[]> = {
       label: 'Scenarios',
       description: 'Snapshoturi versionate, fără a promova drafturi implicit.',
       sourceDomain: 'planning',
-      mechanism: ['scenario'],
+      requiresSlice: true,
     },
     {
       id: 'sensitivity',
       label: 'Sensitivity',
       description: 'Sensibilitate numai dacă există contract explicit.',
       sourceDomain: 'planning',
-      mechanism: ['sensitivity'],
+      requiresSlice: true,
     },
   ],
 };
@@ -372,6 +370,35 @@ export function unavailableSubviewCopy(view: ModuleSubview): string {
   return 'Contractul lipsă nu este înlocuit cu cifre din alt mecanism sau din altă generație.';
 }
 
+/**
+ * Resolve the exact server projection for a sub-view. The parent payload is
+ * intentionally not used as a substitute when a specialized slice is required.
+ */
+export function moduleSliceForSubview(
+  data: ModuleAnalytics,
+  view: ModuleSubview,
+): ModuleAnalyticsSlice | undefined {
+  if (view.id === 'visits') return data.visits ?? data.subviews?.[view.id];
+  const portfolioDimension = portfolioDimensions[view.id];
+  if (portfolioDimension) return data.portfolio?.[portfolioDimension];
+  return data.subviews?.[view.id] ?? data.campaigns?.[view.id];
+}
+
+function sliceSource(
+  slice: ModuleAnalyticsSlice | undefined,
+  view: ModuleSubview,
+): SourceMetadata | undefined {
+  if (!slice) return undefined;
+  const sources = slice.sources ?? {};
+  return sources[view.sourceDomain] ?? Object.values(sources)[0];
+}
+
+function availabilityForStatus(status: ModuleAnalyticsSlice['status']): SubviewAvailability {
+  if (status === 'official') return 'available';
+  if (status === 'partial' || status === 'stale') return 'partial';
+  return 'unavailable';
+}
+
 export function subviewForId(module: ModuleId, id: string | undefined): ModuleSubview {
   const views = moduleSubviewConfig[module];
   const fallback = views[0];
@@ -380,7 +407,15 @@ export function subviewForId(module: ModuleId, id: string | undefined): ModuleSu
 }
 
 export function subviewStatus(data: ModuleAnalytics, view: ModuleSubview): SubviewStatus {
-  const source = data.meta.sources?.[view.sourceDomain];
+  const slice = moduleSliceForSubview(data, view);
+  const source = sliceSource(slice, view) ?? data.meta.sources?.[view.sourceDomain];
+  if (!slice && view.requiresSlice) {
+    return {
+      availability: 'unavailable',
+      reason: `Slice-ul server-side pentru ${view.label} nu este prezent în răspunsul modulului.`,
+      source,
+    };
+  }
   if (!source) {
     return {
       availability: 'unavailable',
@@ -388,82 +423,35 @@ export function subviewStatus(data: ModuleAnalytics, view: ModuleSubview): Subvi
       source,
     };
   }
-  if (source.status === 'unavailable') {
+  const availability = slice
+    ? availabilityForStatus(slice.status)
+    : availabilityForStatus(source.status);
+  if (availability === 'unavailable') {
     return {
       availability: 'unavailable',
-      reason: `Sursa ${source.source} este marcată unavailable pentru ${view.label}.`,
+      reason: slice
+        ? `Slice-ul server-side pentru ${view.label} este marcat unavailable.`
+        : `Sursa ${source.source} este marcată unavailable pentru ${view.label}.`,
       source,
     };
   }
-  const normalize = (value: string): string =>
-    value
-      .toLocaleLowerCase('ro-RO')
-      .replace(/[^a-z0-9ăâîșț]+/gi, ' ')
-      .trim();
-  const warnings = source.warnings.map(normalize);
-  const sourceText = normalize(
-    [
-      source.source,
-      source.source_generation,
-      source.authority,
-      source.authority_head,
-      source.rule_version,
-      ...source.warnings,
-    ]
-      .filter(Boolean)
-      .join(' '),
-  );
-  const blockingWarning = view.blockedByWarnings?.find((marker) =>
-    warnings.some((warning) => warning.includes(normalize(marker))),
-  );
-  if (blockingWarning) {
-    return {
-      availability: 'unavailable',
-      reason: `Sursa curentă declară explicit că ${view.label} nu are contract oficial eligibil.`,
-      source,
-    };
-  }
-  if (
-    view.mechanism?.some((token) =>
-      warnings.some(
-        (warning) =>
-          warning.includes(normalize(token)) &&
-          warning.includes('unavailable') &&
-          !warning.includes(`${normalize(token)} only`),
-      ),
-    )
-  ) {
-    return {
-      availability: 'unavailable',
-      reason: `Metadata marchează mecanismul ${view.label} ca unavailable.`,
-      source,
-    };
-  }
-  const responseProvesMechanism =
-    (view.id === 'focus' &&
-      (data.kpis?.some((item) => item.id.startsWith('campaigns.focus_')) ?? false)) ||
-    Boolean(data.campaigns?.[view.id]?.kpis.length);
-  if (
-    view.mechanism &&
-    !responseProvesMechanism &&
-    !view.mechanism.some((token) => sourceText.includes(token))
-  ) {
-    return {
-      availability: 'unavailable',
-      reason: `Metadata nu publică un contract pentru mecanismul ${view.label}; Focus nu îl substituie.`,
-      source,
-    };
-  }
-  if (source.status === 'partial' || source.status === 'stale') {
+  if (availability === 'partial') {
+    const observedWorkforceActivity =
+      view.sourceDomain === 'workforce' &&
+      ['people', 'movements', 'stability', 'coverage'].includes(view.id);
     return {
       availability: 'partial',
-      reason: `Sursa este ${source.status}; vezi cutoff-ul și warnings înainte de interpretare.`,
+      reason: observedWorkforceActivity
+        ? 'Activitate comercială observată; nu este un roster oficial de personal. Sursa server-side este PARTIAL.'
+        : `Slice-ul server-side pentru ${view.label} este ${slice?.status ?? source.status}.`,
       source,
     };
   }
   return {
     availability: 'available',
-    reason: 'Sursa este oficială pentru snapshotul curent.',
+    reason: slice
+      ? `Slice-ul server-side pentru ${view.label} este oficial.`
+      : 'Sursa este oficială pentru snapshotul curent.',
     source,
   };
 }

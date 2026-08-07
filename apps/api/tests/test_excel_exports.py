@@ -93,6 +93,37 @@ def test_module_export_does_not_fetch_an_unavailable_source(client: TestClient) 
     assert "finance" in response.json()["detail"]
 
 
+def test_mixed_module_exports_allow_an_eligible_slice(client: TestClient) -> None:
+    repository = client.app.state.analytics_repository
+    original_resolve = repository.resolve_snapshot
+    original_get_module = repository.get_module
+    fetched: list[str] = []
+
+    async def mixed_sources(scope):
+        snapshot = await original_resolve(scope)
+        campaigns = snapshot.sources["campaigns"].model_copy(update={"status": SourceStatus.UNAVAILABLE})
+        workforce = snapshot.sources["workforce"].model_copy(update={"status": SourceStatus.UNAVAILABLE})
+        return snapshot.model_copy(
+            update={"sources": {**snapshot.sources, "campaigns": campaigns, "workforce": workforce}}
+        )
+
+    async def counted_get_module(module, scope):
+        fetched.append(module.value)
+        return await original_get_module(module, scope)
+
+    repository.resolve_snapshot = mixed_sources
+    repository.get_module = counted_get_module
+
+    campaigns = client.get("/api/v1/exports/modules/campaigns.xlsx", params={"period": "2026-07"})
+    workforce = client.get("/api/v1/exports/modules/workforce.xlsx", params={"period": "2026-07"})
+
+    assert campaigns.status_code == 200
+    assert workforce.status_code == 200
+    assert_xlsx(campaigns.content)
+    assert_xlsx(workforce.content)
+    assert fetched == ["campaigns", "workforce"]
+
+
 def test_module_export_rejects_a_stale_ui_snapshot_before_fetch(client: TestClient) -> None:
     repository = client.app.state.analytics_repository
     original_get_module = repository.get_module

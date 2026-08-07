@@ -29,6 +29,8 @@ from unihub_insight_api.domain import (
     OverviewMeta,
     RiskLevel,
     SourceDomain,
+    SourceMetadata,
+    SourceStatus,
     TrendPoint,
     ValueAxis,
 )
@@ -93,7 +95,7 @@ MODULE_DEFINITIONS: dict[ModuleId, tuple[str, str, Capability, tuple[ValueAxis, 
     ),
     ModuleId.WORKFORCE: (
         "Workforce",
-        "Headcount, stabilitate, acoperire, productivitate și Grile.",
+        "Activitate comercială observată, productivitate și Grile; nu reprezintă registru oficial de personal.",
         Capability.MANAGEMENT,
         (
             ValueAxis(key="primary", label="Headcount", unit=MetricUnit.INTEGER),
@@ -190,6 +192,10 @@ CATEGORY_LABELS = {
     "c6": "Alte costuri operaționale",
     "a1": "Amortizare",
 }
+
+
+async def _empty_records() -> Sequence[asyncpg.Record]:
+    return ()
 
 
 def compensation_is_suppressed(person_count: int) -> bool:
@@ -340,6 +346,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         visits: ModuleAnalyticsSlice | None = None,
         campaigns: dict[str, ModuleAnalyticsSlice] | None = None,
         portfolio: dict[str, ModuleAnalyticsSlice] | None = None,
+        subviews: dict[str, ModuleAnalyticsSlice] | None = None,
     ) -> ModuleAnalyticsResponse:
         title, description, capability, axes, charts = MODULE_DEFINITIONS[module]
         return ModuleAnalyticsResponse(
@@ -360,6 +367,45 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             visits=visits,
             campaigns=campaigns or {},
             portfolio=portfolio or {},
+            subviews=subviews or {},
+        )
+
+    @staticmethod
+    def _slice_status(sources: dict[SourceDomain, SourceMetadata]) -> SourceStatus:
+        """Derive a slice state only from the immutable snapshot metadata."""
+        if not sources or any(item.status is SourceStatus.UNAVAILABLE for item in sources.values()):
+            return SourceStatus.UNAVAILABLE
+        if any(item.status in {SourceStatus.PARTIAL, SourceStatus.STALE} for item in sources.values()):
+            return SourceStatus.PARTIAL
+        return SourceStatus.OFFICIAL
+
+    @classmethod
+    def _unavailable_slice(
+        cls,
+        *,
+        source: SourceMetadata | None,
+        title: str,
+        description: str,
+    ) -> ModuleAnalyticsSlice:
+        sources = {source.domain: source} if source is not None else {}
+        return ModuleAnalyticsSlice(
+            status=SourceStatus.UNAVAILABLE,
+            sources=sources,
+            axes=(),
+            supported_charts=(ChartKind.KPI, ChartKind.TABLE),
+            kpis=[],
+            trend=[],
+            distribution=[],
+            breakdown=[],
+            matrix=[],
+            alerts=[
+                InsightAlert(
+                    id=f"{title.lower().replace(' ', '-')}-unavailable",
+                    severity=AlertSeverity.INFO,
+                    title=title,
+                    description=description,
+                )
+            ],
         )
 
     async def _sales_history(
@@ -972,7 +1018,29 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             weight += row_weight
         return _percent(weighted / weight) if weight > 0 else None
 
-    async def _visit_slice(self, scope: AnalyticsScope) -> ModuleAnalyticsSlice:
+    async def _visit_slice(
+        self,
+        scope: AnalyticsScope,
+        source: SourceMetadata | None = None,
+    ) -> ModuleAnalyticsSlice:
+        if source is None:
+            snapshot = await self.resolve_snapshot(scope)
+            source = snapshot.sources.get(SourceDomain.VISITS.value)
+        if scope.agent:
+            return self._unavailable_slice(
+                source=source,
+                title="Vizite indisponibile pentru filtrul agent",
+                description=(
+                    "Vizitele sunt atribuite Team Leader-ului autor; scope-ul agent moștenit "
+                    "nu este permis și nu este ignorat."
+                ),
+            )
+        if source is None or source.status is SourceStatus.UNAVAILABLE:
+            return self._unavailable_slice(
+                source=source,
+                title="Vizite indisponibile",
+                description="Read-model-ul FieldOps nu este eligibil în snapshotul selectat.",
+            )
         rows = await self._visit_rows(
             scope,
             start=shift_month(scope.period, -11),
@@ -1114,6 +1182,8 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             else []
         )
         return ModuleAnalyticsSlice(
+            status=self._slice_status({SourceDomain.VISITS: source}),
+            sources={SourceDomain.VISITS: source},
             axes=(
                 ValueAxis(key="primary", label="Vizite", unit=MetricUnit.INTEGER),
                 ValueAxis(key="secondary", label="Completion", unit=MetricUnit.PERCENT),
@@ -1316,7 +1386,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         async with self.pool.acquire() as connection:
             return await connection.fetch(
                 f"""
-                SELECT campaign.period, campaign.mechanism, campaign.campaign_key,
+                SELECT campaign.period, campaign.mechanism, campaign.mechanism_variant, campaign.campaign_key,
                        campaign.site_code, campaign.agent, campaign.locatie, campaign.firma,
                        campaign.regional, campaign.asm,
                        campaign.actual_sales, campaign.actual_quantity,
@@ -1331,7 +1401,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                        campaign.incentive_potential,
                        campaign.incentive_store_qualified,
                        campaign.status, campaign.warnings
-                FROM reporting_campaign_month_v2 AS campaign
+                FROM reporting_campaign_month_v3 AS campaign
                 WHERE {" AND ".join(clauses)}
                   AND campaign.mechanism IN ('promo', 'incentive')
                 ORDER BY campaign.period, campaign.mechanism,
@@ -1345,13 +1415,27 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         mechanism: str,
         rows: Sequence[asyncpg.Record],
         period: str,
+        *,
+        source: SourceMetadata | None = None,
+        metric_name: str | None = None,
+        mechanism_variant: str | None = None,
     ) -> ModuleAnalyticsSlice:
         is_promo = mechanism == "promo"
-        all_current = [row for row in rows if str(row["period"]) == period and str(row["mechanism"]) == mechanism]
+        metric_name = metric_name or mechanism
+
+        def matches(row: asyncpg.Record) -> bool:
+            if str(row["mechanism"]) != mechanism:
+                return False
+            row_variant = str(row.get("mechanism_variant") or "")
+            if mechanism_variant is not None:
+                return row_variant == mechanism_variant
+            # Folii has its own product surface even though Retail evaluates it
+            # under the broader promo mechanism.
+            return not (is_promo and row_variant == "same_model_screen_camera")
+
+        all_current = [row for row in rows if str(row["period"]) == period and matches(row)]
         current = [row for row in all_current if str(row["status"]) != "unavailable"]
-        mechanism_rows = [
-            row for row in rows if str(row["mechanism"]) == mechanism and str(row["status"]) != "unavailable"
-        ]
+        mechanism_rows = [row for row in rows if matches(row) and str(row["status"]) != "unavailable"]
 
         def numeric(row: asyncpg.Record, field: str) -> Decimal:
             value = row[field]
@@ -1393,7 +1477,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             Decimal(0),
         )
 
-        prefix = f"campaigns.{mechanism}"
+        prefix = f"campaigns.{metric_name}"
         kpis = []
         if current:
             kpis = [
@@ -1418,18 +1502,22 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                     unit=MetricUnit.INTEGER,
                 ),
                 KpiMetric(
-                    id=f"{prefix}_{'qualifying_receipts' if is_promo else 'qualified_quantity'}",
-                    label="Bonuri eligibile" if is_promo else "Cantitate calificată",
-                    value=qualifying,
-                    unit=MetricUnit.INTEGER,
-                ),
-                KpiMetric(
                     id=f"{prefix}_{'discounted_units' if is_promo else 'eligible_quantity'}",
                     label="Unități cu discount" if is_promo else "Cantitate eligibilă",
                     value=eligible,
                     unit=MetricUnit.INTEGER,
                 ),
             ]
+            if not is_promo or any(row["promo_qualifying_bons"] is not None for row in current):
+                kpis.insert(
+                    -1,
+                    KpiMetric(
+                        id=f"{prefix}_{'qualifying_receipts' if is_promo else 'qualified_quantity'}",
+                        label="Bonuri eligibile" if is_promo else "Cantitate calificată",
+                        value=qualifying,
+                        unit=MetricUnit.INTEGER,
+                    ),
+                )
 
         monthly: dict[str, dict[str, Decimal]] = defaultdict(lambda: {"sales": Decimal(0), "reward": Decimal(0)})
         by_campaign: dict[str, Decimal] = defaultdict(Decimal)
@@ -1521,9 +1609,9 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         alerts = (
             [
                 InsightAlert(
-                    id=f"campaign-{mechanism}-partial",
+                    id=f"campaign-{metric_name}-partial",
                     severity=AlertSeverity.INFO,
-                    title=f"{mechanism.title()} publicat parțial",
+                    title=f"{metric_name.title()} publicat parțial",
                     description="; ".join(warnings),
                 )
             ]
@@ -1534,22 +1622,24 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         if unavailable_campaigns and current:
             alerts.append(
                 InsightAlert(
-                    id=f"campaign-{mechanism}-unavailable-items",
+                    id=f"campaign-{metric_name}-unavailable-items",
                     severity=AlertSeverity.WARNING,
-                    title=f"{mechanism.title()} cu coverage incomplet",
+                    title=f"{metric_name.title()} cu coverage incomplet",
                     description="Campanii neincluse în total: " + ", ".join(sorted(unavailable_campaigns)),
                 )
             )
         if not current:
             alerts.append(
                 InsightAlert(
-                    id=f"campaign-{mechanism}-missing",
+                    id=f"campaign-{metric_name}-missing",
                     severity=AlertSeverity.WARNING,
-                    title=f"{mechanism.title()} indisponibil",
+                    title=f"{metric_name.title()} indisponibil",
                     description="Mecanismul nu este publicat în read-model pentru perioada selectată.",
                 )
             )
         return ModuleAnalyticsSlice(
+            status=source.status if source is not None else SourceStatus.UNAVAILABLE,
+            sources={SourceDomain.CAMPAIGNS: source} if source is not None else {},
             axes=(
                 ValueAxis(key="primary", label="Vânzări", unit=MetricUnit.CURRENCY),
                 ValueAxis(key="secondary", label="Cantitate netă", unit=MetricUnit.INTEGER),
@@ -1569,20 +1659,239 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             breakdown=sorted(breakdown, key=lambda item: item.primary, reverse=True),
             matrix=matrix,
             alerts=alerts,
+            entity_dimension="store",
+            distribution_dimension="campaign",
+        )
+
+    async def _contest_rows(
+        self,
+        scope: AnalyticsScope,
+        *,
+        start: str,
+        end: str,
+    ) -> Sequence[asyncpg.Record]:
+        params: list[Any] = [start, end]
+        clauses = ["contest.period BETWEEN $1 AND $2"]
+        clauses.extend(append_reporting_scope(scope, alias="contest", params=params))
+        async with self.pool.acquire() as connection:
+            return await connection.fetch(
+                f"""
+                SELECT contest.period, contest.contest_key, contest.identity_policy,
+                       contest.site_code, contest.agent, contest.locatie, contest.firma,
+                       contest.regional, contest.asm, contest.focus_units,
+                       contest.promo_units, contest.price_units, contest.focus_points,
+                       contest.promo_points, contest.price_points, contest.total_points,
+                       contest.prize, contest.rank, contest.status, contest.warnings
+                FROM reporting_contest_month_v1 AS contest
+                WHERE {" AND ".join(clauses)}
+                ORDER BY contest.period, contest.contest_key, contest.site_code, contest.agent
+                """,
+                *params,
+            )
+
+    @staticmethod
+    def _contest_slice(
+        rows: Sequence[asyncpg.Record],
+        period: str,
+        source: SourceMetadata | None,
+    ) -> ModuleAnalyticsSlice:
+        if source is None or source.status is SourceStatus.UNAVAILABLE:
+            return PostgresInsightRepository._unavailable_slice(
+                source=source,
+                title="Concurs indisponibil",
+                description="Read-model-ul Concurs nu este eligibil în snapshotul selectat.",
+            )
+
+        current = [row for row in rows if str(row["period"]) == period and str(row["status"]) != "unavailable"]
+        eligible_rows = [row for row in rows if str(row["status"]) != "unavailable"]
+
+        def numeric(row: asyncpg.Record, field: str) -> Decimal:
+            value = row[field]
+            return Decimal(str(value)) if value is not None else Decimal(0)
+
+        focus_units = sum((numeric(row, "focus_units") for row in current), Decimal(0))
+        promo_units = sum((numeric(row, "promo_units") for row in current), Decimal(0))
+        price_units = sum((numeric(row, "price_units") for row in current), Decimal(0))
+        focus_points = sum((numeric(row, "focus_points") for row in current), Decimal(0))
+        promo_points = sum((numeric(row, "promo_points") for row in current), Decimal(0))
+        price_points = sum((numeric(row, "price_points") for row in current), Decimal(0))
+        points_total = sum((numeric(row, "total_points") for row in current), Decimal(0))
+        by_period: dict[str, Decimal] = defaultdict(Decimal)
+        by_contest: dict[str, Decimal] = defaultdict(Decimal)
+        current_by_agent: dict[tuple[str, str, str], dict[str, Any]] = {}
+        for row in eligible_rows:
+            row_period = str(row["period"])
+            by_period[row_period] += numeric(row, "total_points")
+            if row_period == period:
+                by_contest[str(row["contest_key"])] += numeric(row, "total_points")
+                key = (str(row["contest_key"]), str(row["site_code"]), str(row["agent"]))
+                bucket = current_by_agent.setdefault(
+                    key,
+                    {
+                        "contest_key": str(row["contest_key"]),
+                        "site_code": str(row["site_code"]),
+                        "agent": str(row["agent"]),
+                        "locatie": str(row["locatie"] or row["site_code"]),
+                        "regional": str(row["regional"] or "—"),
+                        "focus_units": Decimal(0),
+                        "promo_units": Decimal(0),
+                        "price_units": Decimal(0),
+                        "points_total": Decimal(0),
+                        "prize": None,
+                        "rank": None,
+                    },
+                )
+                bucket["focus_units"] += numeric(row, "focus_units")
+                bucket["promo_units"] += numeric(row, "promo_units")
+                bucket["price_units"] += numeric(row, "price_units")
+                bucket["points_total"] += numeric(row, "total_points")
+                bucket["prize"] = str(row["prize"]) if row["prize"] is not None else bucket["prize"]
+                bucket["rank"] = row["rank"] if row["rank"] is not None else bucket["rank"]
+
+        breakdown = [
+            BreakdownRow(
+                id=f"{values['contest_key']}:{values['site_code']}:{values['agent']}",
+                label=values["agent"],
+                context=(
+                    f"{values['contest_key']} · {values['locatie']} · {values['regional']}"
+                    + (f" · premiu {values['prize']}" if values["prize"] else "")
+                ),
+                primary=values["points_total"],
+                secondary=values["focus_units"] + values["promo_units"] + values["price_units"],
+                tertiary=Decimal(str(values["rank"])) if values["rank"] is not None else None,
+                risk=RiskLevel.HEALTHY,
+            )
+            for values in current_by_agent.values()
+        ]
+        warnings = sorted({str(warning) for row in current for warning in (row["warnings"] or ())})
+        alerts = (
+            [
+                InsightAlert(
+                    id="contest-partial",
+                    severity=AlertSeverity.INFO,
+                    title="Concurs publicat parțial",
+                    description="; ".join(warnings),
+                )
+            ]
+            if warnings
+            else []
+        )
+        if not current:
+            alerts.append(
+                InsightAlert(
+                    id="contest-missing",
+                    severity=AlertSeverity.INFO,
+                    title="Concurs nepublicat",
+                    description="Nu există rezultate eligibile Concurs pentru scope și perioadă.",
+                )
+            )
+        return ModuleAnalyticsSlice(
+            status=source.status,
+            sources={SourceDomain.CONTEST: source},
+            axes=(
+                ValueAxis(key="primary", label="Puncte", unit=MetricUnit.INTEGER),
+                ValueAxis(key="secondary", label="Unități", unit=MetricUnit.INTEGER),
+                ValueAxis(key="tertiary", label="Loc", unit=MetricUnit.INTEGER),
+            ),
+            supported_charts=(ChartKind.KPI, ChartKind.LINE, ChartKind.BAR, ChartKind.DONUT, ChartKind.TABLE),
+            kpis=[
+                KpiMetric(
+                    id="campaigns.contest_points_total",
+                    label="Puncte totale",
+                    value=points_total,
+                    unit=MetricUnit.INTEGER,
+                ),
+                KpiMetric(
+                    id="campaigns.contest_focus_units",
+                    label="Unități Focus",
+                    value=focus_units,
+                    unit=MetricUnit.INTEGER,
+                ),
+                KpiMetric(
+                    id="campaigns.contest_promo_units",
+                    label="Unități Promo",
+                    value=promo_units,
+                    unit=MetricUnit.INTEGER,
+                ),
+                KpiMetric(
+                    id="campaigns.contest_price_units",
+                    label="Unități Price",
+                    value=price_units,
+                    unit=MetricUnit.INTEGER,
+                ),
+                KpiMetric(
+                    id="campaigns.contest_focus_points",
+                    label="Puncte Focus",
+                    value=focus_points,
+                    unit=MetricUnit.INTEGER,
+                ),
+                KpiMetric(
+                    id="campaigns.contest_promo_points",
+                    label="Puncte Promo",
+                    value=promo_points,
+                    unit=MetricUnit.INTEGER,
+                ),
+                KpiMetric(
+                    id="campaigns.contest_price_points",
+                    label="Puncte Price",
+                    value=price_points,
+                    unit=MetricUnit.INTEGER,
+                ),
+            ]
+            if current
+            else [],
+            trend=[TrendPoint(key=item, label=item, primary=value) for item, value in sorted(by_period.items())],
+            distribution=shares(list(by_contest.items())),
+            breakdown=sorted(breakdown, key=lambda item: item.primary, reverse=True),
+            matrix=[],
+            alerts=alerts,
+            entity_dimension="agent",
+            distribution_dimension="contest",
         )
 
     async def _campaigns(self, scope: AnalyticsScope) -> ModuleAnalyticsResponse:
+        meta = await self._meta(
+            ModuleId.CAMPAIGNS,
+            scope,
+            "reporting_campaign_month_v3",
+            (SourceDomain.SALES, SourceDomain.CONTEST),
+        )
         start = shift_month(scope.period, -11)
-        rows, distribution_rows, mechanism_rows, meta = await asyncio.gather(
-            self._campaign_rows(scope, start=start, end=scope.period),
-            self._campaign_distribution(scope),
-            self._campaign_mechanism_rows(scope, start=start, end=scope.period),
-            self._meta(
-                ModuleId.CAMPAIGNS,
-                scope,
-                "reporting_campaign_month_v2",
-                (SourceDomain.SALES,),
-            ),
+        campaign_source = meta.sources.get(SourceDomain.CAMPAIGNS)
+        contest_source = meta.sources.get(SourceDomain.CONTEST)
+        sales_source = meta.sources.get(SourceDomain.SALES)
+        focus_sources = {
+            domain: source
+            for domain, source in (
+                (SourceDomain.CAMPAIGNS, campaign_source),
+                (SourceDomain.SALES, sales_source),
+            )
+            if source is not None
+        }
+        if (
+            campaign_source is None
+            or sales_source is None
+            or campaign_source.status is SourceStatus.UNAVAILABLE
+            or sales_source.status is SourceStatus.UNAVAILABLE
+        ):
+            focus_status = SourceStatus.UNAVAILABLE
+        elif SourceStatus.STALE in {campaign_source.status, sales_source.status}:
+            focus_status = SourceStatus.STALE
+        elif SourceStatus.PARTIAL in {campaign_source.status, sales_source.status}:
+            focus_status = SourceStatus.PARTIAL
+        else:
+            focus_status = SourceStatus.OFFICIAL
+        rows, distribution_rows, mechanism_rows, contest_rows = await asyncio.gather(
+            self._campaign_rows(scope, start=start, end=scope.period)
+            if focus_status is not SourceStatus.UNAVAILABLE
+            else _empty_records(),
+            self._campaign_distribution(scope) if focus_status is not SourceStatus.UNAVAILABLE else _empty_records(),
+            self._campaign_mechanism_rows(scope, start=start, end=scope.period)
+            if campaign_source is not None and campaign_source.status is not SourceStatus.UNAVAILABLE
+            else _empty_records(),
+            self._contest_rows(scope, start=start, end=scope.period)
+            if contest_source is not None and contest_source.status is not SourceStatus.UNAVAILABLE
+            else _empty_records(),
         )
         current = [row for row in rows if str(row["import_month"]) == scope.period]
         focus_sales = sum((_money(row["focus_sales"]) for row in current), Decimal(0))
@@ -1690,8 +1999,35 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             matrix=matrix,
             alerts=alerts,
             campaigns={
-                mechanism: self._commercial_campaign_slice(mechanism, mechanism_rows, scope.period)
-                for mechanism in ("promo", "incentive")
+                "promo": self._commercial_campaign_slice("promo", mechanism_rows, scope.period, source=campaign_source),
+                "incentive": self._commercial_campaign_slice(
+                    "incentive", mechanism_rows, scope.period, source=campaign_source
+                ),
+                "folii": self._commercial_campaign_slice(
+                    "promo",
+                    mechanism_rows,
+                    scope.period,
+                    source=campaign_source,
+                    metric_name="folii",
+                    mechanism_variant="same_model_screen_camera",
+                ),
+                "contest": self._contest_slice(contest_rows, scope.period, contest_source),
+            },
+            subviews={
+                "focus": ModuleAnalyticsSlice(
+                    status=focus_status,
+                    sources=focus_sources,
+                    axes=MODULE_DEFINITIONS[ModuleId.CAMPAIGNS][3],
+                    supported_charts=MODULE_DEFINITIONS[ModuleId.CAMPAIGNS][4],
+                    kpis=kpis,
+                    trend=trend,
+                    distribution=shares([(str(row["label"]), _money(row["sales"])) for row in distribution_rows]),
+                    breakdown=sorted(breakdown, key=lambda item: item.primary, reverse=True),
+                    matrix=matrix,
+                    alerts=alerts,
+                    entity_dimension="store",
+                    distribution_dimension="subcategory",
+                )
             },
         )
 
@@ -1711,6 +2047,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                        MAX(agg.asm) AS asm,
                        SUM(agg.total_sales) AS total_sales,
                        SUM(agg.working_days)::INT AS working_days,
+                       ARRAY_AGG(DISTINCT agg.site_code ORDER BY agg.site_code) AS site_codes,
                        COUNT(DISTINCT agg.site_code)::INT AS store_count,
                        MIN(profile.first_seen_month) AS first_seen_month,
                        MAX(profile.active_months_count)::INT AS active_months_count,
@@ -1727,82 +2064,163 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                 *params,
             )
 
-    async def _grile_alerts(self, scope: AnalyticsScope) -> list[InsightAlert]:
+    async def _grile_slice(
+        self,
+        scope: AnalyticsScope,
+        source: SourceMetadata | None,
+    ) -> ModuleAnalyticsSlice:
+        if source is None or source.status is SourceStatus.UNAVAILABLE:
+            return self._unavailable_slice(
+                source=source,
+                title="Grile indisponibil",
+                description="Contractul Grile v2 nu are observații eligibile în snapshot.",
+            )
         params: list[Any] = [scope.period]
-        clauses = ["status.run_month = $1"]
-        if scope.stores:
-            params.append(list(scope.stores))
-            clauses.append(f"status.site_code = ANY(${len(params)}::text[])")
-        else:
-            if scope.firm:
-                params.append(scope.firm)
-                clauses.append(f"store.firma = ${len(params)}")
-            if scope.regional:
-                params.append(list(scope.regional))
-                clauses.append(f"store.regional = ANY(${len(params)}::text[])")
-            if scope.asm:
-                params.append(scope.asm)
-                clauses.append(f"store.asm = ${len(params)}")
+        clauses = ["grile.run_month = $1"]
+        clauses.extend(append_reporting_scope(scope, alias="grile", params=params, include_agent=False))
         async with self.pool.acquire() as connection:
-            row = await connection.fetchrow(
+            rows = await connection.fetch(
                 f"""
-                SELECT COUNT(*)::INT AS total,
-                       COUNT(*) FILTER (WHERE status.fill_status <> 'ok' OR status.target_status <> 'ok' OR status.sales_status <> 'ok')::INT AS problems,
-                       COUNT(*) FILTER (WHERE status.last_error_code IS NOT NULL)::INT AS errors
-                FROM grile_store_current_status status
-                JOIN stores store ON store.site_code = status.site_code
+                SELECT grile.period, grile.run_month, grile.source_run_id,
+                       grile.site_code, grile.locatie, grile.firma, grile.regional, grile.asm,
+                       grile.fill_status, grile.target_status, grile.sales_status,
+                       grile.last_error_code, grile.status, grile.warnings
+                FROM reporting_grile_month_v2 AS grile
                 WHERE {" AND ".join(clauses)}
+                ORDER BY grile.site_code
                 """,
                 *params,
             )
-        if row is None or int(row["total"] or 0) == 0:
-            return [
+        current = [row for row in rows if str(row["status"]) != "unavailable"]
+        problems = [
+            row
+            for row in current
+            if str(row["fill_status"] or "").casefold() != "completat"
+            or str(row["target_status"] or "").casefold() != "ok"
+            or str(row["sales_status"] or "").casefold() != "ok"
+        ]
+        errors = [row for row in current if row["last_error_code"] is not None]
+        alerts: list[InsightAlert] = []
+        if not current:
+            alerts.append(
                 InsightAlert(
                     id="grile-missing",
                     severity=AlertSeverity.INFO,
                     title="Grile fără observație",
-                    description="Nu există observații Grile pentru scope și perioadă.",
+                    description="Nu există observații Grile eligibile pentru scope și perioadă.",
                 )
-            ]
-        alerts: list[InsightAlert] = []
-        if int(row["problems"] or 0) > 0:
+            )
+        if problems:
             alerts.append(
                 InsightAlert(
                     id="grile-problems",
                     severity=AlertSeverity.WARNING,
                     title="Grile cu neconcordanțe",
-                    description=f"{row['problems']} magazine au cel puțin o verificare diferită de OK.",
+                    description=f"{len(problems)} magazine au cel puțin o verificare diferită de OK.",
                 )
             )
-        if int(row["errors"] or 0) > 0:
+        if errors:
             alerts.append(
                 InsightAlert(
                     id="grile-errors",
                     severity=AlertSeverity.CRITICAL,
                     title="Erori Grile",
-                    description=f"{row['errors']} magazine păstrează o ultimă eroare de verificare.",
+                    description=f"{len(errors)} magazine păstrează o ultimă eroare de verificare.",
                 )
             )
-        return alerts
+        warnings = sorted({str(warning) for row in current for warning in (row["warnings"] or ())})
+        if warnings:
+            alerts.append(
+                InsightAlert(
+                    id="grile-source-warnings",
+                    severity=AlertSeverity.INFO,
+                    title="Avertismente sursă Grile",
+                    description="; ".join(warnings),
+                )
+            )
+        return ModuleAnalyticsSlice(
+            status=source.status,
+            sources={SourceDomain.GRILE: source},
+            axes=(
+                ValueAxis(key="primary", label="Magazine observate", unit=MetricUnit.INTEGER),
+                ValueAxis(key="secondary", label="Neconcordanțe", unit=MetricUnit.INTEGER),
+            ),
+            supported_charts=(ChartKind.KPI, ChartKind.BAR, ChartKind.TABLE),
+            kpis=[
+                KpiMetric(
+                    id="grile.observed_stores",
+                    label="Magazine observate",
+                    value=Decimal(len(current)),
+                    unit=MetricUnit.INTEGER,
+                ),
+                KpiMetric(
+                    id="grile.problem_stores",
+                    label="Magazine cu neconcordanțe",
+                    value=Decimal(len(problems)),
+                    unit=MetricUnit.INTEGER,
+                    risk=RiskLevel.WATCH if problems else RiskLevel.HEALTHY,
+                ),
+            ]
+            if current
+            else [],
+            trend=[],
+            distribution=[],
+            breakdown=[
+                BreakdownRow(
+                    id=str(row["site_code"]),
+                    label=str(row["locatie"] or row["site_code"]),
+                    context=f"{row['firma'] or '—'} · {row['regional'] or '—'} · run {row['source_run_id']}",
+                    primary=Decimal(1),
+                    secondary=Decimal(
+                        (str(row["fill_status"] or "").casefold() != "completat")
+                        + (str(row["target_status"] or "").casefold() != "ok")
+                        + (str(row["sales_status"] or "").casefold() != "ok")
+                    ),
+                    tertiary=Decimal(1) if row["last_error_code"] is not None else Decimal(0),
+                    risk=RiskLevel.RISK
+                    if row["last_error_code"] is not None
+                    else RiskLevel.WATCH
+                    if row in problems
+                    else RiskLevel.HEALTHY,
+                )
+                for row in current
+            ],
+            matrix=[],
+            alerts=alerts,
+            entity_dimension="store",
+        )
 
     async def _workforce(self, scope: AnalyticsScope) -> ModuleAnalyticsResponse:
-        rows, grile_alerts, meta, visits = await asyncio.gather(
-            self._workforce_rows(scope),
-            self._grile_alerts(scope),
-            self._meta(
-                ModuleId.WORKFORCE,
-                scope,
-                "reporting_agent_month/reporting_agent_profile/grile",
-                (SourceDomain.VISITS,),
-            ),
-            self._visit_slice(scope),
+        meta = await self._meta(
+            ModuleId.WORKFORCE,
+            scope,
+            "reporting_agent_month/reporting_agent_profile/reporting_grile_month_v2",
+            (SourceDomain.VISITS, SourceDomain.GRILE),
+        )
+        workforce_source = meta.sources.get(SourceDomain.WORKFORCE)
+        visits_source = meta.sources.get(SourceDomain.VISITS)
+        grile_source = meta.sources.get(SourceDomain.GRILE)
+        rows, grile, visits = await asyncio.gather(
+            self._workforce_rows(scope)
+            if workforce_source is not None and workforce_source.status is not SourceStatus.UNAVAILABLE
+            else _empty_records(),
+            self._grile_slice(scope, grile_source),
+            self._visit_slice(scope, visits_source),
         )
         current = [row for row in rows if str(row["import_month"]) == scope.period]
         headcount = len(current)
         total_sales = sum((_money(row["total_sales"]) for row in current), Decimal(0))
-        staffed_stores = {str(row["site_code"]) for row in current}
-        selected_store_count = len(scope.stores) if scope.stores else len(staffed_stores)
-        movement_count = sum(1 for row in current if row["is_new"] or row["is_reactivated"])
+        staffed_stores = {str(site_code) for row in current for site_code in (row["site_codes"] or ())}
+        selected_store_count = len(scope.stores)
+        if (
+            selected_store_count == 0
+            and not any((scope.firm, scope.regional, scope.asm, scope.agent))
+            and workforce_source is not None
+        ):
+            selected_store_count = int(workforce_source.coverage_denominator or 0)
+        new_count = sum(1 for row in current if row["is_new"])
+        reactivated_count = sum(1 for row in current if row["is_reactivated"])
+        movement_count = new_count + reactivated_count
         stability = (
             _percent(Decimal(max(headcount - movement_count, 0)) * Decimal("100") / Decimal(headcount))
             if headcount
@@ -1863,7 +2281,20 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             if f"{row['site_code']}:{row['agent']}" in top_agents
             and str(row["import_month"]) >= shift_month(scope.period, -5)
         ]
-        alerts = list(grile_alerts)
+        alerts = list(grile.alerts)
+        alerts.insert(
+            0,
+            InsightAlert(
+                id="workforce-observed-commercial-activity",
+                severity=AlertSeverity.INFO,
+                title="Activitate comercială observată",
+                description=(
+                    "People, Stability, Coverage și Movements provin din activitate comercială observată; "
+                    "nu sunt registru oficial de personal. Movements include numai nou/reactivat; "
+                    "plecările și transferurile nu sunt publicate."
+                ),
+            ),
+        )
         if not current:
             alerts.insert(
                 0,
@@ -1873,7 +2304,7 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             [
                 KpiMetric(
                     id="workforce.headcount",
-                    label="Headcount activ",
+                    label="Persoane active observate",
                     value=Decimal(headcount),
                     unit=MetricUnit.INTEGER,
                 ),
@@ -1884,22 +2315,44 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                     unit=MetricUnit.CURRENCY,
                 ),
                 KpiMetric(
-                    id="workforce.coverage",
-                    label="Acoperire magazine",
-                    value=coverage or Decimal(0),
-                    unit=MetricUnit.PERCENT,
-                    risk=_risk(coverage),
-                ),
-                KpiMetric(
                     id="workforce.stability",
-                    label="Stabilitate",
+                    label="Stabilitate activitate observată",
                     value=stability or Decimal(0),
                     unit=MetricUnit.PERCENT,
                     risk=_risk(stability),
                 ),
+                KpiMetric(
+                    id="workforce.new_agents",
+                    label="Nou observați",
+                    value=Decimal(new_count),
+                    unit=MetricUnit.INTEGER,
+                ),
+                KpiMetric(
+                    id="workforce.reactivated_agents",
+                    label="Reactivați observați",
+                    value=Decimal(reactivated_count),
+                    unit=MetricUnit.INTEGER,
+                ),
             ]
             if current
             else []
+        )
+        if current and coverage is not None:
+            kpis.append(
+                KpiMetric(
+                    id="workforce.coverage",
+                    label="Acoperire magazine selectate observată",
+                    value=coverage,
+                    unit=MetricUnit.PERCENT,
+                    risk=_risk(coverage),
+                )
+            )
+        workforce_sources = {SourceDomain.WORKFORCE: workforce_source} if workforce_source is not None else {}
+        # Commercial activity is useful but never a substitute for an official roster.
+        workforce_status = (
+            SourceStatus.PARTIAL
+            if workforce_source is not None and workforce_source.status is not SourceStatus.UNAVAILABLE
+            else SourceStatus.UNAVAILABLE
         )
         return self._response(
             ModuleId.WORKFORCE,
@@ -1911,6 +2364,64 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             matrix=matrix,
             alerts=alerts,
             visits=visits,
+            subviews={
+                "people": ModuleAnalyticsSlice(
+                    status=workforce_status,
+                    sources=workforce_sources,
+                    axes=(ValueAxis(key="primary", label="Persoane active observate", unit=MetricUnit.INTEGER),),
+                    supported_charts=(ChartKind.KPI, ChartKind.LINE, ChartKind.TABLE),
+                    kpis=[item for item in kpis if item.id == "workforce.headcount"],
+                    trend=trend,
+                    distribution=shares(list(tenure_bands.items())),
+                    breakdown=sorted(breakdown, key=lambda item: item.primary, reverse=True),
+                    matrix=[],
+                    alerts=alerts[:1],
+                    entity_dimension="agent",
+                    distribution_dimension="tenure",
+                ),
+                "stability": ModuleAnalyticsSlice(
+                    status=workforce_status,
+                    sources=workforce_sources,
+                    axes=(ValueAxis(key="primary", label="Stabilitate activitate observată", unit=MetricUnit.PERCENT),),
+                    supported_charts=(ChartKind.KPI, ChartKind.LINE, ChartKind.TABLE),
+                    kpis=[item for item in kpis if item.id == "workforce.stability"],
+                    trend=trend,
+                    distribution=[],
+                    breakdown=[],
+                    matrix=[],
+                    alerts=alerts[:1],
+                ),
+                "coverage": ModuleAnalyticsSlice(
+                    status=workforce_status,
+                    sources=workforce_sources,
+                    axes=(
+                        ValueAxis(
+                            key="primary", label="Acoperire magazine selectate observată", unit=MetricUnit.PERCENT
+                        ),
+                    ),
+                    supported_charts=(ChartKind.KPI, ChartKind.TABLE),
+                    kpis=[item for item in kpis if item.id == "workforce.coverage"],
+                    trend=[],
+                    distribution=[],
+                    breakdown=[],
+                    matrix=[],
+                    alerts=alerts[:1],
+                ),
+                "movements": ModuleAnalyticsSlice(
+                    status=workforce_status,
+                    sources=workforce_sources,
+                    axes=(ValueAxis(key="primary", label="Mișcări observate", unit=MetricUnit.INTEGER),),
+                    supported_charts=(ChartKind.KPI, ChartKind.TABLE),
+                    kpis=[item for item in kpis if item.id in {"workforce.new_agents", "workforce.reactivated_agents"}],
+                    trend=[],
+                    distribution=[],
+                    breakdown=[item for item in breakdown if item.risk is RiskLevel.WATCH],
+                    matrix=[],
+                    alerts=alerts[:1],
+                    entity_dimension="agent",
+                ),
+                "grile": grile,
+            },
         )
 
     async def _compensation_rows(self, scope: AnalyticsScope) -> Sequence[asyncpg.Record]:
@@ -2244,38 +2755,28 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
 
     async def _planning_rows(self, scope: AnalyticsScope) -> Sequence[asyncpg.Record]:
         params: list[Any] = [shift_month(scope.period, -11), scope.period]
-        store_clauses = append_reporting_scope(scope, alias="forecast", params=params, include_agent=False)
+        store_clauses = append_reporting_scope(scope, alias="scenario", params=params, include_agent=False)
         scope_sql = " AND ".join(store_clauses) if store_clauses else "TRUE"
         async with self.pool.acquire() as connection:
             return await connection.fetch(
                 f"""
-                WITH ranked_forecast AS (
-                    SELECT scenario.*,
-                           ROW_NUMBER() OVER (
-                               PARTITION BY scenario.period, scenario.site_code
-                               ORDER BY
-                                   CASE scenario.horizon
-                                       WHEN 'current_month' THEN 0
-                                       ELSE 1
-                                   END,
-                                   scenario.forecast_run_id DESC
-                           ) AS selection_rank
-                    FROM reporting_planning_scenario_v2 scenario
+                WITH forecast AS (
+                    SELECT scenario.*
+                    FROM reporting_planning_scenario_v2 AS scenario
                     WHERE scenario.period BETWEEN $1 AND $2
                       AND scenario.authority_kind = 'forecast'
                       AND scenario.metric = 'sales_value'
-                ), forecast AS (
-                    SELECT forecast.*
-                    FROM ranked_forecast AS forecast
-                    WHERE selection_rank = 1
+                      AND scenario.status <> 'unavailable'
                       AND {scope_sql}
                 ), target AS (
                     SELECT scenario.period,
                            scenario.site_code,
-                           SUM(scenario.target_value) AS target_value
-                    FROM reporting_planning_scenario_v2 scenario
+                           SUM(scenario.target_value) AS target_value,
+                           MIN(scenario.status) AS target_status
+                    FROM reporting_planning_scenario_v2 AS scenario
                     WHERE scenario.period BETWEEN $1 AND $2
                       AND scenario.authority_kind = 'target'
+                      AND scenario.status <> 'unavailable'
                     GROUP BY scenario.period, scenario.site_code
                 ), planning AS (
                     SELECT forecast.period AS forecast_month,
@@ -2286,7 +2787,8 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                            forecast.asm,
                            forecast.forecast_value AS forecast_sales,
                            target.target_value,
-                           false AS target_contract_invalid
+                           forecast.status AS forecast_status,
+                           target.target_status
                     FROM forecast
                     LEFT JOIN target
                       ON target.period = forecast.period
@@ -2320,7 +2822,6 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
         current = [row for row in rows if str(row["forecast_month"]) == scope.period]
         forecast = sum((_money(row["forecast_sales"]) for row in current), Decimal(0))
         has_target = any(row["target_value"] is not None for row in current)
-        invalid_target = any(bool(row["target_contract_invalid"]) for row in current)
         target = sum(
             (_money(row["target_value"]) for row in current if row["target_value"] is not None),
             Decimal(0),
@@ -2419,19 +2920,6 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
                     description=f"Gap-ul proiectat este {_money(forecast - target)} RON.",
                 )
             )
-        if invalid_target:
-            warning = (
-                "Targetul finalizat nu are rule_set_hash verificabil; valorile Target și gap-ul rămân indisponibile."
-            )
-            alerts.append(
-                InsightAlert(
-                    id="planning-target-unversioned",
-                    severity=AlertSeverity.WARNING,
-                    title="Target neversionat indisponibil",
-                    description=warning,
-                )
-            )
-            meta = meta.model_copy(update={"warnings": (*meta.warnings, warning)})
         kpis: list[KpiMetric] = []
         if current:
             kpis.append(
@@ -2483,6 +2971,30 @@ class PostgresInsightRepository(PostgresAnalyticsRepository):
             breakdown=sorted(breakdown, key=lambda item: item.progress_pct or Decimal(0)),
             matrix=matrix,
             alerts=alerts,
+            subviews={
+                "forecast": ModuleAnalyticsSlice(
+                    status=(
+                        meta.sources[SourceDomain.PLANNING].status
+                        if SourceDomain.PLANNING in meta.sources
+                        else SourceStatus.UNAVAILABLE
+                    ),
+                    sources=(
+                        {SourceDomain.PLANNING: meta.sources[SourceDomain.PLANNING]}
+                        if SourceDomain.PLANNING in meta.sources
+                        else {}
+                    ),
+                    axes=MODULE_DEFINITIONS[ModuleId.PLANNING][3],
+                    supported_charts=MODULE_DEFINITIONS[ModuleId.PLANNING][4],
+                    kpis=kpis,
+                    trend=trend,
+                    distribution=shares(list(distribution_by_regional.items())),
+                    breakdown=sorted(breakdown, key=lambda item: item.progress_pct or Decimal(0)),
+                    matrix=matrix,
+                    alerts=alerts,
+                    entity_dimension="store",
+                    distribution_dimension="regional",
+                )
+            },
         )
 
     @staticmethod

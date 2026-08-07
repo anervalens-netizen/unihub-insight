@@ -38,6 +38,7 @@ type RecipeKind =
   | 'alerts'
   | 'pace'
   | 'ranking'
+  | 'campaign-ranking'
   | 'scatter'
   | 'histogram'
   | 'waterfall'
@@ -137,6 +138,7 @@ const matrixMetrics: Partial<Record<ModuleId, string>> = {
 export function moduleWidgetQuerySpec(
   module: ModuleId,
   widgetId: string,
+  subviewId?: ModuleSubviewId,
 ): ModuleWidgetQuerySpec | null {
   if (widgetId.startsWith('kpi:')) {
     return { kind: 'kpi', metricId: widgetId.slice(4) };
@@ -169,6 +171,19 @@ export function moduleWidgetQuerySpec(
   if (widgetId === 'focus-ranking' && module === 'campaigns') {
     return { kind: 'breakdown', metricId: 'campaigns.focus_share' };
   }
+  if (widgetId === 'campaign-ranking' && module === 'campaigns') {
+    const metricId =
+      subviewId === 'promo'
+        ? 'campaigns.promo_sales'
+        : subviewId === 'incentive'
+          ? 'campaigns.incentive_sales'
+          : subviewId === 'folii'
+            ? 'campaigns.folii_sales'
+            : subviewId === 'contest'
+              ? 'campaigns.contest_points_total'
+              : 'campaigns.focus_sales';
+    return { kind: 'breakdown', metricId };
+  }
   if (widgetId === 'accuracy-scatter' && module === 'planning') {
     return { kind: 'scatter', metricId: 'planning.forecast' };
   }
@@ -182,7 +197,16 @@ export function moduleWidgetQuerySpec(
     return { kind: 'matrix', metricId: 'visits.total' };
   }
   if (widgetId === 'distribution') {
-    const metricId = distributionMetrics[module];
+    const metricId =
+      module === 'campaigns' && subviewId === 'promo'
+        ? 'campaigns.promo_discount'
+        : module === 'campaigns' && subviewId === 'incentive'
+          ? 'campaigns.incentive_reward'
+          : module === 'campaigns' && subviewId === 'folii'
+            ? 'campaigns.folii_discount'
+            : module === 'campaigns' && subviewId === 'contest'
+              ? 'campaigns.contest_points_total'
+              : distributionMetrics[module];
     return metricId ? { kind: 'distribution', metricId } : null;
   }
   if (widgetId === 'portfolio-distribution' && module === 'sales') {
@@ -192,11 +216,40 @@ export function moduleWidgetQuerySpec(
     return { kind: 'table', metricId: 'sales.portfolio_sales' };
   }
   if (widgetId === 'matrix') {
-    const metricId = matrixMetrics[module];
+    const metricId =
+      module === 'campaigns' && subviewId === 'promo'
+        ? 'campaigns.promo_discount'
+        : module === 'campaigns' && subviewId === 'incentive'
+          ? 'campaigns.incentive_reward'
+          : module === 'campaigns' && subviewId === 'folii'
+            ? 'campaigns.folii_discount'
+            : module === 'campaigns' && subviewId === 'focus'
+              ? 'campaigns.focus_share'
+              : matrixMetrics[module];
     return metricId ? { kind: 'matrix', metricId } : null;
   }
   if (widgetId === 'trend' || widgetId === 'breakdown') {
-    return { kind: widgetId, metricId: metricSlots[module].primary };
+    const metricId =
+      module === 'campaigns' && subviewId === 'promo'
+        ? 'campaigns.promo_sales'
+        : module === 'campaigns' && subviewId === 'incentive'
+          ? 'campaigns.incentive_sales'
+          : module === 'campaigns' && subviewId === 'folii'
+            ? 'campaigns.folii_sales'
+            : module === 'campaigns' && subviewId === 'contest'
+              ? 'campaigns.contest_points_total'
+              : module === 'campaigns' && subviewId === 'focus'
+                ? 'campaigns.focus_sales'
+                : module === 'workforce' && subviewId === 'people'
+                  ? 'workforce.headcount'
+                  : module === 'workforce' && subviewId === 'stability'
+                    ? 'workforce.stability'
+                    : module === 'workforce' && subviewId === 'movements'
+                      ? 'workforce.new_agents'
+                      : module === 'workforce' && subviewId === 'grile'
+                        ? 'grile.problem_stores'
+                        : metricSlots[module].primary;
+    return { kind: widgetId, metricId };
   }
   return null;
 }
@@ -326,6 +379,7 @@ const recipes: Partial<Record<ModuleSubviewId, readonly Recipe[]>> = {
     { kind: 'kpi', metricId: 'campaigns.promo_qualifying_receipts' },
     { kind: 'kpi', metricId: 'campaigns.promo_discounted_units' },
     { kind: 'trend', metricId: 'campaigns.promo_sales', title: 'Vânzări Promo în timp' },
+    { kind: 'campaign-ranking', title: 'Promo pe magazine' },
     { kind: 'breakdown', metricId: 'campaigns.promo_sales', title: 'Promo pe magazine' },
     { kind: 'distribution', metricId: 'campaigns.promo_discount', title: 'Discount pe campanie' },
     { kind: 'matrix', metricId: 'campaigns.promo_discount', title: 'Discount magazin × perioadă' },
@@ -340,6 +394,7 @@ const recipes: Partial<Record<ModuleSubviewId, readonly Recipe[]>> = {
     { kind: 'kpi', metricId: 'campaigns.incentive_qualified_quantity' },
     { kind: 'kpi', metricId: 'campaigns.incentive_eligible_quantity' },
     { kind: 'trend', metricId: 'campaigns.incentive_sales', title: 'Vânzări Incentive în timp' },
+    { kind: 'campaign-ranking', title: 'Incentive pe magazine' },
     { kind: 'breakdown', metricId: 'campaigns.incentive_sales', title: 'Incentive pe magazine' },
     {
       kind: 'distribution',
@@ -353,7 +408,32 @@ const recipes: Partial<Record<ModuleSubviewId, readonly Recipe[]>> = {
     },
     { kind: 'alerts', title: 'Coverage Incentive' },
   ],
-  contest: [{ kind: 'alerts', title: 'Concurs indisponibil' }],
+  contest: [
+    { kind: 'kpi', metricId: 'campaigns.contest_points_total' },
+    { kind: 'kpi', metricId: 'campaigns.contest_focus_units' },
+    { kind: 'kpi', metricId: 'campaigns.contest_promo_units' },
+    { kind: 'kpi', metricId: 'campaigns.contest_price_units' },
+    { kind: 'kpi', metricId: 'campaigns.contest_focus_points' },
+    { kind: 'kpi', metricId: 'campaigns.contest_promo_points' },
+    { kind: 'kpi', metricId: 'campaigns.contest_price_points' },
+    {
+      kind: 'trend',
+      metricId: 'campaigns.contest_points_total',
+      title: 'Puncte în timp',
+    },
+    { kind: 'campaign-ranking', title: 'Clasament Concurs' },
+    {
+      kind: 'breakdown',
+      metricId: 'campaigns.contest_points_total',
+      title: 'Tabel Concurs pe agent',
+    },
+    {
+      kind: 'distribution',
+      metricId: 'campaigns.contest_points_total',
+      title: 'Puncte pe concurs',
+    },
+    { kind: 'alerts', title: 'Coverage Concurs' },
+  ],
   focus: [
     { kind: 'kpi', slot: 'primary' },
     { kind: 'kpi', slot: 'secondary' },
@@ -363,28 +443,47 @@ const recipes: Partial<Record<ModuleSubviewId, readonly Recipe[]>> = {
     { kind: 'distribution', title: 'Focus mix' },
     { kind: 'matrix', title: 'Pondere Focus magazin × perioadă' },
   ],
-  folii: [{ kind: 'alerts', title: 'Folii indisponibil' }],
+  folii: [
+    { kind: 'kpi', metricId: 'campaigns.folii_sales' },
+    { kind: 'kpi', metricId: 'campaigns.folii_quantity' },
+    { kind: 'kpi', metricId: 'campaigns.folii_discount' },
+    { kind: 'kpi', metricId: 'campaigns.folii_active_stores' },
+    { kind: 'kpi', metricId: 'campaigns.folii_active_products' },
+    { kind: 'kpi', metricId: 'campaigns.folii_qualifying_receipts' },
+    { kind: 'kpi', metricId: 'campaigns.folii_discounted_units' },
+    { kind: 'trend', metricId: 'campaigns.folii_sales', title: 'Vânzări Folii în timp' },
+    { kind: 'campaign-ranking', title: 'Folii pe magazine' },
+    { kind: 'breakdown', metricId: 'campaigns.folii_sales', title: 'Tabel Folii pe magazine' },
+    { kind: 'distribution', metricId: 'campaigns.folii_discount', title: 'Discount pe campanie' },
+    { kind: 'alerts', title: 'Coverage Folii' },
+  ],
   people: [
     { kind: 'kpi', slot: 'primary' },
+    { kind: 'trend', metricId: 'workforce.headcount', title: 'Persoane observate în timp' },
     { kind: 'breakdown', title: 'People agregat' },
-    { kind: 'matrix', title: 'Headcount în timp' },
+    { kind: 'alerts', title: 'Limită de interpretare' },
   ],
   movements: [
-    { kind: 'kpi', slot: 'primary' },
+    { kind: 'kpi', metricId: 'workforce.new_agents' },
+    { kind: 'kpi', metricId: 'workforce.reactivated_agents' },
     { kind: 'breakdown', title: 'Mișcări livrate de sursă' },
     { kind: 'alerts', title: 'Coverage și lipsuri' },
   ],
   stability: [
-    { kind: 'kpi', slot: 'quaternary' },
+    { kind: 'kpi', metricId: 'workforce.stability' },
     { kind: 'trend', title: 'Stabilitate' },
-    { kind: 'matrix', title: 'Stabilitate în timp' },
+    { kind: 'alerts', title: 'Limită de interpretare' },
   ],
   coverage: [
-    { kind: 'kpi', slot: 'tertiary' },
-    { kind: 'breakdown', title: 'Acoperire' },
-    { kind: 'matrix', title: 'Acoperire entitate × perioadă' },
+    { kind: 'kpi', metricId: 'workforce.coverage' },
+    { kind: 'alerts', title: 'Limită de interpretare' },
   ],
-  grile: [{ kind: 'alerts', title: 'Grile indisponibil' }],
+  grile: [
+    { kind: 'kpi', metricId: 'grile.observed_stores' },
+    { kind: 'kpi', metricId: 'grile.problem_stores' },
+    { kind: 'breakdown', metricId: 'grile.problem_stores', title: 'Status Grile pe magazine' },
+    { kind: 'alerts', title: 'Alerte Grile' },
+  ],
   distribution: [
     { kind: 'kpi', slot: 'primary' },
     { kind: 'distribution', title: 'Distribuție agregată' },
@@ -466,6 +565,11 @@ const ModulePaceWidget = lazy(() =>
 const ModuleRankingWidget = lazy(() =>
   import('./specialized-widgets').then((module) => ({ default: module.ModuleRankingWidget })),
 );
+const ModuleCampaignRankingWidget = lazy(() =>
+  import('./specialized-widgets').then((module) => ({
+    default: module.ModuleCampaignRankingWidget,
+  })),
+);
 const ModuleProductivityScatterWidget = lazy(() =>
   import('./specialized-widgets').then((module) => ({
     default: module.ModuleProductivityScatterWidget,
@@ -508,6 +612,7 @@ const componentByKind: Record<Exclude<RecipeKind, 'kpi'>, ComponentType> = {
   alerts: ModuleAlertsWidget,
   pace: ModulePaceWidget,
   ranking: ModuleRankingWidget,
+  'campaign-ranking': ModuleCampaignRankingWidget,
   scatter: ModuleProductivityScatterWidget,
   histogram: ModuleHistogramWidget,
   waterfall: ModuleWaterfallWidget,

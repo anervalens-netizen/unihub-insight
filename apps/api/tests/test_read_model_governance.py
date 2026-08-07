@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[3]
 def test_overview_snapshot_metadata_uses_only_the_governed_read_model() -> None:
     summary = inspect.getsource(PostgresAnalyticsRepository._fetch_summary)
 
-    assert "reporting_source_snapshot_v4" in summary
+    assert "reporting_source_snapshot_v6" in summary
     assert "import_snapshots" not in summary
 
 
@@ -37,9 +37,11 @@ def test_sensitive_modules_read_only_versioned_reporting_contracts() -> None:
     assert "ai_forecast_runs" not in planning
     assert "target_scenarios" not in planning
     assert "scenario.metric = 'sales_value'" in planning
-    assert "ROW_NUMBER() OVER" in planning
-    assert "WHEN 'current_month' THEN 0" in planning
-    assert "target_contract_invalid" in planning
+    assert "ROW_NUMBER() OVER" not in planning
+    assert "forecast_run_id DESC" not in planning
+    assert "scenario.status <> 'unavailable'" in planning
+    assert 'alias="scenario"' in planning
+    assert "target_contract_invalid" not in planning
 
 
 def test_sales_calendar_reads_only_the_versioned_daily_contract() -> None:
@@ -61,15 +63,30 @@ def test_visits_read_only_the_team_leader_v2_contract() -> None:
     assert "team_leader_name" in visits
 
 
-def test_commercial_campaigns_read_only_the_head_selected_v2_contract() -> None:
+def test_commercial_campaigns_read_only_the_head_selected_v3_contract() -> None:
     campaigns = inspect.getsource(PostgresInsightRepository._campaign_mechanism_rows)
 
-    assert "reporting_campaign_month_v2" in campaigns
+    assert "reporting_campaign_month_v3" in campaigns
+    assert "campaign.mechanism_variant" in campaigns
     assert "campaign.agent" in campaigns
     assert "incentive_campaigns" not in campaigns
     assert "incentive_products" not in campaigns
     assert "reporting_item_day" not in campaigns
     assert "reporting_item_month" not in campaigns
+
+
+def test_contest_and_grile_use_only_the_published_read_models() -> None:
+    contest = inspect.getsource(PostgresInsightRepository._contest_rows)
+    grile = inspect.getsource(PostgresInsightRepository._grile_slice)
+
+    assert "reporting_contest_month_v1" in contest
+    assert "qualifying_sales" not in contest
+    assert "qualifying_quantity" not in contest
+    assert "score" not in contest
+    assert "contest.total_points" in contest
+    assert "contest.prize" in contest
+    assert "reporting_grile_month_v2" in grile
+    assert "grile_store_current_status" not in grile
 
 
 def test_compensation_rejects_direct_differentiating_scope_and_export() -> None:
@@ -112,8 +129,12 @@ def test_bootstrap_uses_view_only_sensitive_acl_and_audit_is_append_only() -> No
     assert "reporting_source_snapshot_v2" in roles
     assert "reporting_source_snapshot_v3" in roles
     assert "reporting_source_snapshot_v4" in roles
+    assert "reporting_source_snapshot_v6" in roles
     assert "reporting_visit_month_v2" in roles
     assert "reporting_campaign_month_v2" in roles
+    assert "reporting_campaign_month_v3" in roles
+    assert "reporting_contest_month_v1" in roles
+    assert "reporting_grile_month_v2" in roles
     assert "'fieldops_visits'" in roles
     assert "ON TABLE salary_records" not in roles
     assert "ON TABLE agent_salary_links" not in roles

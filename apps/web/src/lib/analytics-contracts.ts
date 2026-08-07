@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const sourceDomainSchema = z.enum([
   'sales',
   'campaigns',
+  'contest',
   'workforce',
   'compensation',
   'visits',

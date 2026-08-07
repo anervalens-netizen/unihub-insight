@@ -62,8 +62,10 @@ METRICS = {metric.id: metric for metric in METRIC_CATALOG}
 COMMERCIAL_CAMPAIGN_METRICS = frozenset(
     metric_id
     for metric_id in METRICS
-    if metric_id.startswith("campaigns.promo_") or metric_id.startswith("campaigns.incentive_")
+    if metric_id.startswith(("campaigns.promo_", "campaigns.incentive_", "campaigns.folii_"))
 )
+CONTEST_METRICS = frozenset(metric_id for metric_id in METRICS if metric_id.startswith("campaigns.contest_"))
+GRILE_METRICS = frozenset(metric_id for metric_id in METRICS if metric_id.startswith("grile."))
 VISIT_METRICS = frozenset(
     {
         "visits.total",
@@ -99,6 +101,7 @@ MODULE_METRICS: dict[ModuleId, frozenset[str]] = {
             "campaigns.active_stores",
             "campaigns.active_products",
             *COMMERCIAL_CAMPAIGN_METRICS,
+            *CONTEST_METRICS,
         }
     ),
     ModuleId.WORKFORCE: frozenset(
@@ -107,6 +110,9 @@ MODULE_METRICS: dict[ModuleId, frozenset[str]] = {
             "workforce.productivity",
             "workforce.coverage",
             "workforce.stability",
+            "workforce.new_agents",
+            "workforce.reactivated_agents",
+            *GRILE_METRICS,
             *VISIT_METRICS,
         }
     ),
@@ -128,14 +134,22 @@ MODULE_SOURCE_DOMAINS: dict[ModuleId, SourceDomain] = {
 
 
 def primary_source_domain(query: WidgetQuery) -> SourceDomain:
-    return SourceDomain.VISITS if query.metric_id in VISIT_METRICS else MODULE_SOURCE_DOMAINS[query.module]
+    if query.metric_id in VISIT_METRICS:
+        return SourceDomain.VISITS
+    if query.metric_id in CONTEST_METRICS:
+        return SourceDomain.CONTEST
+    if query.metric_id in GRILE_METRICS:
+        return SourceDomain.GRILE
+    return MODULE_SOURCE_DOMAINS[query.module]
 
 
 def required_source_domains(query: WidgetQuery) -> tuple[SourceDomain, ...]:
     primary = primary_source_domain(query)
-    if query.metric_id in VISIT_METRICS:
+    if query.metric_id in {*VISIT_METRICS, *CONTEST_METRICS, *GRILE_METRICS}:
         return (primary,)
-    if query.module in {ModuleId.CAMPAIGNS, ModuleId.COMPENSATION, ModuleId.PLANNING}:
+    if query.module in {ModuleId.COMPENSATION, ModuleId.PLANNING}:
+        return (primary, SourceDomain.SALES)
+    if query.module is ModuleId.CAMPAIGNS and query.metric_id.startswith("campaigns.focus_"):
         return (primary, SourceDomain.SALES)
     return (primary,)
 
@@ -162,6 +176,8 @@ SCALAR_ONLY_METRICS = frozenset(
         "campaigns.promo_active_products",
         "campaigns.incentive_active_stores",
         "campaigns.incentive_active_products",
+        "campaigns.folii_active_stores",
+        "campaigns.folii_active_products",
         "workforce.coverage",
         "workforce.stability",
         "compensation.sales_ratio",
@@ -230,11 +246,14 @@ def _metric_for(query: WidgetQuery, user: UserContext) -> MetricDefinition:
         raise QueryValidationFailure("Trendul cere exact dimensiunea time.")
     distribution_dimensions = {
         "sales.total": "category",
-        "campaigns.focus_sales": "category",
-        "campaigns.promo_sales": "category",
-        "campaigns.promo_discount": "category",
-        "campaigns.incentive_sales": "category",
-        "campaigns.incentive_reward": "category",
+        "campaigns.focus_sales": "subcategory",
+        "campaigns.promo_sales": "campaign",
+        "campaigns.promo_discount": "campaign",
+        "campaigns.incentive_sales": "campaign",
+        "campaigns.incentive_reward": "campaign",
+        "campaigns.folii_sales": "campaign",
+        "campaigns.folii_discount": "campaign",
+        "campaigns.contest_points_total": "contest",
         "workforce.headcount": "tenure",
         "compensation.payroll": "firm",
         "finance.operating_costs": "category",
@@ -360,9 +379,23 @@ def _field_for(module: ModuleId, metric_id: str, *, breakdown: bool = False) -> 
         "campaigns.incentive_sales": "primary",
         "campaigns.incentive_quantity": "secondary",
         "campaigns.incentive_reward": "tertiary" if breakdown else "secondary",
+        "campaigns.folii_sales": "primary",
+        "campaigns.folii_quantity": "secondary",
+        "campaigns.folii_discount": "tertiary" if breakdown else "secondary",
+        "campaigns.contest_points_total": "primary",
+        "campaigns.contest_focus_units": "secondary",
+        "campaigns.contest_promo_units": "secondary",
+        "campaigns.contest_price_units": "secondary",
+        "campaigns.contest_focus_points": "primary",
+        "campaigns.contest_promo_points": "primary",
+        "campaigns.contest_price_points": "primary",
         "workforce.headcount": "primary",
         "workforce.productivity": "secondary",
         "workforce.stability": "comparison" if not breakdown else "progress_pct",
+        "workforce.new_agents": "primary",
+        "workforce.reactivated_agents": "primary",
+        "grile.observed_stores": "primary",
+        "grile.problem_stores": "secondary" if breakdown else "primary",
         "compensation.payroll": "primary",
         "compensation.average": "secondary",
         "compensation.median": "tertiary" if breakdown else "comparison",
@@ -399,6 +432,14 @@ def _data_for_metric(
         if data is None:
             raise RuntimeError("Portfolio analytics slice is unavailable.")
         return data
+    if response.module is ModuleId.CAMPAIGNS and metric_id in {
+        "campaigns.focus_sales",
+        "campaigns.focus_share",
+        "campaigns.active_stores",
+        "campaigns.active_products",
+    }:
+        data = response.subviews.get("focus")
+        return data if data is not None else response
     if metric_id.startswith("campaigns.promo_"):
         data = response.campaigns.get("promo")
         if data is None:
@@ -408,6 +449,21 @@ def _data_for_metric(
         data = response.campaigns.get("incentive")
         if data is None:
             raise RuntimeError("Incentive analytics slice is unavailable.")
+        return data
+    if metric_id.startswith("campaigns.folii_"):
+        data = response.campaigns.get("folii")
+        if data is None:
+            raise RuntimeError("Folii analytics slice is unavailable.")
+        return data
+    if metric_id.startswith("campaigns.contest_"):
+        data = response.campaigns.get("contest")
+        if data is None:
+            raise RuntimeError("Contest analytics slice is unavailable.")
+        return data
+    if metric_id.startswith("grile."):
+        data = response.subviews.get("grile")
+        if data is None:
+            raise RuntimeError("Grile analytics slice is unavailable.")
         return data
     if metric_id not in VISIT_METRICS:
         return response
@@ -640,7 +696,9 @@ def _dataset(
         )
 
     if query.visualization in {ChartKind.DONUT, ChartKind.TREEMAP} or (
-        query.metric_id not in PORTFOLIO_METRIC_IDS and query.dimensions[0] in {"category", "mechanism"}
+        query.metric_id not in PORTFOLIO_METRIC_IDS
+        and (distribution_dimension := getattr(data, "distribution_dimension", None)) is not None
+        and query.dimensions[0] == distribution_dimension
     ):
         return QueryDataset(
             dimensions=[
@@ -745,6 +803,12 @@ async def execute_query_batch(
             if query.time_range is not None and query.time_range.end != base_scope.period:
                 raise QueryValidationFailure("time_range.end trebuie să fie perioada snapshotului comun.")
             query_scope = resolve_query_scope(base_scope, query)
+            if query.metric_id in VISIT_METRICS and query_scope.agent:
+                raise QueryValidationFailure(
+                    "Scope-ul agent moștenit nu este permis pentru vizitele atribuite Team Leader-ului autor."
+                )
+            if query.module in {ModuleId.FINANCE, ModuleId.PLANNING} and query_scope.agent:
+                raise QueryValidationFailure(f"Scope-ul agent nu este permis pentru {query.module.value}.")
             unavailable_domains = [
                 domain.value
                 for domain in required_source_domains(query)

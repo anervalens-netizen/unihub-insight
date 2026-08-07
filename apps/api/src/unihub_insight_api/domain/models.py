@@ -95,6 +95,7 @@ class SourceStatus(StrEnum):
 class SourceDomain(StrEnum):
     SALES = "sales"
     CAMPAIGNS = "campaigns"
+    CONTEST = "contest"
     WORKFORCE = "workforce"
     COMPENSATION = "compensation"
     VISITS = "visits"
@@ -360,6 +361,17 @@ class CalendarCell(BaseModel):
 
 
 class ModuleAnalyticsSlice(BaseModel):
+    """A specialized module sub-view with its own governed source state.
+
+    Top-level module metadata is intentionally insufficient for mixed-domain
+    modules: Campaigns can expose Focus, Promo, Incentive and Concurs from
+    distinct Retail contracts, while Workforce combines commercial activity,
+    Visits and Grile.  A slice therefore carries the exact source metadata
+    used to build it; clients must not infer availability from warning text.
+    """
+
+    status: SourceStatus = SourceStatus.UNAVAILABLE
+    sources: dict[SourceDomain, SourceMetadata] = Field(default_factory=dict)
     axes: tuple[ValueAxis, ...]
     supported_charts: tuple[ChartKind, ...]
     kpis: list[KpiMetric]
@@ -391,6 +403,7 @@ class ModuleAnalyticsResponse(BaseModel):
     visits: ModuleAnalyticsSlice | None = None
     campaigns: dict[str, ModuleAnalyticsSlice] = Field(default_factory=dict)
     portfolio: dict[str, ModuleAnalyticsSlice] = Field(default_factory=dict)
+    subviews: dict[str, ModuleAnalyticsSlice] = Field(default_factory=dict)
 
 
 class DashboardLayout(BaseModel):

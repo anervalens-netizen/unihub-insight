@@ -6,7 +6,7 @@
 
 ## Starea curentă
 
-Producția existentă rămâne operațională, iar `1.0.0-rc.2` este candidatul integrat pentru promovare. RC2 păstrează coloana vertebrală analitică versionată din RC1 și adaugă Sales Portfolio reconciliat pe categorie, subcategorie, brand și produs. Nu este încă `1.0`: sursele live Compensation și Finance nu au generații oficiale eligibile, iar pilotul vizual owner și poarta de șapte zile trebuie închise după deploy.
+Producția existentă rămâne operațională, iar `1.0.0-rc.3` este candidatul integrat pentru promovare. RC3 păstrează Sales Portfolio din RC2 și adaugă Campaigns v3, Concurs canonic, Folii, Grile fenced și felii Workforce explicit limitate la activitate comercială observată. Nu este încă `1.0`: sursele live Compensation și Finance nu au generații oficiale eligibile, Planning nu are forecast promovat, iar pilotul vizual owner și poarta de șapte zile rămân deschise.
 
 | Suprafață | Stare |
 | --- | --- |
@@ -14,7 +14,7 @@ Producția existentă rămâne operațională, iar `1.0.0-rc.2` este candidatul 
 | Shell desktop, filtre în URL, Overview | `LIVE` |
 | Raport lunar cu istoric/comparații și XLSX numeric | `LIVE` |
 | Snapshot comun, catalog metrici/dimensiuni, query batch/inspect/CSV | `RC1` |
-| Sales, Performance, Campaigns, Workforce, Compensation, Finance, Planning | `PARȚIAL` — sub-view-uri distincte peste primitive comune; starea sursei este `LIVE/PARTIAL/UNAVAILABLE` |
+| Sales, Performance, Campaigns, Workforce, Compensation, Finance, Planning | `PARȚIAL` — sub-view-uri distincte și stare server-side per felie; contractele lipsă rămân `UNAVAILABLE` |
 | Custom Dashboards, preseturi, clone, versiuni, ACL/scope ceiling | `RC1` |
 | `ChartSpec` ECharts Canvas, URL drill, backing table și PNG sigur | `PARȚIAL` — formele fără dataset autoritativ revin la tabel |
 | Compensation și Finance live | `UNAVAILABLE` până la promovarea unei generații autoritative Retail |

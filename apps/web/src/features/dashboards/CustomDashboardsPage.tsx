@@ -236,7 +236,13 @@ export function CustomDashboardsPage() {
   });
   const deleteMutation = useMutation({
     mutationFn: deleteDashboard,
-    onSuccess: async () => {
+    onSuccess: async (_response, deletedId) => {
+      queryClient.setQueryData(dashboardsQuery.queryKey, (current) =>
+        current
+          ? { ...current, items: current.items.filter((document) => document.id !== deletedId) }
+          : current,
+      );
+      queryClient.removeQueries({ queryKey: ['dashboard-versions', deletedId], exact: true });
       setSelectedId(null);
       setDraft(null);
       updateSearch({ dashboard_id: undefined, dashboard_version: undefined }, true);

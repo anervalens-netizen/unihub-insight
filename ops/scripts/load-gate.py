@@ -79,7 +79,7 @@ def mixed_dashboard() -> dict[str, Any]:
                 "campaigns",
                 "campaigns.focus_sales",
                 "treemap",
-                ["category"],
+                ["subcategory"],
             ),
             widget(
                 "workforce-distribution",

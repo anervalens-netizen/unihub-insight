@@ -25,8 +25,10 @@ CATALOG_METRICS = {metric.id: metric for metric in METRIC_CATALOG}
 COMMERCIAL_CAMPAIGN_METRICS = frozenset(
     metric_id
     for metric_id in CATALOG_METRICS
-    if metric_id.startswith("campaigns.promo_") or metric_id.startswith("campaigns.incentive_")
+    if metric_id.startswith(("campaigns.promo_", "campaigns.incentive_", "campaigns.folii_"))
 )
+CONTEST_METRICS = frozenset(metric_id for metric_id in CATALOG_METRICS if metric_id.startswith("campaigns.contest_"))
+GRILE_METRICS = frozenset(metric_id for metric_id in CATALOG_METRICS if metric_id.startswith("grile."))
 VISIT_METRICS = frozenset(
     {
         "visits.total",
@@ -73,6 +75,7 @@ MODULE_METRICS: dict[ModuleId, frozenset[str]] = {
             "campaigns.active_stores",
             "campaigns.active_products",
             *COMMERCIAL_CAMPAIGN_METRICS,
+            *CONTEST_METRICS,
         }
     ),
     ModuleId.WORKFORCE: frozenset(
@@ -81,6 +84,9 @@ MODULE_METRICS: dict[ModuleId, frozenset[str]] = {
             "workforce.productivity",
             "workforce.coverage",
             "workforce.stability",
+            "workforce.new_agents",
+            "workforce.reactivated_agents",
+            *GRILE_METRICS,
             *VISIT_METRICS,
         }
     ),
@@ -202,6 +208,8 @@ SCALAR_ONLY_METRICS = frozenset(
         "campaigns.promo_active_products",
         "campaigns.incentive_active_stores",
         "campaigns.incentive_active_products",
+        "campaigns.folii_active_stores",
+        "campaigns.folii_active_products",
         "workforce.coverage",
         "workforce.stability",
         "compensation.sales_ratio",
@@ -338,11 +346,14 @@ def validate_dashboard(request: DashboardCreateRequest, user: UserContext) -> No
             errors.append(f"{prefix}.visualization requires dimensions=[time]")
         mix_dimensions = {
             "sales.total": "category",
-            "campaigns.focus_sales": "category",
-            "campaigns.promo_sales": "category",
-            "campaigns.promo_discount": "category",
-            "campaigns.incentive_sales": "category",
-            "campaigns.incentive_reward": "category",
+            "campaigns.focus_sales": "subcategory",
+            "campaigns.promo_sales": "campaign",
+            "campaigns.promo_discount": "campaign",
+            "campaigns.incentive_sales": "campaign",
+            "campaigns.incentive_reward": "campaign",
+            "campaigns.folii_sales": "campaign",
+            "campaigns.folii_discount": "campaign",
+            "campaigns.contest_points_total": "contest",
             "workforce.headcount": "tenure",
             "compensation.payroll": "firm",
             "finance.operating_costs": "category",

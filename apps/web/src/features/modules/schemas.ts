@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { sourceMetadataSchema } from '../../lib/analytics-contracts';
+import { sourceMetadataSchema, sourceStatusSchema } from '../../lib/analytics-contracts';
 import { capabilities } from '../identity/schemas';
 
 const numeric = z.coerce.number();
@@ -140,26 +140,35 @@ const moduleAnalyticsBaseSchema = z.object({
   distribution_dimension: z.string().nullable().optional(),
 });
 
-export const moduleAnalyticsSliceSchema = moduleAnalyticsBaseSchema.pick({
-  axes: true,
-  supported_charts: true,
-  kpis: true,
-  trend: true,
-  distribution: true,
-  breakdown: true,
-  matrix: true,
-  calendar: true,
-  alerts: true,
-  entity_dimension: true,
-  distribution_dimension: true,
-});
+export const moduleAnalyticsSliceSchema = moduleAnalyticsBaseSchema
+  .pick({
+    axes: true,
+    supported_charts: true,
+    kpis: true,
+    trend: true,
+    distribution: true,
+    breakdown: true,
+    matrix: true,
+    calendar: true,
+    alerts: true,
+    entity_dimension: true,
+    distribution_dimension: true,
+  })
+  .extend({
+    // Slice state is authoritative for a specialized sub-view. Do not infer it
+    // from the parent module metadata or warning text.
+    status: sourceStatusSchema.default('unavailable'),
+    sources: z.record(z.string(), sourceMetadataSchema).default({}),
+  });
 
 export const moduleAnalyticsSchema = moduleAnalyticsBaseSchema.extend({
   visits: moduleAnalyticsSliceSchema.nullable().optional(),
   campaigns: z.record(z.string(), moduleAnalyticsSliceSchema).optional(),
   portfolio: z.record(z.string(), moduleAnalyticsSliceSchema).default({}),
+  subviews: z.record(z.string(), moduleAnalyticsSliceSchema).default({}),
 });
 
 export type ModuleAnalytics = z.infer<typeof moduleAnalyticsSchema>;
+export type ModuleAnalyticsSlice = z.infer<typeof moduleAnalyticsSliceSchema>;
 export type ModuleKpi = z.infer<typeof kpiSchema>;
 export type BreakdownRow = ModuleAnalytics['breakdown'][number];

@@ -65,4 +65,19 @@ describe('native module query batch projection', () => {
 
     expect(applyNativeBatchResults(base, [failed]).matrix).toEqual([]);
   });
+
+  it('does not synthesize a zero receipt KPI when the slice omits it', () => {
+    const campaignData = {
+      ...base,
+      module: 'campaigns',
+      kpis: [{ id: 'campaigns.promo_sales', value: 120 }],
+    } as unknown as ModuleAnalytics;
+    const missingReceipt = result('kpi:campaigns.promo_qualifying_receipts', 'kpi', [{ value: 0 }]);
+    missingReceipt.query.metric_id = 'campaigns.promo_qualifying_receipts';
+
+    const projected = applyNativeBatchResults(campaignData, [missingReceipt]);
+    expect(
+      projected.kpis.find((item) => item.id === 'campaigns.promo_qualifying_receipts'),
+    ).toBeUndefined();
+  });
 });

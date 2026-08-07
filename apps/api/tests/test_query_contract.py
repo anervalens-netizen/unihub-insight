@@ -64,6 +64,12 @@ def test_versioned_catalog_exposes_query_and_dimension_contract(client: TestClie
         "campaigns.incentive_sales",
         "campaigns.incentive_reward",
     } <= campaign_metrics
+    catalog_metrics = {item["id"]: item for item in payload["metrics"]}
+    assert "campaign" in catalog_metrics["campaigns.promo_sales"]["allowed_dimensions"]
+    assert "category" not in catalog_metrics["campaigns.promo_sales"]["allowed_dimensions"]
+    assert "subcategory" in catalog_metrics["campaigns.focus_sales"]["allowed_dimensions"]
+    assert catalog_metrics["campaigns.contest_points_total"]["unit"] == "integer"
+    assert "campaign" in {item["id"] for item in payload["dimensions"]}
     formula_references = [item["formula_reference"] for item in payload["metrics"]]
     assert len(formula_references) == len(set(formula_references))
     assert all(reference != "retail-reporting-contract" for reference in formula_references)
@@ -212,6 +218,25 @@ def test_visits_query_rejects_agent_filter(client: TestClient) -> None:
     response = client.post(
         "/api/v1/query/batch",
         params={"period": "2026-08"},
+        json={"widgets": [query]},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["results"][0]["error"]["code"] == "invalid-query"
+
+
+def test_visits_query_rejects_inherited_agent_scope(client: TestClient) -> None:
+    query = widget(
+        "visits-inherited-agent",
+        module="performance",
+        metric_id="visits.total",
+        visualization="table",
+        dimensions=["team_leader"],
+    )
+    query["comparisons"] = []
+    response = client.post(
+        "/api/v1/query/batch",
+        params={"period": "2026-08", "agent": "Agent 01"},
         json={"widgets": [query]},
     )
 

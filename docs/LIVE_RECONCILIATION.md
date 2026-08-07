@@ -4,7 +4,7 @@
 
 Prove that UniHub Insight presents the same business truth as UniHub Retail for identical period and scope. Visual similarity is not acceptance; control totals must match.
 
-## Latest production evidence — 2026-08-06
+## Latest production evidence — 2026-08-07
 
 The bounded matrix has zero numeric differences for every available case:
 19/19 in the closed month 2026-07 and 18/18 in the current month 2026-08.
@@ -16,8 +16,9 @@ Workforce and Planning are `partial`, Finance and Compensation are
 where eligible. Missing/partial sources and missing samples are never converted
 to success.
 
-The next integrated candidate is `1.0.0-rc.2`; it carries the Sales Portfolio
-contract below and is not a relabeling of `1.0.0-rc.1`.
+The next integrated candidate is `1.0.0-rc.3`; it retains the Sales Portfolio
+contract below and adds Campaigns v3, canonical Contest v1 and Grile v2 selected atomically by snapshot v6.
+Finance, Compensation and unpromoted Planning remain fail-closed.
 
 ### Sales Portfolio control — entire network, 2026-06
 
@@ -102,22 +103,26 @@ new SKU. Never use the SKU incidence as a distinct receipt control.
 Compare Focus sales/quantity and the count of active products/stores. Promo and
 Incentive additionally compare mechanism existence, sales, signed net quantity,
 distinct published product codes, participating stores and canonical
-discount/reward from `reporting_campaign_month_v2`. Promo, Incentive and Concurs
-remain separate metrics and are not merged into Focus.
+discount/reward from `reporting_campaign_month_v3`. Promo, Incentive, Folii and
+Concurs remain separate metrics and are not merged into Focus.
 
 Focus `active_products` is the distinct union of products with Focus results in
 `reporting_focus_item_month`, never the largest per-store count and never the
 configured campaign catalog. In 2026-06 the network control is 44 distinct
 result products; the previous maximum-store projection returned 28.
 
-Concurs has two Retail mechanisms in 2026-06 but no eligible official
-head/read-model for Insight, so it is unavailable rather than zero or partial
-reconciliation evidence. The current Retail `promo_bonuri` aggregate sums
-excluded units and is not a distinct-receipt control.
+Concurs v1 compares the exact `focus_units`, `promo_units`, `price_units`,
+point breakdown/total and ranking published by the canonical Retail service.
+The prize is textual and is not summed. `promo_units` remains a unit control,
+not a distinct-receipt control. Folii is selected only through the canonical
+`same_model_screen_camera` variant.
 
 ### Workforce
 
-Compare active headcount, days worked, entries/exits and eligible-store coverage. Coverage denominator includes eligible stores with no staffed sales row.
+Compare observed active agents, sales days, new/reactivated observations and
+eligible-store coverage. Do not infer hires, exits, transfers or an official HR
+roster from missing/present sales activity. Reconcile Grile separately through
+`reporting_grile_month_v2` and the single month source selected by snapshot v6.
 
 ### Compensation
 

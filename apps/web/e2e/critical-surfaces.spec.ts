@@ -174,6 +174,77 @@ test('native modules render their specialized analytical forms', async ({ page }
   expect(errors).toEqual([]);
 });
 
+test('specialized slice status drives Campaigns and Workforce subviews', async ({ page }) => {
+  await page.route('**/api/v1/modules/campaigns*', async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    const campaignSource = body.meta.sources.campaigns;
+    const slice = (status: string, source = campaignSource) => ({
+      status,
+      sources: { [source.domain]: { ...source, warnings: [] } },
+      axes: body.axes,
+      supported_charts: body.supported_charts,
+      kpis: body.kpis,
+      trend: body.trend,
+      distribution: body.distribution,
+      breakdown: body.breakdown,
+      matrix: body.matrix,
+      calendar: body.calendar,
+      alerts: body.alerts,
+    });
+    const contestSource = body.meta.sources.contest ?? { ...campaignSource, domain: 'contest' };
+    body.subviews = { focus: slice('official') };
+    body.campaigns = {
+      promo: slice('official'),
+      incentive: slice('official'),
+      folii: slice('official'),
+      contest: slice('official', contestSource),
+    };
+    await route.fulfill({ response, json: body });
+  });
+  await page.route('**/api/v1/modules/workforce*', async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    const workforceSource = body.meta.sources.workforce;
+    const slice = (status: string, source = workforceSource) => ({
+      status,
+      sources: { [source.domain]: { ...source, warnings: [] } },
+      axes: body.axes,
+      supported_charts: body.supported_charts,
+      kpis: body.kpis,
+      trend: body.trend,
+      distribution: body.distribution,
+      breakdown: body.breakdown,
+      matrix: body.matrix,
+      calendar: body.calendar,
+      alerts: body.alerts,
+    });
+    const grileSource = body.meta.sources.grile ?? { ...workforceSource, domain: 'grile' };
+    body.subviews = {
+      people: slice('partial'),
+      movements: slice('partial'),
+      stability: slice('partial'),
+      coverage: slice('partial'),
+      grile: slice('official', grileSource),
+    };
+    await route.fulfill({ response, json: body });
+  });
+
+  await page.goto('/campaigns?period=2026-08&subview=contest');
+  await expect(page.locator('.module-contract-state--available')).toContainText(
+    'Contract disponibil',
+  );
+  await expect(page.locator('.module-unavailable')).toHaveCount(0);
+  await expect(page.locator('[gs-id="campaign-ranking"]')).toBeVisible();
+
+  await page.goto('/workforce?period=2026-08&subview=people');
+  await expect(page.locator('.module-contract-state--partial')).toContainText('Contract parțial');
+  await expect(page.locator('.module-contract-state')).toContainText(
+    'Activitate comercială observată',
+  );
+  await expect(page.locator('.insight-grid')).toBeVisible();
+});
+
 test('distribution reuses one eligible sample for histogram and box plot', async ({ page }) => {
   const errors = collectRuntimeErrors(page);
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -588,10 +659,16 @@ test('custom dashboard blank, widget duplication, versioning and clone lifecycle
 
 test('custom dashboard template executes batch and exports inspected rows', async ({ page }) => {
   await page.goto('/dashboards?period=2026-08');
+  await expect(page.locator('.dashboard-templates')).toBeVisible();
+  const regionalManagerItems = page
+    .locator('.dashboard-list-item')
+    .filter({ hasText: 'Regional Manager' });
+  const existingRegionalManagerCount = await regionalManagerItems.count();
   await page
     .locator('.dashboard-templates')
     .getByRole('button', { name: /Regional Manager/ })
     .click();
+  await expect(regionalManagerItems).toHaveCount(existingRegionalManagerCount + 1);
   await expect(page.locator('.dashboard-name-input')).toHaveValue('Regional Manager');
   await expect(page.locator('.insight-grid')).toBeVisible();
   const initialCards = await page.locator('.widget-card').count();
@@ -617,9 +694,7 @@ test('custom dashboard template executes batch and exports inspected rows', asyn
   await page.getByRole('button', { name: 'Configurare' }).click();
   page.once('dialog', (confirmation) => confirmation.accept());
   await page.getByRole('button', { name: 'Șterge dashboard' }).click();
-  await expect(
-    page.locator('.dashboard-list-item').filter({ hasText: 'Regional Manager' }),
-  ).toHaveCount(0);
+  await expect(regionalManagerItems).toHaveCount(existingRegionalManagerCount);
 });
 
 test('canvas POC bounds 10 widgets, heatmap 100x36, scatter 5000 and repeated navigation', async ({
@@ -629,10 +704,16 @@ test('canvas POC bounds 10 widgets, heatmap 100x36, scatter 5000 and repeated na
   testInfo.setTimeout(90_000);
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/dashboards?period=2026-08&range=12');
+  await expect(page.locator('.dashboard-templates')).toBeVisible();
+  const regionalManagerItems = page
+    .locator('.dashboard-list-item')
+    .filter({ hasText: 'Regional Manager' });
+  const existingRegionalManagerCount = await regionalManagerItems.count();
   await page
     .locator('.dashboard-templates')
     .getByRole('button', { name: /Regional Manager/ })
     .click();
+  await expect(regionalManagerItems).toHaveCount(existingRegionalManagerCount + 1);
   await page.getByRole('button', { name: 'Configurare' }).click();
   const editors = page.locator('.widget-editor-card');
   const matrix = editors.nth(3);
@@ -805,7 +886,5 @@ test('canvas POC bounds 10 widgets, heatmap 100x36, scatter 5000 and repeated na
   await page.getByRole('button', { name: 'Configurare' }).click();
   page.once('dialog', (confirmation) => confirmation.accept());
   await page.getByRole('button', { name: 'Șterge dashboard' }).click();
-  await expect(
-    page.locator('.dashboard-list-item').filter({ hasText: 'Regional Manager' }),
-  ).toHaveCount(0);
+  await expect(regionalManagerItems).toHaveCount(existingRegionalManagerCount);
 });

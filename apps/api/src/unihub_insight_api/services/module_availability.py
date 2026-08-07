@@ -7,6 +7,7 @@ from unihub_insight_api.domain import (
     AnalyticalSnapshot,
     AnalyticsScope,
     Capability,
+    DataMode,
     InsightAlert,
     ModuleAnalyticsResponse,
     ModuleId,
@@ -19,12 +20,18 @@ from unihub_insight_api.services.scope import scope_label
 MODULE_SOURCE_DOMAINS: dict[ModuleId, tuple[SourceDomain, ...]] = {
     ModuleId.SALES: (SourceDomain.SALES,),
     ModuleId.PERFORMANCE: (SourceDomain.SALES,),
-    ModuleId.CAMPAIGNS: (SourceDomain.CAMPAIGNS, SourceDomain.SALES),
-    ModuleId.WORKFORCE: (SourceDomain.WORKFORCE,),
+    ModuleId.CAMPAIGNS: (SourceDomain.CAMPAIGNS, SourceDomain.CONTEST),
+    ModuleId.WORKFORCE: (SourceDomain.WORKFORCE, SourceDomain.VISITS, SourceDomain.GRILE),
     ModuleId.COMPENSATION: (SourceDomain.COMPENSATION, SourceDomain.SALES),
     ModuleId.FINANCE: (SourceDomain.FINANCE,),
     ModuleId.PLANNING: (SourceDomain.PLANNING, SourceDomain.SALES),
 }
+
+# These modules compose independent, governed sub-views.  The route must let
+# the repository expose each slice's own availability when at least one source
+# is eligible.  Sensitive modules deliberately remain outside this set: their
+# complete source contracts fail closed before any read is attempted.
+MIXED_SLICE_MODULES = frozenset({ModuleId.CAMPAIGNS, ModuleId.WORKFORCE})
 
 MODULE_PRESENTATION: dict[ModuleId, tuple[str, str, Capability]] = {
     ModuleId.SALES: ("Sales Intelligence", "Pace, trend, mix și calitatea tranzacțiilor.", Capability.ANALYTICS),
@@ -40,7 +47,7 @@ MODULE_PRESENTATION: dict[ModuleId, tuple[str, str, Capability]] = {
     ),
     ModuleId.WORKFORCE: (
         "Workforce",
-        "Headcount, stabilitate, acoperire, productivitate și Grile.",
+        "Activitate comercială observată, productivitate și Grile; nu reprezintă registru oficial de personal.",
         Capability.MANAGEMENT,
     ),
     ModuleId.COMPENSATION: (
@@ -62,11 +69,14 @@ MODULE_PRESENTATION: dict[ModuleId, tuple[str, str, Capability]] = {
 
 
 def unavailable_source_domains(module: ModuleId, snapshot: AnalyticalSnapshot) -> tuple[SourceDomain, ...]:
-    return tuple(
+    unavailable = tuple(
         domain
         for domain in MODULE_SOURCE_DOMAINS[module]
         if (source := snapshot.sources.get(domain.value)) is None or source.status is SourceStatus.UNAVAILABLE
     )
+    if module in MIXED_SLICE_MODULES and len(unavailable) != len(MODULE_SOURCE_DOMAINS[module]):
+        return ()
+    return unavailable
 
 
 def unavailable_module_response(
@@ -90,7 +100,7 @@ def unavailable_module_response(
             comparison=scope.comparison,
             as_of=primary.as_of if primary else None,
             is_final=primary.is_final if primary else False,
-            data_mode="postgres",
+            data_mode=DataMode.POSTGRES,
             scope_label=scope_label(scope),
             generated_at=datetime.now(UTC),
             source=primary.source if primary else "source-unavailable",
