@@ -18,7 +18,7 @@ to success.
 
 The next integrated candidate is `1.0.0-rc.3`; it retains the Sales Portfolio
 contract below and adds Campaigns v3, canonical Contest v1 and Grile v2 selected atomically by snapshot v6.
-Finance, Compensation and unpromoted Planning remain fail-closed.
+Finance, Compensation and Planning must expose existing canonical Retail rows with truthful provenance; only genuinely absent rows remain unavailable.
 
 ### Sales Portfolio control — entire network, 2026-06
 
@@ -77,7 +77,7 @@ Use one finalized month and the current open month. For each, test:
 - at least five agents, including an agent with partial-month target allocation;
 - one store with returns;
 - one month containing estimated P&L;
-- one HR scope with fewer than three people.
+- one Compensation scope with one or two people, which must remain fully visible to the allowlisted user.
 
 ## Control totals
 
@@ -126,11 +126,10 @@ roster from missing/present sales activity. Reconcile Grile separately through
 
 ### Compensation
 
-- Compare only approved aggregate cohorts from `reporting_compensation_month_v1`; Insight never reads salary/person rows.
-- Total payroll includes all canonical salary rows in the Retail-owned aggregation.
-- Average includes only salaries of at least 2,000 RON; median does not apply pragul.
-- Any cohort with one or two people exposes no values, rows, charts or exports.
-- Public contracts contain no `person_id`, name, CNP or filter that can differentiate a person.
+- Compare the complete versioned Compensation contract against every canonical Retail salary row in the same period/scope.
+- Person identity, company/store/hierarchy, salary values/components and provenance reconcile row-for-row; aggregates conserve those visible rows.
+- Any alternative average rule such as a 2,000 RON threshold is separately named and shown beside the all-person average, never applied silently.
+- Scopes with one or two people remain visible in KPI, person detail, charts, inspect and export for both allowlisted users.
 
 ### Finance
 
@@ -156,8 +155,8 @@ Compare completed forecast run IDs, actuals, forecast values, target gap and acc
 - Currency: exact to 0.01 RON after canonical rounding.
 - Integer counts/quantities: exact.
 - Percentages: derived from exact control totals; display tolerance 0.01 percentage points.
-- Dates, entity counts, capability decisions and suppression: exact.
+- Dates, entity counts, allowlist decisions and person-row visibility: exact.
 
 ## No-go conditions
 
-Promotion remains blocked by any missing required sample, non-official required source, write privilege on the analytics role, unexplained total difference, a Portfolio dimension that does not conserve its required values/cardinality, an SKU incidence presented as distinct receipts, an agent receiving a store target, sensitive values visible below the suppression threshold, P&L actual/estimate overlap, stale migration checksum or non-finite query scope.
+Promotion remains blocked by any missing required sample, canonical Retail rows hidden from an allowlisted user, write privilege on the analytics role, unexplained total difference, a Portfolio dimension that does not conserve its required values/cardinality, an SKU incidence presented as distinct receipts, an agent receiving a store target without a defined allocation, P&L actual/estimate mislabeling or duplicate selection, stale migration checksum or non-finite query scope.

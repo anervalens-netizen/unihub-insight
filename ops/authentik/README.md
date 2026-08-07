@@ -22,28 +22,20 @@ identity headers before copying the trusted Authentik response headers. Adapt
 the Caddy site only if the live outpost uses different response-header names;
 do not change application headers without updating proxy-auth tests and docs.
 
-## Capability mapping
+## Allowlist mapping
 
-| Capability | Default groups |
-| --- | --- |
-| General analytics | `unihub-manager`, `unihub-analytics`, `unihub-admin`, `authentik Admins` |
-| Management / Workforce / Planning | `unihub-manager`, `unihub-admin`, `authentik Admins` |
-| Compensation | `unihub-hr`, `unihub-admin`, `authentik Admins` |
-| Finance & P&L | `unihub-pnl`, `unihub-admin`, `authentik Admins` |
-| Insight administration | `unihub-admin`, `authentik Admins` |
-
-Group mapping is configurable through the production environment file. Admin capability does not silently create HR/P&L access unless the group is also present in those configured lists.
+Production has one application-access decision: an exact allowlist containing the owner and general director. Each allowlisted subject receives all existing capabilities (Analytics, Management, Compensation, Finance/P&L and Insight administration) so legacy capability checks cannot hide a module, endpoint, inspect response or export. Module-specific groups such as `unihub-hr` and `unihub-pnl` are not product permissions for Insight.
 
 ## Required negative tests
 
 1. No Authentik session → redirect to login.
 2. Identity headers without proxy secret → 401.
 3. Wrong proxy secret → 401.
-4. General analytics user calling Compensation or Finance directly → 403.
-5. Shared dashboard containing a sensitive module without capability → absent/404.
-6. User losing a group → capability disappears on the next verified request.
+4. Either allowlisted user can call every module, inspect and export endpoint and receives complete data.
+5. A non-allowlisted authenticated identity receives 403 for the application and API.
+6. Removing a subject from the allowlist takes effect on the next verified request.
 7. Browser-supplied `X-Authentik-*` and `X-UniHub-Proxy-Secret` headers are
-   stripped by Caddy; only the API upstream receives the Caddy-injected secret.
+stripped by Caddy; only the API upstream receives the Caddy-injected secret.
 
 ## Secret handling
 

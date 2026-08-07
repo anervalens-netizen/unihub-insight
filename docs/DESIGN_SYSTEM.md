@@ -42,13 +42,13 @@ Apache ECharts 6.1 uses modular registration. The canonical research and complet
 | Part-to-whole | stacked/100% stacked bar | donut only for 5–6 meaningful categories |
 | Change bridge | waterfall | signed components must reconcile start/end |
 | Relationship | scatter | bubble only for one meaningful third metric; no causal claim |
-| Distribution | histogram + boxplot | only non-sensitive cohorts with sample size visible |
+| Distribution | histogram + boxplot | sample size visible; full person-level backing table available to authorized users |
 | Entity × time | Canvas heatmap | initial 100×36, then aggregation/paging |
 | Forecast uncertainty | range/fan band + scenario lines | actual, estimate and scenario remain visually distinct |
 
 `ChartSpec` maps question and data shape to allowed charts, cardinality, renderer, interaction, formatter, accessible table and export. Shared `dataset`/`dimensions`/`encode` is the chart data boundary; client transforms are presentation-safe only. Realized, target, forecast and comparison keep stable identities. Future actual values are gaps.
 
-Chart Studio exposes governed Executive, Ocean, Vibrant, Accessible and Monochrome presets plus density, legend, labels and motion controls. User preferences may change presentation, never formulas, missing-data behavior, suppression or required non-color encoding.
+Chart Studio exposes governed Executive, Ocean, Vibrant, Accessible and Monochrome presets plus density, legend, labels and motion controls. User preferences may change presentation, never formulas, missing-data behavior, source provenance or required non-color encoding.
 
 Canvas is the default for dense/large charts. SVG is allowed only after measured POC for many small charts or vector/zoom needs. Acceptance profiles bundle/chunk size, first render, resize, frame time and memory for 8–12 widgets; interaction p95 remains under 200 ms. Cross-filter uses ECharts events/actions through URL state. ARIA, decals/non-color encoding, backing table and sanitized non-persistent PNG export are mandatory.
 

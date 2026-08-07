@@ -4,7 +4,7 @@
 
 The filter bar controls period, comparison, company, RM, stores and agent. RM, stores and agents are searchable multi-selects; ASM remains available only in internal drill/reconciliation contracts. Scope is stored in the URL, so a copied link reproduces the same analysis. Selected stores dominate historical parent-company filters where the Retail identity contract requires it.
 
-Finance and Planning do not accept agent scope. Compensation is visible only with the HR capability; Finance only with the P&L capability.
+Both allowlisted users can open every module and use every available business dimension. Compensation includes person-level drill and export. Finance/Planning accept agent scope only where Retail publishes a meaningful agent allocation; absence of that grain is shown as a source limitation, never as a permission denial.
 
 ## Modules
 
@@ -37,7 +37,7 @@ Start blank or clone Director, Regional Manager, Finance or Risk templates. A ca
 - **Override** — ignores global business filters and uses only specified local values; period/comparison remain global.
 - **Ignore** — analyzes network scope for the selected period/comparison.
 
-Orice stare non-inherited este vizibilă pe card. Duplicarea din vizualizare salvează atomic o versiune nouă înainte să execute query-ul nou. Share-ul este țintit per subject cu `read/edit/admin`; capability și scope ceiling sunt reverificate server-side la read/query/inspect/export. Versiunile anterioare rămân selectabile, iar preset-urile pot fi personale sau partajate și suportă creare, aplicare, actualizare și ștergere.
+Orice stare non-inherited este vizibilă pe card. Duplicarea din vizualizare salvează atomic o versiune nouă înainte să execute query-ul nou. Share-ul este țintit per subject cu `read/edit/admin` pentru layout; nu schimbă vizibilitatea datelor, identică pentru ambii utilizatori autorizați. Versiunile anterioare rămân selectabile, iar preset-urile pot fi personale sau partajate și suportă creare, aplicare, actualizare și ștergere.
 
 ## Data-state interpretation
 
@@ -48,8 +48,8 @@ Orice stare non-inherited este vizibilă pe card. Duplicarea din vizualizare sal
 - Missing data is not silently converted to zero.
 - Calendarul Sales arată numai zile observate până la cutoff. O celulă absentă rămâne missing; returul este cantitate negativă, iar numărul afișat de magazine este observat, nu coverage complet declarat.
 - Visits din Performance și Workforce folosește autorul Team Leader păstrat în vizită, nu ASM-ul magazinului. Filtrele firmă/RM/magazin folosesc ierarhia curentă; filtrul agent este incompatibil și trebuie eliminat înainte de deschiderea sub-view-ului.
-- Compensation citește numai read-model-ul agregat Retail; nu există persoană/nume/CNP în contract. Cohortele sub trei persoane sunt suprimate inclusiv în inspect și export.
-- `UNAVAILABLE` înseamnă că nu există o generație autoritativă eligibilă; UI nu transformă date legacy sau lipsa în zero.
+- Compensation folosește read-model-ul Retail complet: persoane, salarii/componente, firmă, magazin, ierarhie, provenance și agregate. Nu suprimă cohorte sau persoane în UI, inspect ori export pentru utilizatorii autorizați.
+- `UNAVAILABLE` înseamnă că nu există rânduri canonice Retail pentru perioada/scope-ul cerut sau sursa este inaccesibilă. Datele legacy/estimate existente rămân vizibile și etichetate corect; lipsa nu devine zero.
 
 ## Operational actions
 

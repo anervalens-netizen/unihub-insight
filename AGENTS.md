@@ -24,14 +24,14 @@ For an explicitly requested implementation task, execute end-to-end: inspect rel
 - Browser code never receives database credentials and never sends SQL.
 - Missing data remains missing unless the metric contract explicitly defines a zero.
 - Every analytical response carries period, scope, cutoff, source and generated time.
-- Salary and P&L access is enforced server-side; hiding UI is insufficient.
+- Every allowlisted Insight user has full server-side access to every analytical module and all available business detail, including person-level Compensation and Finance. Authentication remains mandatory; module-specific HR/P&L roles must not hide data from an authorized user.
 - A metric formula has one canonical implementation and version.
 - Store selection dominates historical parent-company mapping when the source contract requires it.
 - `Cartele` and distribution/TR locations stay outside normal Retail KPI calculations unless a dedicated metric says otherwise.
 - Quantities are net; returns reduce volume.
 - Large scans need a measured reason and a bounded deadline.
 - Dashboard widgets in one render use one eligible analytical snapshot; metadata cutoff/finality is per source domain.
-- Compensation reads only an approved aggregate read-model; no direct person/salary source or differentiating filters/exports.
+- Compensation uses a versioned, read-only Retail contract that preserves person identity, salary values/components and all useful business dimensions in UI, inspect and export. It must not apply cohort suppression, identity masking or legacy-batch eligibility rules that hide rows already accepted by Retail.
 
 ## Architecture rules
 

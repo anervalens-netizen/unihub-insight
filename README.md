@@ -6,18 +6,18 @@
 
 ## Starea curentă
 
-Producția existentă rămâne operațională, iar `1.0.0-rc.3` este candidatul integrat pentru promovare. RC3 păstrează Sales Portfolio din RC2 și adaugă Campaigns v3, Concurs canonic, Folii, Grile fenced și felii Workforce explicit limitate la activitate comercială observată. Nu este încă `1.0`: sursele live Compensation și Finance nu au generații oficiale eligibile, Planning nu are forecast promovat, iar pilotul vizual owner și poarta de șapte zile rămân deschise.
+Producția existentă rămâne operațională, iar `1.0.0-rc.3` este candidatul integrat curent. RC3 păstrează Sales Portfolio din RC2 și adaugă Campaigns v3, Concurs canonic, Folii, Grile fenced și felii Workforce bazate pe activitatea comercială observată. Nu este încă `1.0`: Compensation și Finance ascund în prezent date Retail existente prin contracte prea restrictive, Planning nu expune toate run-urile disponibile, iar pilotul vizual owner și poarta de șapte zile rămân deschise.
 
 | Suprafață | Stare |
 | --- | --- |
-| Deploy, Authentik, acces limitat la Andrei/Alexandra/Bogdan, PostgreSQL read-only, monitorizare | `LIVE` |
+| Deploy, Authentik, PostgreSQL read-only, monitorizare | `LIVE`; allowlistul țintă owner + director general trebuie reconciliat live |
 | Shell desktop, filtre în URL, Overview | `LIVE` |
 | Raport lunar cu istoric/comparații și XLSX numeric | `LIVE` |
 | Snapshot comun, catalog metrici/dimensiuni, query batch/inspect/CSV | `RC1` |
 | Sales, Performance, Campaigns, Workforce, Compensation, Finance, Planning | `PARȚIAL` — sub-view-uri distincte și stare server-side per felie; contractele lipsă rămân `UNAVAILABLE` |
-| Custom Dashboards, preseturi, clone, versiuni, ACL/scope ceiling | `RC1` |
+| Custom Dashboards, preseturi, clone, versiuni și permisiuni layout | `RC1` |
 | `ChartSpec` ECharts Canvas, URL drill, backing table și PNG sigur | `PARȚIAL` — formele fără dataset autoritativ revin la tabel |
-| Compensation și Finance live | `UNAVAILABLE` până la promovarea unei generații autoritative Retail |
+| Compensation și Finance live | `DEFECT DESCHIS` — trebuie să expună datele acceptate de Retail, inclusiv persoane și P&L `actual/estimated`, fără praguri/head-uri care le ascund |
 | Reconciliere completă, pilot owner, șapte zile de performanță | `POARTĂ 1.0` |
 
 Ținta completă, research-ul ECharts și regulile de execuție Luna/Terra sunt în [Planul integrat](docs/PLAN_DEZVOLTARE_INTEGRAT.md), iar statusul compact este în [Roadmap](ROADMAP.md).
@@ -59,8 +59,8 @@ Modul implicit este `demo`, deci aplicația pornește fără baza de date Retail
 
 Creează prin `ops/postgres/roles-before-migration.sql.template` autorități
 NOLOGIN și login-uri de proces separate. Login-ul analitic are
-`default_transaction_read_only=on` și acces `SELECT` numai la read models
-aprobate; nu primește acces raw la tranzacții. Apoi:
+`default_transaction_read_only=on` și acces `SELECT` numai la read-model-uri
+versionate complete; acestea pot conține toate detaliile business necesare, inclusiv persoane și salarii, fără acces SQL arbitrar la tabelele raw. Apoi:
 
 ```env
 UNIHUB_INSIGHT_DATA_MODE=postgres
@@ -90,7 +90,7 @@ npm run browser:qa
 - [Contracte de date](docs/DATA_CONTRACTS.md)
 - [Sistem de design](docs/DESIGN_SYSTEM.md)
 - [Deploy](docs/DEPLOYMENT.md)
-- [Autorizare și date sensibile](docs/AUTHORIZATION.md)
+- [Autorizare și vizibilitate completă](docs/AUTHORIZATION.md)
 
 ## Principii
 

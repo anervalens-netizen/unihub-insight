@@ -6,11 +6,10 @@ UniHub Insight is the desktop decision cockpit for the UniHub Retail business. I
 
 ## Primary users
 
-- Commercial director / owner — network health, profit, forecast and priorities.
-- Regional Manager — comparison and drill-down across ASM/store/agent scope.
-- ASM / team leadership — store and people performance where authorized.
-- Finance — P&L, cost structure, reconciliation and scenarios.
-- HR / management — workforce and compensation under dedicated permissions.
+- Owner — complete network, person, salary, P&L, forecast and operational analysis.
+- General director — the same complete analytical visibility as the owner.
+
+No module-specific HR, Finance, management or geographical permission narrows data for either authorized user.
 
 ## Core jobs
 
@@ -26,13 +25,13 @@ UniHub Insight is the desktop decision cockpit for the UniHub Retail business. I
 
 | Module | Core question | Target surfaces |
 | --- | --- | --- |
-| Overview | How is the business doing and where should I look? | health, target/forecast, comparisons, profit/cost where authorized, risk, data alerts |
+| Overview | How is the business doing and where should I look? | health, target/forecast, comparisons, profit/cost, risk, data alerts |
 | Monthly Review | What happened in the selected month versus history? | YoY, MoM, 3/6/12-month context, hierarchy, products, returns, numeric XLSX |
 | Sales | What drives sales, pace, mix and transaction quality? | Pace, Trend, Mix, Drivers, Transactions, Calendar |
 | Performance | Which organizational entities are strong, weak or unstable? | hierarchy, Rankings, Distribution, Target matrix, Consistency, Productivity, Visits |
 | Campaigns | How are commercial mechanisms adopted and performing? | Overview, Promo, Incentive, Concurs, Focus, Folii |
 | Workforce | Do staffing, stability and productivity support performance? | People, Movements, Stability, Coverage, Productivity, Visits, Grile |
-| Compensation | How does approved aggregate remuneration relate to performance? | structure, distribution, payroll/sales, payroll/profit, suppression-safe comparison |
+| Compensation | How do individual and aggregate remuneration relate to performance? | complete person detail, salary components, structure, distribution, payroll/sales, payroll/profit and person/team comparison |
 | Finance | Where is revenue converted into profit or lost to cost? | Overview, Trend, Cost structure, Profitability, Reconciliation, Break-even |
 | Planning | What is likely to happen and what changes the outcome? | Current, 12 months, Accuracy, Scenarios, Sensitivity |
 | Custom | Which recurring view does this user need? | blank/template/clone, complete widget editor, targeted sharing, inspect/export |
@@ -60,7 +59,7 @@ A widget defines metric(s) with versions, dimension, time grain, comparison(s), 
 - Charts never rely only on color for meaning.
 - Chart selection follows the business-question matrix in the [integrated plan](PLAN_DEZVOLTARE_INTEGRAT.md); users see only semantically compatible choices.
 - Click/cross-filter, drill path and time selection are serializable in URL and reproducible after reload.
-- Every chart has an accessible description and backing table; sensitive cohorts remain suppressed in chart, inspect and export.
+- Every chart has an accessible description and a complete backing table available to both authorized users; person-level drill, inspect and export preserve the canonical Retail rows.
 - Global Chart Studio keeps governed Executive/Ocean/Vibrant/Accessible/Monochrome presets, density, legend, labels and animation controls without changing metric semantics.
 - Generated explanations and deviation alerts are evidence-backed and versioned; they never state unsupported causality.
 

@@ -18,11 +18,11 @@ This is the current XLSX coverage. CSV currently exists through the generic modu
 - no locale-formatted number is written as text;
 - every sheet freezes its header, uses filters and applies bounded column widths;
 - the exported scope, period, cutoff and data source are included in metadata;
-- sensitive modules preserve the same API capability checks and aggregate-suppression rules as the UI;
+- both allowlisted users receive complete module data, including person-level Compensation and actual/estimated Finance; no cohort or module-capability suppression applies;
 - temporary workbooks are deleted after the response completes;
 - exports are marked private and non-cacheable.
 
-Target contract additions: same analytical snapshot as the widget, paging/bounds, cancellation/deadline, audit, Excel formula-injection protection, sanitized filenames and the same ACL/scope ceiling at download time.
+Target contract additions: same analytical snapshot as the widget, paging/bounds, cancellation/deadline, audit, Excel formula-injection protection and sanitized filenames. Dashboard ACL may control access to a saved layout, but never reduce the business rows exported by an allowlisted user.
 
 ## Workbook layout
 

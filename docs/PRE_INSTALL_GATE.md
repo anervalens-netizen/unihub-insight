@@ -10,8 +10,8 @@ This gate separates work that can be completed in Git from facts that require th
 - Overview plus Sales, Performance, Campaigns, Workforce, Compensation, Finance and Planning contracts.
 - Deterministic demo repositories for every module.
 - Read-only PostgreSQL adapters over canonical Retail reporting sources.
-- Server-side capability matrix and trusted-proxy identity boundary.
-- Compensation aggregate suppression and Retail salary-average threshold.
+- Server-side two-subject allowlist and trusted-proxy identity boundary.
+- Complete person-level Compensation and actual/estimated Finance contracts over the same canonical rows accepted by Retail.
 - Versioned metric/widget contracts and compatible chart enforcement.
 - Personal/shared dashboard persistence with optimistic concurrency.
 - Drag/resize, local filter semantics, inspect-data and CSV export.
@@ -35,13 +35,13 @@ The installation operator must supply:
 The first release is `GO` only when all checks below pass:
 
 - analytics role reports `transaction_read_only=on` and cannot create, update or delete;
-- metadata role cannot read Retail salary/P&L source tables directly;
+- analytics role reads complete versioned salary/P&L contracts without arbitrary raw-table or write privileges;
 - migration registry has no pending, unknown or checksum-mismatched files;
 - unauthenticated requests are redirected by Authentik;
 - forged identity headers without the proxy secret return 401;
-- direct Finance/Compensation endpoints return 403 without their capability;
+- both allowlisted subjects can call all Finance/Compensation endpoints, inspect and exports; a non-allowlisted subject receives 403;
 - network, firm, RM, store and agent control totals reconcile with Retail;
-- Compensation scopes below three people return no values or export rows;
+- Compensation person/KPI/inspect/export controls conserve every canonical Retail salary row, including one- and two-person scopes;
 - `/livez`, `/readyz`, `/metrics` and public UI smoke checks pass;
 - Docker Caddy imports `authentik_forward`, strips/replaces all identity headers and injects the proxy secret only upstream;
 - one rollback drill restores the previous application SHA;
